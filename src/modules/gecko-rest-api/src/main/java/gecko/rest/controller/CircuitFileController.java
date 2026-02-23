@@ -344,4 +344,89 @@ public class CircuitFileController {
         CircuitInfo info = circuitFileService.updateCircuitParameters(circuitId, update);
         return ResponseEntity.ok(info);
     }
+
+    /**
+     * Import a SPICE netlist (.cir) and convert it to a GeckoCIRCUITS circuit.
+     */
+    @PostMapping(value = "/import/spice", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(
+        summary = "Import SPICE netlist",
+        description = "Parse a SPICE .cir netlist and convert it to a GeckoCIRCUITS circuit. "
+                + "The resulting circuit is stored in memory and can be queried, simulated, "
+                + "or exported just like any other loaded circuit. "
+                + "Supported elements: R, L, C, V (DC/AC), I (DC/AC), D. "
+                + "Set encoded=true to provide Base64-encoded content."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "201",
+            description = "SPICE netlist imported and converted successfully",
+            content = @Content(schema = @Schema(implementation = CircuitLoadResponse.class))
+        ),
+        @ApiResponse(
+            responseCode = "400",
+            description = "Invalid SPICE netlist syntax or unsupported elements"
+        )
+    })
+    public ResponseEntity<CircuitLoadResponse> importSpiceNetlist(
+            @Valid @RequestBody SpiceImportRequest request) {
+
+        String content = request.getContent();
+        if (request.isEncoded()) {
+            try {
+                content = new String(java.util.Base64.getDecoder().decode(content),
+                        java.nio.charset.StandardCharsets.UTF_8);
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest().body(
+                        CircuitLoadResponse.failure(request.getFilename(),
+                                "Invalid Base64 encoding: " + e.getMessage()));
+            }
+        }
+
+        CircuitLoadResponse response = circuitFileService.importFromSpice(content, request.getFilename());
+        if ("failed".equals(response.status())) {
+            return ResponseEntity.badRequest().body(response);
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Export a loaded circuit as a GeckoCIRCUITS .ipes file.
+     */
+    @GetMapping("/{circuitId}/export/ipes")
+    @Operation(
+        summary = "Export circuit as .ipes file",
+        description = "Download the gzip-compressed .ipes file for a loaded circuit. "
+                + "Available for circuits that were imported from SPICE or loaded from an .ipes file."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200",
+            description = "Circuit exported successfully",
+            content = @Content(mediaType = "application/octet-stream")
+        ),
+        @ApiResponse(
+            responseCode = "404",
+            description = "Circuit not found"
+        ),
+        @ApiResponse(
+            responseCode = "500",
+            description = "Raw .ipes bytes not available for this circuit"
+        )
+    })
+    public ResponseEntity<byte[]> exportIpes(
+            @Parameter(description = "Circuit ID")
+            @PathVariable String circuitId) {
+
+        byte[] ipesBytes = circuitFileService.exportToIpes(circuitId);
+        if (ipesBytes == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header("Content-Disposition",
+                        "attachment; filename=\"circuit-" + circuitId + ".ipes\"")
+                .body(ipesBytes);
+    }
 }

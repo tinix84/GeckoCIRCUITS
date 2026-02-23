@@ -17,6 +17,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.hamcrest.Matchers.containsString;
 
 /**
  * Unit tests for CircuitFileController using MockMvc.
@@ -261,5 +262,81 @@ class CircuitFileControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.total").value(0))
             .andExpect(jsonPath("$.circuits").isEmpty());
+    }
+
+    // ==================== SPICE import ====================
+
+    @Test
+    void testImportSpiceNetlist_success() throws Exception {
+        CircuitLoadResponse mockResponse = CircuitLoadResponse.success("circuit-spice-1", "rc.cir", 3);
+        when(circuitFileService.importFromSpice(anyString(), anyString())).thenReturn(mockResponse);
+
+        mockMvc.perform(post("/api/v1/circuits/import/spice")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                        "content": "* RC\\nV1 1 0 DC 12\\nR1 1 2 1k\\nC1 2 0 100u\\n.end",
+                        "filename": "rc.cir",
+                        "encoded": false
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.circuitId").value("circuit-spice-1"))
+            .andExpect(jsonPath("$.status").value("loaded"))
+            .andExpect(jsonPath("$.filename").value("rc.cir"))
+            .andExpect(jsonPath("$.componentCount").value(3));
+    }
+
+    @Test
+    void testImportSpiceNetlist_parseError_returnsBadRequest() throws Exception {
+        CircuitLoadResponse mockResponse = CircuitLoadResponse.failure("bad.cir", "SPICE parse error: empty");
+        when(circuitFileService.importFromSpice(anyString(), any())).thenReturn(mockResponse);
+
+        mockMvc.perform(post("/api/v1/circuits/import/spice")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                        "content": "not a valid spice netlist"
+                    }
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.status").value("failed"));
+    }
+
+    @Test
+    void testImportSpiceNetlist_base64Encoded_success() throws Exception {
+        CircuitLoadResponse mockResponse = CircuitLoadResponse.success("circuit-spice-2", "enc.cir", 1);
+        when(circuitFileService.importFromSpice(anyString(), any())).thenReturn(mockResponse);
+
+        // Base64-encode a simple SPICE netlist
+        String spice = "Title\nR1 1 0 1k\n.end";
+        String encoded = java.util.Base64.getEncoder().encodeToString(spice.getBytes());
+
+        mockMvc.perform(post("/api/v1/circuits/import/spice")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"content\":\"" + encoded + "\",\"encoded\":true}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.status").value("loaded"));
+    }
+
+    // ==================== .ipes export ====================
+
+    @Test
+    void testExportIpes_success() throws Exception {
+        byte[] fakeIpesBytes = new byte[]{0x1f, (byte) 0x8b, 0x08, 0x00}; // gzip magic + stub
+        when(circuitFileService.exportToIpes("circuit-123")).thenReturn(fakeIpesBytes);
+
+        mockMvc.perform(get("/api/v1/circuits/circuit-123/export/ipes"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Content-Disposition",
+                    containsString("circuit-123.ipes")));
+    }
+
+    @Test
+    void testExportIpes_notFound() throws Exception {
+        when(circuitFileService.exportToIpes("nonexistent")).thenReturn(null);
+
+        mockMvc.perform(get("/api/v1/circuits/nonexistent/export/ipes"))
+            .andExpect(status().isNotFound());
     }
 }
