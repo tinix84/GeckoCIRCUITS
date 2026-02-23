@@ -31,6 +31,8 @@ import java.awt.datatransfer.Transferable;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.io.BufferedReader;
 import java.io.StringReader;
 import java.util.*;
@@ -56,6 +58,7 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
     static boolean zustandGeaendert = false;  // MS_PKGPROTECT: only used within package - zeigt an, ob 'QuitWithoutSaving' aktiviert werden muss
     //
     private static final double CLICK_RADIUS_RELATIVE = 0.5;  // [0...1]
+    static final int[] ZOOM_LEVELS = {10, 12, 14, 16, 18};
     // Ansicht: verschiedene Varianten -->
     public static final ElementDisplayProperties _lkDisplayMode = new ElementDisplayProperties();
     public static final ElementDisplayProperties _thermDisplayMode = new ElementDisplayProperties();
@@ -631,6 +634,27 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
         this.resetCircuitSheetsForNewFile();
 
         _circuitSheet.setDoubleBuffered(true);
+        _circuitSheet.addMouseWheelListener(new MouseWheelListener() {
+            @Override
+            public void mouseWheelMoved(final MouseWheelEvent e) {
+                final int current = AbstractCircuitSheetComponent.dpixValue.getValue();
+                int idx = 0;
+                int minDist = Integer.MAX_VALUE;
+                for (int i = 0; i < ZOOM_LEVELS.length; i++) {
+                    int dist = Math.abs(ZOOM_LEVELS[i] - current);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        idx = i;
+                    }
+                }
+                if (e.getWheelRotation() < 0) {
+                    idx = Math.min(idx + 1, ZOOM_LEVELS.length - 1);
+                } else {
+                    idx = Math.max(idx - 1, 0);
+                }
+                AbstractCircuitSheetComponent.dpixValue.setValue(ZOOM_LEVELS[idx]);
+            }
+        });
         setSingleton(this);
 
     }
