@@ -218,9 +218,26 @@ public class IpesFileWriter {
     }
 
     private void appendElementBlock(StringBuilder sb, SpiceComponent comp, int index) {
+        GeckoElementDictionary dict = comp.getElementType();
+
         sb.append("<ElementLK>\n");
         sb.append("labelAnfangsKnoten[] /").append(comp.getPositiveNode()).append('\n');
         sb.append("labelEndKnoten[] /").append(comp.getNegativeNode()).append('\n');
+
+        // For multi-terminal elements, additional nodes are appended to the label arrays
+        // using the gecko .ipes /node1/node2 syntax
+        if (dict == GeckoElementDictionary.TRANS || dict == GeckoElementDictionary.OPAMP) {
+            // Secondary/output nodes go to labelEndKnoten
+            for (String extra : comp.getExtraNodes()) {
+                sb.append("labelEndKnoten[] /").append(extra).append('\n');
+            }
+        } else if (dict == GeckoElementDictionary.BJT) {
+            // Base node is an additional XIN terminal
+            for (String extra : comp.getExtraNodes()) {
+                sb.append("labelAnfangsKnoten[] /").append(extra).append('\n');
+            }
+        }
+
         sb.append("enabledShorted 1\n");
         sb.append("parentSheetIdentifier 0\n");
         sb.append("typ ").append(comp.getGeckoTypeId()).append('\n');
@@ -245,22 +262,71 @@ public class IpesFileWriter {
     /**
      * Appends the {@code parameter[]} array for the component.
      *
-     * <p>Parameter layout per component type:</p>
+     * <p>Parameter layout per component type (derived from real .ipes files):</p>
      * <ul>
-     *   <li>R: {@code resistance}</li>
-     *   <li>L: {@code inductance  initialCurrent}</li>
-     *   <li>C: {@code capacitance initialVoltage}</li>
-     *   <li>V/I: {@code subType amplitude freq phase 0 0.5 0 0 0 0 0}</li>
-     *   <li>D: {@code reverseBlockingV forwardVoltage onResistance reverseBlockingV2 …}</li>
+     *   <li>R:     {@code resistance}</li>
+     *   <li>L/Lc:  {@code inductance  initialCurrent}</li>
+     *   <li>C:     {@code capacitance initialVoltage}</li>
+     *   <li>V/I:   {@code subType amplitude freq phase 0 0.5 0 0 0 0 0}</li>
+     *   <li>D:     {@code roff vf ron roff 0 0 0 0 0 0 0 0 1.0}</li>
+     *   <li>S:     {@code ron ron roff 0 0 0 0 0 0 0 0 0 1.0}</li>
+     *   <li>THYR:  {@code roff vf ron roff 0 0 0 0 0 0 0 0}</li>
+     *   <li>IGBT/MOSFET: {@code ron vf roff roff 0 0 -1 -1 1.0 0 0 0 1.0}</li>
+     *   <li>K:     {@code k x1 y1 x2 y2 i1 i2} (positions from layout)</li>
+     *   <li>TRANS: {@code ratio 1 1 0}</li>
+     *   <li>OPAMP: {@code gain Rin Rout freq vlim+ vlim- Ra Rb}</li>
+     *   <li>BJT:   {@code beta backBeta Rbase Remit Rcol vf isNpn}</li>
+     *   <li>LISN:  {@code (no user params)}</li>
      * </ul>
      */
     private void appendParameters(StringBuilder sb, SpiceComponent comp) {
-        switch (comp.getType()) {
+        switch (comp.getElementType()) {
             case R -> sb.append(' ').append(comp.getValue());
-            case L -> sb.append(' ').append(comp.getValue()).append(" 0.0");
+            case L, LC -> sb.append(' ').append(comp.getValue()).append(" 0.0");
             case C -> sb.append(' ').append(comp.getValue()).append(" 0.0");
             case V, I -> appendSourceParameters(sb, comp);
-            case D -> sb.append(" 1.0E7 0.6 0.01 1.0E7 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0");
+            case D -> {
+                double vf = comp.getValue();
+                sb.append(" 1.0E7 ").append(vf).append(" 0.01 1.0E7 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0");
+            }
+            // Ideal switch: ron, ron, roff, state…
+            case S -> {
+                double ron = comp.getValue();
+                sb.append(' ').append(ron)
+                  .append(' ').append(ron)
+                  .append(" 1.0E7 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0");
+            }
+            // Thyristor: roff, vf, ron, roff, …
+            case THYR -> {
+                double vf = comp.getValue2();
+                double ron = comp.getValue();
+                sb.append(" 1.0E7 ").append(vf).append(' ').append(ron)
+                  .append(" 1.0E7 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0");
+            }
+            // IGBT / MOSFET: ron, vf, roff, roff_sat, x, y, -1 -1 1.0 0 0 0 1.0
+            // The third param (0.01) is the saturation resistance (same default as ron)
+            case IGBT, MOSFET -> {
+                double ron = comp.getValue();
+                double vf = comp.getValue2();
+                sb.append(' ').append(ron).append(' ').append(vf)
+                  .append(' ').append(ron) // saturation resistance = same as ron
+                  .append(" 1.0E7 0.0 0.0 -1.0 -1.0 1.0 0.0 0.0 0.0 1.0");
+            }
+            // Mutual coupling: k, and dummy positions (actual positions come from layout)
+            case K -> sb.append(' ').append(comp.getValue()).append(" 0.0 0.0 0.0 0.0 0 0");
+            // Transformer: ratio, w1, w2, polarity
+            case TRANS -> sb.append(' ').append(comp.getValue()).append(" 1.0 1.0 0.0");
+            // Op-amp: gain, Rin, Rout, freq, Vlim+, Vlim-, Ra, Rb
+            case OPAMP -> sb.append(" 1.0E6 1.0E6 1.0 1.0E6 1.0E10 -1.0E10 9.0E5 1.0E5");
+            // BJT: forwardBeta, backBeta, Rbase, Remit, Rcol, vf, isNpn
+            case BJT -> {
+                double beta = comp.getValue();
+                double isNpn = comp.getValue2();
+                sb.append(' ').append(beta)
+                  .append(' ').append(beta / 5.0)
+                  .append(" 1.0 0.01 0.01 0.6 ").append(isNpn);
+            }
+            case LISN -> { /* LISN has no user-settable parameters */ }
         }
     }
 
@@ -275,21 +341,44 @@ public class IpesFileWriter {
     }
 
     /**
-     * Appends the {@code parameterString[]} array (always NIX for converted SPICE circuits).
+     * Appends the {@code parameterString[]} array.
+     *
+     * <p>For gate-controlled switches (S, THYR, IGBT, MOSFET) this stores the
+     * gate signal reference using the gecko convention {@code /<gateName>/NIX_NIX_NIX/0}.
+     * For K (mutual coupling) the two referenced Lc inductor names are stored.</p>
      */
     private void appendParameterStrings(StringBuilder sb, SpiceComponent comp) {
-        sb.append(" /NIX_NIX_NIX/NIX_NIX_NIX/0");
+        GeckoElementDictionary dict = comp.getElementType();
+        if (dict.hasGateSignal && comp.hasGateSignal()) {
+            // Gate-controlled switches: /gateName/NIX_NIX_NIX/0
+            sb.append(" /").append(comp.getGateSignal()).append("/NIX_NIX_NIX/0");
+        } else if (dict == GeckoElementDictionary.K) {
+            // Mutual coupling: /Lc1_name/Lc2_name/1
+            sb.append(" /").append(comp.getPositiveNode())
+              .append('/').append(comp.getNegativeNode()).append("/1");
+        } else {
+            sb.append(" /NIX_NIX_NIX/NIX_NIX_NIX/0");
+        }
     }
 
     /**
-     * Appends the {@code nameOpt[]} array (all NIX for converted SPICE circuits).
+     * Appends the {@code nameOpt[]} array (all NIX for converted SPICE/Gecko .cir circuits).
+     * The count must match the number of user parameters for each type
+     * (verified against real .ipes files from the education examples).
      */
     private void appendNameOpt(StringBuilder sb, SpiceComponent comp) {
-        int count = switch (comp.getType()) {
+        int count = switch (comp.getElementType()) {
             case R -> 3;
-            case L, C -> 6;
+            case L, LC -> 5;  // L and Lc (typ 2 and 12): 5 nameOpt entries
+            case C -> 11;
             case V, I -> 15;
-            case D -> 13;
+            case D, S, IGBT, MOSFET -> 13;
+            case THYR -> 12;
+            case K -> 7;
+            case TRANS -> 4;
+            case OPAMP -> 8;
+            case BJT -> 7;
+            case LISN -> 0;
         };
         sb.append(" /NIX_NIX_NIX".repeat(count));
     }

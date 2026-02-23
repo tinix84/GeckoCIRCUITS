@@ -80,7 +80,7 @@ class SpiceNetlistParserTest {
         List<SpiceComponent> comps = netlist.getComponents();
         assertEquals(1, comps.size());
         SpiceComponent r = comps.get(0);
-        assertEquals(SpiceComponent.Type.R, r.getType());
+        assertEquals(GeckoElementDictionary.R, r.getElementType());
         assertEquals("R1", r.getName());
         assertEquals("1", r.getPositiveNode());
         assertEquals("0", r.getNegativeNode());
@@ -105,7 +105,7 @@ class SpiceNetlistParserTest {
     void parse_inductor_millihenry() throws Exception {
         SpiceNetlist netlist = parser.parse("Title\nL1 2 3 10m\n.end");
         SpiceComponent l = netlist.getComponents().get(0);
-        assertEquals(SpiceComponent.Type.L, l.getType());
+        assertEquals(GeckoElementDictionary.L, l.getElementType());
         assertEquals(0.01, l.getValue(), 1e-12);
         assertEquals(2, l.getGeckoTypeId());
     }
@@ -122,7 +122,7 @@ class SpiceNetlistParserTest {
     void parse_capacitor_microfarad() throws Exception {
         SpiceNetlist netlist = parser.parse("Title\nC1 3 0 100u\n.end");
         SpiceComponent c = netlist.getComponents().get(0);
-        assertEquals(SpiceComponent.Type.C, c.getType());
+        assertEquals(GeckoElementDictionary.C, c.getElementType());
         assertEquals(100e-6, c.getValue(), 1e-15);
         assertEquals(3, c.getGeckoTypeId());
     }
@@ -139,7 +139,7 @@ class SpiceNetlistParserTest {
     void parse_voltageSource_dcKeyword() throws Exception {
         SpiceNetlist netlist = parser.parse("Title\nV1 1 0 DC 12\n.end");
         SpiceComponent v = netlist.getComponents().get(0);
-        assertEquals(SpiceComponent.Type.V, v.getType());
+        assertEquals(GeckoElementDictionary.V, v.getElementType());
         assertEquals(SpiceComponent.SourceMode.DC, v.getSourceMode());
         assertEquals(12.0, v.getDcValue(), 1e-9);
         assertEquals(4, v.getGeckoTypeId());
@@ -177,7 +177,7 @@ class SpiceNetlistParserTest {
     void parse_currentSource_dc() throws Exception {
         SpiceNetlist netlist = parser.parse("Title\nI1 1 0 DC 2.5\n.end");
         SpiceComponent i = netlist.getComponents().get(0);
-        assertEquals(SpiceComponent.Type.I, i.getType());
+        assertEquals(GeckoElementDictionary.I, i.getElementType());
         assertEquals(2.5, i.getDcValue(), 1e-9);
         assertEquals(5, i.getGeckoTypeId());
     }
@@ -188,7 +188,7 @@ class SpiceNetlistParserTest {
     void parse_diode_defaultForwardVoltage() throws Exception {
         SpiceNetlist netlist = parser.parse("Title\nD1 A K 1N4148\n.end");
         SpiceComponent d = netlist.getComponents().get(0);
-        assertEquals(SpiceComponent.Type.D, d.getType());
+        assertEquals(GeckoElementDictionary.D, d.getElementType());
         assertEquals("A", d.getPositiveNode());
         assertEquals("K", d.getNegativeNode());
         assertEquals(0.6, d.getValue(), 1e-9);
@@ -235,19 +235,19 @@ class SpiceNetlistParserTest {
         assertEquals(4, netlist.getComponentCount());
 
         List<SpiceComponent> comps = netlist.getComponents();
-        assertEquals(SpiceComponent.Type.V, comps.get(0).getType());
-        assertEquals(SpiceComponent.Type.R, comps.get(1).getType());
-        assertEquals(SpiceComponent.Type.L, comps.get(2).getType());
-        assertEquals(SpiceComponent.Type.C, comps.get(3).getType());
+        assertEquals(GeckoElementDictionary.V, comps.get(0).getElementType());
+        assertEquals(GeckoElementDictionary.R, comps.get(1).getElementType());
+        assertEquals(GeckoElementDictionary.L, comps.get(2).getElementType());
+        assertEquals(GeckoElementDictionary.C, comps.get(3).getElementType());
     }
 
     @Test
     void parse_unsupportedElements_silentlyIgnored() throws Exception {
-        // Transistors (Q, M), subcircuits (X), etc. should be silently skipped
-        String cir = "Title\nQ1 C B E NPN\nM1 D G S B NMOS\nR1 1 0 1k\n.end";
+        // Standard SPICE Q (BJT) and X (subcircuit) are not in gecko dict → skipped
+        String cir = "Title\nX1 A B subckt\nR1 1 0 1k\n.end";
         SpiceNetlist netlist = parser.parse(cir);
         assertEquals(1, netlist.getComponentCount());
-        assertEquals(SpiceComponent.Type.R, netlist.getComponents().get(0).getType());
+        assertEquals(GeckoElementDictionary.R, netlist.getComponents().get(0).getElementType());
     }
 
     // ==================== SI prefix parsing ====================
@@ -269,4 +269,194 @@ class SpiceNetlistParserTest {
     void parseValue_siPrefixes(String input, double expected) {
         assertEquals(expected, SpiceNetlistParser.parseValue(input), Math.abs(expected) * 1e-9 + 1e-30);
     }
+
+    // ==================== Gecko-dialect: gate-controlled switches ====================
+
+    @Test
+    void parse_idealSwitch_withGateSignal() throws Exception {
+        SpiceNetlist netlist = parser.parse("Title\nS1 in out GATE.1 0.01\n.end");
+        SpiceComponent s = netlist.getComponents().get(0);
+        assertEquals(GeckoElementDictionary.S, s.getElementType());
+        assertEquals("S1", s.getName());
+        assertEquals("in", s.getPositiveNode());
+        assertEquals("out", s.getNegativeNode());
+        assertEquals("GATE.1", s.getGateSignal());
+        assertEquals(0.01, s.getValue(), 1e-12);
+        assertEquals(7, s.getGeckoTypeId());
+        assertTrue(s.hasGateSignal());
+    }
+
+    @Test
+    void parse_idealSwitch_defaultRon_whenNotSpecified() throws Exception {
+        SpiceNetlist netlist = parser.parse("Title\nS1 a b GATE.1\n.end");
+        SpiceComponent s = netlist.getComponents().get(0);
+        assertEquals(GeckoElementDictionary.S, s.getElementType());
+        assertEquals("GATE.1", s.getGateSignal());
+        assertEquals(0.01, s.getValue(), 1e-12); // default ron
+    }
+
+    @Test
+    void parse_thyristor_withGateAndParams() throws Exception {
+        SpiceNetlist netlist = parser.parse("Title\nTHYR1 anode cathode GATE.2 0.8 0.005\n.end");
+        SpiceComponent t = netlist.getComponents().get(0);
+        assertEquals(GeckoElementDictionary.THYR, t.getElementType());
+        assertEquals("THYR1", t.getName());
+        assertEquals("anode", t.getPositiveNode());
+        assertEquals("cathode", t.getNegativeNode());
+        assertEquals("GATE.2", t.getGateSignal());
+        assertEquals(0.8, t.getValue2(), 1e-9); // vf
+        assertEquals(0.005, t.getValue(), 1e-9); // ron
+        assertEquals(8, t.getGeckoTypeId());
+    }
+
+    @Test
+    void parse_igbt_withGateAndParams() throws Exception {
+        SpiceNetlist netlist = parser.parse("Title\nIGBT1 C E GATE.3 0.6 0.01\n.end");
+        SpiceComponent igbt = netlist.getComponents().get(0);
+        assertEquals(GeckoElementDictionary.IGBT, igbt.getElementType());
+        assertEquals("C", igbt.getPositiveNode());
+        assertEquals("E", igbt.getNegativeNode());
+        assertEquals("GATE.3", igbt.getGateSignal());
+        assertEquals(0.6, igbt.getValue2(), 1e-9); // vf
+        assertEquals(0.01, igbt.getValue(), 1e-9); // ron
+        assertEquals(10, igbt.getGeckoTypeId());
+    }
+
+    @Test
+    void parse_mosfet_withGateSignal() throws Exception {
+        SpiceNetlist netlist = parser.parse("Title\nMOSFET1 drain source GATE.4\n.end");
+        SpiceComponent m = netlist.getComponents().get(0);
+        assertEquals(GeckoElementDictionary.MOSFET, m.getElementType());
+        assertEquals("GATE.4", m.getGateSignal());
+        assertEquals(28, m.getGeckoTypeId());
+    }
+
+    // ==================== Gecko-dialect: BJT ====================
+
+    @Test
+    void parse_bjt_npn() throws Exception {
+        SpiceNetlist netlist = parser.parse("Title\nBJT1 collector emitter base NPN 200\n.end");
+        SpiceComponent bjt = netlist.getComponents().get(0);
+        assertEquals(GeckoElementDictionary.BJT, bjt.getElementType());
+        assertEquals("collector", bjt.getPositiveNode());
+        assertEquals("emitter", bjt.getNegativeNode());
+        assertEquals("base", bjt.getExtraNodes().get(0));
+        assertEquals(200.0, bjt.getValue(), 1e-9); // beta
+        assertEquals(1.0, bjt.getValue2(), 1e-9); // isNpn = 1.0
+        assertEquals(33, bjt.getGeckoTypeId());
+    }
+
+    @Test
+    void parse_bjt_pnp() throws Exception {
+        SpiceNetlist netlist = parser.parse("Title\nBJT1 c e b PNP 50\n.end");
+        SpiceComponent bjt = netlist.getComponents().get(0);
+        assertEquals(0.0, bjt.getValue2(), 1e-9); // isNpn = 0.0 (PNP)
+    }
+
+    // ==================== Gecko-dialect: coupled inductors ====================
+
+    @Test
+    void parse_coupledInductor_lc() throws Exception {
+        SpiceNetlist netlist = parser.parse("Title\nLc1 n1 n2 5m\n.end");
+        SpiceComponent lc = netlist.getComponents().get(0);
+        assertEquals(GeckoElementDictionary.LC, lc.getElementType());
+        assertEquals(0.005, lc.getValue(), 1e-9);
+        assertEquals(12, lc.getGeckoTypeId());
+    }
+
+    @Test
+    void parse_mutualCoupling_k() throws Exception {
+        SpiceNetlist netlist = parser.parse("Title\nK1 Lc1 Lc2 0.85\n.end");
+        SpiceComponent k = netlist.getComponents().get(0);
+        assertEquals(GeckoElementDictionary.K, k.getElementType());
+        assertEquals("Lc1", k.getPositiveNode()); // first coupled inductor
+        assertEquals("Lc2", k.getNegativeNode()); // second coupled inductor
+        assertEquals(0.85, k.getValue(), 1e-9);   // coupling coefficient
+        assertNull(k.getGateSignal());
+        assertEquals(9, k.getGeckoTypeId());
+    }
+
+    // ==================== Gecko-dialect: transformer ====================
+
+    @Test
+    void parse_transformer_withRatio() throws Exception {
+        SpiceNetlist netlist = parser.parse("Title\nTRANS1 p+ p- s+ s- 10\n.end");
+        SpiceComponent trans = netlist.getComponents().get(0);
+        assertEquals(GeckoElementDictionary.TRANS, trans.getElementType());
+        assertEquals("p+", trans.getPositiveNode());
+        assertEquals("p-", trans.getNegativeNode());
+        assertEquals("s+", trans.getExtraNodes().get(0));
+        assertEquals("s-", trans.getExtraNodes().get(1));
+        assertEquals(10.0, trans.getValue(), 1e-9);
+        assertEquals(23, trans.getGeckoTypeId());
+    }
+
+    @Test
+    void parse_transformer_defaultRatio() throws Exception {
+        SpiceNetlist netlist = parser.parse("Title\nTRANS1 p+ p- s+ s-\n.end");
+        SpiceComponent trans = netlist.getComponents().get(0);
+        assertEquals(1.0, trans.getValue(), 1e-9); // default 1:1
+    }
+
+    // ==================== Gecko-dialect: op-amp ====================
+
+    @Test
+    void parse_opamp() throws Exception {
+        SpiceNetlist netlist = parser.parse("Title\nOPAMP1 in+ in- out ref\n.end");
+        SpiceComponent op = netlist.getComponents().get(0);
+        assertEquals(GeckoElementDictionary.OPAMP, op.getElementType());
+        assertEquals("in+", op.getPositiveNode());
+        assertEquals("in-", op.getNegativeNode());
+        assertEquals("out", op.getExtraNodes().get(0));
+        assertEquals("ref", op.getExtraNodes().get(1));
+        assertEquals(22, op.getGeckoTypeId());
+    }
+
+    // ==================== Gecko-dialect: LISN ====================
+
+    @Test
+    void parse_lisn() throws Exception {
+        SpiceNetlist netlist = parser.parse("Title\nLISN1 a1 a2 a3 b1 b2 b3\n.end");
+        SpiceComponent lisn = netlist.getComponents().get(0);
+        assertEquals(GeckoElementDictionary.LISN, lisn.getElementType());
+        assertEquals("a1", lisn.getPositiveNode());
+        assertEquals(13, lisn.getGeckoTypeId());
+    }
+
+    // ==================== GeckoElementDictionary lookups ====================
+
+    @Test
+    void geckoDict_fromElementName_resistor() {
+        assertEquals(GeckoElementDictionary.R, GeckoElementDictionary.fromElementName("R1"));
+        assertEquals(GeckoElementDictionary.R, GeckoElementDictionary.fromElementName("Rload"));
+    }
+
+    @Test
+    void geckoDict_fromElementName_igbtBeatsCurrentSource() {
+        // IGBT starts with 'I' but should win over current source 'I' keyword
+        assertEquals(GeckoElementDictionary.IGBT, GeckoElementDictionary.fromElementName("IGBT1"));
+    }
+
+    @Test
+    void geckoDict_fromElementName_lcBeatsL() {
+        // Lc should win over plain L
+        assertEquals(GeckoElementDictionary.LC, GeckoElementDictionary.fromElementName("Lc1"));
+        assertEquals(GeckoElementDictionary.L, GeckoElementDictionary.fromElementName("L1"));
+    }
+
+    @Test
+    void geckoDict_fromGeckoTypeId_roundtrip() {
+        for (GeckoElementDictionary entry : GeckoElementDictionary.values()) {
+            assertEquals(entry, GeckoElementDictionary.fromGeckoTypeId(entry.geckoTypeId));
+        }
+    }
+
+    @Test
+    void geckoDict_formatDescription_containsKeyword() {
+        for (GeckoElementDictionary entry : GeckoElementDictionary.values()) {
+            assertTrue(entry.formatDescription().startsWith(entry.keyword),
+                    "Format should start with keyword: " + entry.keyword);
+        }
+    }
+
 }
