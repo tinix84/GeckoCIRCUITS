@@ -251,7 +251,7 @@ public class CircuitFileService {
             // Generate unique circuit ID
             String newCircuitId = UUID.randomUUID().toString();
 
-            // Create parsed circuit with timestamp (cloned circuit has no raw bytes)
+            // Create parsed circuit with timestamp (cloned circuit has no raw .ipes bytes, so set to null)
             ParsedCircuit newParsed = new ParsedCircuit(
                 sourceParsed.filename,
                 newModel,
@@ -368,8 +368,6 @@ public class CircuitFileService {
         }
         return raw;
     }
-
-    // ========== Private Helper Methods ==========
 
     private CircuitLoadResponse loadCircuitFromBytes(byte[] content, String filename) {
         try {

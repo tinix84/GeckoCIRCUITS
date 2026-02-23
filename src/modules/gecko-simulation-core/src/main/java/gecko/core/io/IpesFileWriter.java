@@ -268,10 +268,9 @@ public class IpesFileWriter {
         boolean isAc = comp.getSourceMode() == SpiceComponent.SourceMode.AC;
         double subType = isAc ? SOURCE_SUBTYPE_AC : SOURCE_SUBTYPE_DC;
         double amplitude = isAc ? comp.getAcAmplitude() : comp.getDcValue();
-        double freq = isAc ? DEFAULT_AC_FREQ : DEFAULT_AC_FREQ;
         sb.append(' ').append(subType)
           .append(' ').append(amplitude)
-          .append(' ').append(freq)
+          .append(' ').append(DEFAULT_AC_FREQ)
           .append(" 0.0 0.0 0.5 0.0 0.0 0.0 0.0 0.0");
     }
 
