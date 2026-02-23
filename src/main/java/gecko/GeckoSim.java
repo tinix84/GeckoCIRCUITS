@@ -110,6 +110,16 @@ public class GeckoSim {
             }
         }
 
+        // Handle --convert-ltspice CLI flag (headless, no GUI required)
+        for (int i = 0; i < args.length; i++) {
+            if ("--convert-ltspice".equalsIgnoreCase(args[i])) {
+                // Collect remaining args as the LtspiceConversionCli argument list
+                String[] cliArgs = java.util.Arrays.copyOfRange(args, i + 1, args.length);
+                gecko.examples.LtspiceConversionCli.main(cliArgs);
+                return;
+            }
+        }
+
         // Also check command line args for -headless flag
         for (String arg : args) {
             if ("-headless".equalsIgnoreCase(arg) || "--headless".equalsIgnoreCase(arg)) {

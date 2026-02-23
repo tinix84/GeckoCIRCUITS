@@ -95,7 +95,7 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
     public JCheckBoxMenuItem vItemShowParTHERM, vItemShowFlowTHERM, vItemShowNameTHERM, vItemShowTextLineTHERM;
     JMenuItem mItemNew, mItemOpen, mItemSave, mItemSaveAs, mItemExit, mItemSaveView, mItemMemorySettings, mItemRemoteSettings,
             mItemUpdateSettings;
-    private JMenuItem mItemCheckModel, mItemFindString, mItemExport, mItemImport, mItemImportFromFile, mItemSetPar, mItemSetOrder;
+    private JMenuItem mItemCheckModel, mItemFindString, mItemExport, mItemImport, mItemImportFromFile, mItemImportLtspice, mItemSetPar, mItemSetOrder;
     private JCheckBoxMenuItem mItemConnectorTest;
     private JMenuItem mItemRECENT_1, mItemRECENT_2, mItemRECENT_3, mItemRECENT_4;
     private JMenuItem mItemUndo, mItemRedo, mItemCopy, mItemMove, mItemDelete, mItemEscape, mItemSelectAll, mItemDisable, mItemDisableShort;
@@ -266,6 +266,10 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
         mItemNew.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_N, KeyEvent.CTRL_DOWN_MASK));
         fileMenu.add(mItemOpen);
         mItemOpen.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_O, KeyEvent.CTRL_DOWN_MASK));
+        mItemImportLtspice = GuiFabric.getJMenuItem(I18nKeys.IMPORT_FROM_LTSPICE);
+        mItemImportLtspice.setActionCommand("ImportLtspice");
+        mItemImportLtspice.addActionListener(this);
+        fileMenu.add(mItemImportLtspice);
         fileMenu.add(mItemSave);
         mItemSave.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, KeyEvent.CTRL_DOWN_MASK));
         fileMenu.add(mItemSaveAs);
@@ -982,6 +986,61 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
         }
     }
 
+    /**
+     * Opens a file chooser for LTspice .asc files, converts the selected file to
+     * GeckoCIRCUITS .ipes format, and loads the result into the editor.
+     * Conversion warnings are shown in a dialog after loading.
+     */
+    private void importLtspiceFile() {
+        File currentDirectory = null;
+        try {
+            currentDirectory = new File(GlobalFilePathes.DATNAM).getParentFile();
+        } catch (Exception e) {
+            currentDirectory = null;
+        }
+
+        GeckoFileChooser fileChooser = GeckoFileChooser.createOpenFileChooser(
+                ".asc", "LTspice Schematic Files (*.asc)", this, currentDirectory);
+        if (fileChooser.getUserResult() == GeckoFileChooser.FileChooserResult.CANCEL) {
+            return;
+        }
+
+        File ascFile = fileChooser.getFileWithCheckedEnding();
+        try {
+            gecko.core.io.ltspice.LtspiceAscParser parser = new gecko.core.io.ltspice.LtspiceAscParser();
+            gecko.core.io.ltspice.LtspiceCircuit ltCircuit = parser.parse(ascFile);
+
+            gecko.core.io.ltspice.AscToIpesConverter converter = new gecko.core.io.ltspice.AscToIpesConverter();
+            gecko.core.io.ltspice.AscToIpesConverter.ConversionResult result = converter.convert(ltCircuit);
+
+            gecko.core.io.IpesFileWriter writer = new gecko.core.io.IpesFileWriter();
+            byte[] ipesBytes = writer.writePlainText(result.getModel());
+
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(new ByteArrayInputStream(ipesBytes), java.nio.charset.StandardCharsets.UTF_8));
+            openFile(reader);
+            setAnsicht();
+
+            if (!result.getWarnings().isEmpty()) {
+                StringBuilder sb = new StringBuilder();
+                sb.append("Conversion of '").append(ascFile.getName()).append("' completed with ").append(result.getWarnings().size()).append(" warning(s):\n\n");
+                for (String w : result.getWarnings()) {
+                    sb.append("• ").append(w).append("\n");
+                }
+                JOptionPane.showMessageDialog(this, sb.toString(),
+                        "LTspice Import Warnings", JOptionPane.WARNING_MESSAGE);
+            }
+        } catch (gecko.core.io.ltspice.LtspiceAscParser.AscParseException e) {
+            JOptionPane.showMessageDialog(this,
+                    "Failed to parse LTspice file:\n" + e.getMessage(),
+                    "LTspice Import Error", JOptionPane.ERROR_MESSAGE);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this,
+                    "I/O error reading file:\n" + e.getMessage(),
+                    "LTspice Import Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
     private void setAnsicht() {
         // set view menu accordingly
         vItemShowNameLK.setState(SchematicEditor2._lkDisplayMode.showName);
@@ -1161,6 +1220,8 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
                     this.openFileDialog();
                     this.setAnsicht();
                 }
+            } else if (befehl.equals("ImportLtspice")) {
+                importLtspiceFile();
             } else if (befehl.equals("Save")) {
                 this.saveFile();
             } else if (befehl.equals("Save As")) {
