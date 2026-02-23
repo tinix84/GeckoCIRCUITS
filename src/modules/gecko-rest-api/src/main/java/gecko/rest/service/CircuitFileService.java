@@ -2,7 +2,10 @@ package gecko.rest.service;
 
 import gecko.core.io.CircuitFileParser;
 import gecko.core.io.CircuitModel;
+import gecko.core.io.IpesFileWriter;
 import gecko.core.io.ParameterOverrideApplicator;
+import gecko.core.io.SpiceNetlist;
+import gecko.core.io.SpiceNetlistParser;
 import gecko.rest.model.circuit.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -24,9 +27,12 @@ import java.util.stream.Stream;
 public class CircuitFileService {
 
     private final CircuitFileParser parser = new CircuitFileParser();
+    private final SpiceNetlistParser spiceParser = new SpiceNetlistParser();
+    private final IpesFileWriter ipesWriter = new IpesFileWriter();
 
     // In-memory storage of parsed circuits (circuit ID -> parsed data)
     private final Map<String, ParsedCircuit> circuits = new ConcurrentHashMap<>();
+
 
     /**
      * Load circuit from multipart file upload.
@@ -245,11 +251,12 @@ public class CircuitFileService {
             // Generate unique circuit ID
             String newCircuitId = UUID.randomUUID().toString();
 
-            // Create parsed circuit with timestamp
+            // Create parsed circuit with timestamp (cloned circuit has no raw .ipes bytes, so set to null)
             ParsedCircuit newParsed = new ParsedCircuit(
                 sourceParsed.filename,
                 newModel,
-                Instant.now()
+                Instant.now(),
+                null
             );
 
             // Store in memory
@@ -307,23 +314,84 @@ public class CircuitFileService {
 
     // ========== Private Helper Methods ==========
 
+    /**
+     * Imports a SPICE netlist (.cir) and converts it to a GeckoCIRCUITS circuit.
+     *
+     * <p>The SPICE text is parsed, converted to .ipes format, then parsed again
+     * using {@link CircuitFileParser} so the result is stored identically to any
+     * other loaded circuit and supports all existing endpoints.</p>
+     *
+     * @param spiceContent the raw SPICE netlist text (not Base64)
+     * @param filename     original filename (used for the circuit name)
+     * @return load response with the new circuit ID, or a failure response
+     */
+    public CircuitLoadResponse importFromSpice(String spiceContent, String filename) {
+        try {
+            SpiceNetlist netlist = spiceParser.parse(spiceContent);
+            byte[] ipesBytes = ipesWriter.write(netlist);
+            String displayName = (filename != null && !filename.isBlank()) ? filename
+                    : (netlist.getTitle().isBlank() ? "spice_import.ipes" : netlist.getTitle() + ".ipes");
+            return loadCircuitFromBytes(ipesBytes, displayName);
+        } catch (SpiceNetlistParser.SpiceParseException e) {
+            String name = (filename != null) ? filename : "spice_import.cir";
+            return CircuitLoadResponse.failure(name, "SPICE parse error: " + e.getMessage());
+        } catch (IOException e) {
+            String name = (filename != null) ? filename : "spice_import.cir";
+            return CircuitLoadResponse.failure(name, "Failed to generate .ipes: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Exports a loaded circuit as a GeckoCIRCUITS {@code .ipes} file (gzip-compressed bytes).
+     *
+     * <p>Only circuits that were originally imported from SPICE can be regenerated
+     * via this method; circuits loaded from existing .ipes files do not retain the
+     * original compressed bytes, so this method re-generates the .ipes from the
+     * in-memory {@link CircuitModel}.</p>
+     *
+     * @param circuitId the circuit ID to export
+     * @return the gzip-compressed .ipes file content, or {@code null} if not found
+     * @throws ResponseStatusException 500 if serialization fails
+     */
+    public byte[] exportToIpes(String circuitId) {
+        ParsedCircuit parsed = circuits.get(circuitId);
+        if (parsed == null) {
+            return null;
+        }
+        // Return the stored raw bytes if available, otherwise indicate unsupported
+        byte[] raw = parsed.rawIpesBytes;
+        if (raw == null) {
+            throw new ResponseStatusException(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Raw .ipes bytes not available for circuit: " + circuitId
+            );
+        }
+        return raw;
+    }
+
     private CircuitLoadResponse loadCircuitFromBytes(byte[] content, String filename) {
         try {
-            // Parse using CircuitFileParser
+            // Parse using CircuitFileParser - auto-detect gzip
             CircuitModel model;
             try (ByteArrayInputStream bais = new ByteArrayInputStream(content)) {
-                model = parser.parse(bais, filename);
+                // Check for gzip magic bytes and decompress if needed
+                if (content.length >= 2
+                        && (content[0] & 0xFF) == 0x1F
+                        && (content[1] & 0xFF) == 0x8B) {
+                    try (java.util.zip.GZIPInputStream gis =
+                                 new java.util.zip.GZIPInputStream(bais)) {
+                        model = parser.parse(gis, filename);
+                    }
+                } else {
+                    model = parser.parse(bais, filename);
+                }
             }
 
             // Generate unique circuit ID
             String circuitId = UUID.randomUUID().toString();
 
-            // Create parsed circuit with timestamp
-            ParsedCircuit parsed = new ParsedCircuit(
-                filename,
-                model,
-                Instant.now()
-            );
+            // Create parsed circuit with timestamp; store raw bytes for later download
+            ParsedCircuit parsed = new ParsedCircuit(filename, model, Instant.now(), content);
 
             // Store in memory
             circuits.put(circuitId, parsed);
@@ -466,9 +534,18 @@ public class CircuitFileService {
 
     // ========== Internal Data Structure ==========
 
-    private record ParsedCircuit(
-        String filename,
-        CircuitModel model,
-        Instant loadedAt
-    ) {}
+    private static final class ParsedCircuit {
+        final String filename;
+        final CircuitModel model;
+        final Instant loadedAt;
+        /** Raw gzip-compressed .ipes bytes; may be null for circuits loaded from byte arrays. */
+        final byte[] rawIpesBytes;
+
+        ParsedCircuit(String filename, CircuitModel model, Instant loadedAt, byte[] rawIpesBytes) {
+            this.filename = filename;
+            this.model = model;
+            this.loadedAt = loadedAt;
+            this.rawIpesBytes = rawIpesBytes;
+        }
+    }
 }

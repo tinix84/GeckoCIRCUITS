@@ -73,8 +73,8 @@ class CircuitFileE2ETest {
         assertThat(componentsResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(componentsResponse.getBody()).isNotNull();
         assertThat(componentsResponse.getBody().circuitId()).isEqualTo(circuitId);
-        // Note: Component parsing not implemented yet, so list will be empty
-        assertThat(componentsResponse.getBody().components()).isEmpty();
+        // test-circuit.ipes has 12 circuit elements (gzip decompression now works correctly)
+        assertThat(componentsResponse.getBody().components()).isNotEmpty();
 
         // 4. Validate circuit
         ResponseEntity<ValidationResponse> validationResponse = restTemplate.getForEntity(
