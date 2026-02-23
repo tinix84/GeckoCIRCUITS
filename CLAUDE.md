@@ -33,9 +33,9 @@ geckocircuits/dev ──PR──> geckocircuits/main
    hotfix PRs (e.g., #49)
 ```
 
-- `tinix84/dev` → `tinix84/main`: via PR #36, gated by 21 regression tests (1% tolerance vs v2.02 golden refs)
+- `tinix84/dev` → `tinix84/main`: via PR, gated by 21 regression tests (1% tolerance vs v2.02 golden refs)
 - `tinix84/main` → `main_gecko2026`: automated via `.github/workflows/sync-to-upstream.yml` on `v*` tags (requires `UPSTREAM_PAT` secret)
-- `geckocircuits/dev` → `geckocircuits/main`: via PR #50 (hotfixes + regression framework ported to `ch.technokrat.gecko`)
+- `geckocircuits/dev` → `geckocircuits/main`: via PR (hotfixes + regression framework ported to `ch.technokrat.gecko`)
 - Community → `main_gecko2026`: via PR with CI gates
 - Community → `geckocircuits/main`: via PR, must not break v2.02 compatibility
 
@@ -46,13 +46,19 @@ geckocircuits/dev ──PR──> geckocircuits/main
 | geckocircuits/main, geckocircuits/dev | `ch.technokrat.gecko` | Java 8 | Original package structure, v2.02 era |
 | tinix84/dev, tinix84/main, main_gecko2026 | `gecko` | Java 21 | Refactored package (post-v2.02) |
 
-### PR Status
+### Archive Branches
+
+| Branch | SHA | Purpose |
+|--------|-----|---------|
+| [geckocircuits/main_gecko2026_old](https://github.com/geckocircuits/GeckoCIRCUITS/tree/main_gecko2026_old) | `fde75701` | Backup of original `main_gecko2026` (`ch.technokrat.gecko` package, pre-restructure) |
+
+### PR History
 
 | PR | Repo | Status | Description |
 |----|------|--------|-------------|
-| [#36](https://github.com/tinix84/GeckoCIRCUITS/pull/36) | tinix84 | Open | dev → main: regression framework + bug #48/#49 fixes |
+| [#36](https://github.com/tinix84/GeckoCIRCUITS/pull/36) | tinix84 | Merged | dev → main: regression framework + bug #48/#49 fixes |
 | [#49](https://github.com/geckocircuits/GeckoCIRCUITS/pull/49) | geckocircuits | Merged → dev | Swing thread safety + daemon thread + phase normalization |
-| [#50](https://github.com/geckocircuits/GeckoCIRCUITS/pull/50) | geckocircuits | Open | dev → main: PR #49 + regression framework (ch.technokrat.gecko) |
+| [#50](https://github.com/geckocircuits/GeckoCIRCUITS/pull/50) | geckocircuits | Merged | dev → main: PR #49 + regression framework (ch.technokrat.gecko) |
 
 ## Build & Test
 ```bash
