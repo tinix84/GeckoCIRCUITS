@@ -391,6 +391,585 @@ public final class SyntheticCircuitBuilder {
     }
 
     // ========================================================================
+    // C7: RLC Series — Vin → R → L → C → GND
+    // ========================================================================
+
+    /**
+     * Creates a series RLC circuit driven by a DC voltage source.
+     *
+     * <pre>
+     * Topology:
+     *   Vin (LK_U, DC) ──[node1]── R ──[node2]── L ──[node3]── C ──[GND]
+     * </pre>
+     *
+     * Elements: [0]=Vin, [1]=R, [2]=L, [3]=C
+     * Nodes: 0=GND, 1=Vin+, 2=R-L junction, 3=L-C junction (capacitor voltage)
+     *
+     * @param vin input voltage [V]
+     * @param r   resistance [Ω]
+     * @param l   inductance [H]
+     * @param c   capacitance [F]
+     * @return configured CircuitNetlist
+     */
+    public static CircuitNetlist rlcSeriesCircuit(double vin, double r, double l, double c) {
+        int elementCount = 4;
+        int maxNode = 3;
+        int maxVSrc = 1;
+
+        CircuitTypCore[] types = {CircuitTypCore.LK_U, CircuitTypCore.LK_R,
+                CircuitTypCore.LK_L, CircuitTypCore.LK_C};
+        int[] nodeX = {1, 1, 2, 3};
+        int[] nodeY = {0, 2, 3, 0};
+        int[] vSrcNr = {1, -1, -1, -1};
+
+        double[][] params = new double[elementCount][];
+        params[0] = makeParams();
+        params[0][0] = SourceType.QUELLE_DC_NEW;
+        params[0][1] = vin;
+
+        params[1] = makeParams();
+        params[1][0] = r;
+
+        params[2] = makeParams();
+        params[2][0] = l;
+
+        params[3] = makeParams();
+        params[3][0] = c;
+        params[3][6] = c;
+        params[3][7] = c;
+        params[3][10] = 0.0;
+
+        return buildNetlist(types, nodeX, nodeY, vSrcNr, params, maxNode, maxVSrc,
+                new String[]{"V_in", "R", "L", "C"});
+    }
+
+    // ========================================================================
+    // C8: RLC Parallel — Vin → Rsrc → node → (R || L || C) → GND
+    // ========================================================================
+
+    /**
+     * Creates a parallel RLC circuit with a source resistor.
+     *
+     * <pre>
+     * Topology:
+     *   Vin (LK_U, DC) ──[node1]── Rsrc ──[node2]── R ──[GND]
+     *                                        │── L ──[GND]
+     *                                        │── C ──[GND]
+     * </pre>
+     *
+     * Elements: [0]=Vin, [1]=Rsrc, [2]=R, [3]=L, [4]=C
+     * Nodes: 0=GND, 1=Vin+, 2=parallel node
+     *
+     * @param vin  input voltage [V]
+     * @param rSrc source resistance [Ω]
+     * @param r    parallel resistance [Ω]
+     * @param l    parallel inductance [H]
+     * @param c    parallel capacitance [F]
+     * @return configured CircuitNetlist
+     */
+    public static CircuitNetlist rlcParallelCircuit(double vin, double rSrc,
+                                                     double r, double l, double c) {
+        int elementCount = 5;
+        int maxNode = 2;
+        int maxVSrc = 1;
+
+        CircuitTypCore[] types = {CircuitTypCore.LK_U, CircuitTypCore.LK_R,
+                CircuitTypCore.LK_R, CircuitTypCore.LK_L, CircuitTypCore.LK_C};
+        int[] nodeX = {1, 1, 2, 2, 2};
+        int[] nodeY = {0, 2, 0, 0, 0};
+        int[] vSrcNr = {1, -1, -1, -1, -1};
+
+        double[][] params = new double[elementCount][];
+        params[0] = makeParams();
+        params[0][0] = SourceType.QUELLE_DC_NEW;
+        params[0][1] = vin;
+
+        params[1] = makeParams();
+        params[1][0] = rSrc;
+
+        params[2] = makeParams();
+        params[2][0] = r;
+
+        params[3] = makeParams();
+        params[3][0] = l;
+
+        params[4] = makeParams();
+        params[4][0] = c;
+        params[4][6] = c;
+        params[4][7] = c;
+        params[4][10] = 0.0;
+
+        return buildNetlist(types, nodeX, nodeY, vSrcNr, params, maxNode, maxVSrc,
+                new String[]{"V_in", "R_src", "R", "L", "C"});
+    }
+
+    // ========================================================================
+    // C9: AC Sine Source + RL load — Vsin → R → L → GND
+    // ========================================================================
+
+    /**
+     * Creates an AC sine source driving an RL load.
+     *
+     * <pre>
+     * Topology:
+     *   Vsin (LK_U, SIN) ──[node1]── R ──[node2]── L ──[GND]
+     * </pre>
+     *
+     * Elements: [0]=Vsin, [1]=R, [2]=L
+     * Nodes: 0=GND, 1=Vsin+, 2=R-L junction
+     *
+     * @param amplitude peak amplitude [V]
+     * @param freq      frequency [Hz]
+     * @param r         resistance [Ω]
+     * @param l         inductance [H]
+     * @return configured CircuitNetlist
+     */
+    public static CircuitNetlist acSineSource(double amplitude, double freq, double r, double l) {
+        int elementCount = 3;
+        int maxNode = 2;
+        int maxVSrc = 1;
+
+        CircuitTypCore[] types = {CircuitTypCore.LK_U, CircuitTypCore.LK_R, CircuitTypCore.LK_L};
+        int[] nodeX = {1, 1, 2};
+        int[] nodeY = {0, 2, 0};
+        int[] vSrcNr = {1, -1, -1};
+
+        double[][] params = new double[elementCount][];
+        // Sine voltage source: [0]=type, [1]=voltage(unused for sin), [2]=freq,
+        // [3]=offset, [4]=phase, [20]=amplitude
+        params[0] = makeParams();
+        params[0][0] = SourceType.QUELLE_SIN_NEW;
+        params[0][2] = freq;
+        params[0][3] = 0.0;   // offset
+        params[0][4] = 0.0;   // phase
+        params[0][20] = amplitude;
+
+        params[1] = makeParams();
+        params[1][0] = r;
+
+        params[2] = makeParams();
+        params[2][0] = l;
+
+        return buildNetlist(types, nodeX, nodeY, vSrcNr, params, maxNode, maxVSrc,
+                new String[]{"V_sin", "R", "L"});
+    }
+
+    /**
+     * Creates an AC sine source driving an RC load.
+     *
+     * <pre>
+     * Topology:
+     *   Vsin (LK_U, SIN) ──[node1]── R ──[node2]── C ──[GND]
+     * </pre>
+     *
+     * Elements: [0]=Vsin, [1]=R, [2]=C
+     * Nodes: 0=GND, 1=Vsin+, 2=R-C junction (output)
+     *
+     * @param amplitude peak amplitude [V]
+     * @param freq      frequency [Hz]
+     * @param r         resistance [Ω]
+     * @param c         capacitance [F]
+     * @return configured CircuitNetlist
+     */
+    public static CircuitNetlist acSineSourceRC(double amplitude, double freq,
+                                                double r, double c) {
+        int elementCount = 3;
+        int maxNode = 2;
+        int maxVSrc = 1;
+
+        CircuitTypCore[] types = {CircuitTypCore.LK_U, CircuitTypCore.LK_R, CircuitTypCore.LK_C};
+        int[] nodeX = {1, 1, 2};
+        int[] nodeY = {0, 2, 0};
+        int[] vSrcNr = {1, -1, -1};
+
+        double[][] params = new double[elementCount][];
+        params[0] = makeParams();
+        params[0][0] = SourceType.QUELLE_SIN_NEW;
+        params[0][2] = freq;
+        params[0][3] = 0.0;
+        params[0][4] = 0.0;
+        params[0][20] = amplitude;
+
+        params[1] = makeParams();
+        params[1][0] = r;
+
+        params[2] = makeParams();
+        params[2][0] = c;
+        params[2][6] = c;
+        params[2][7] = c;
+        params[2][10] = 0.0;
+
+        return buildNetlist(types, nodeX, nodeY, vSrcNr, params, maxNode, maxVSrc,
+                new String[]{"V_sin", "R", "C"});
+    }
+
+    // ========================================================================
+    // C10: Boost Converter — Vin → L → (S→GND, D→Cout||R)
+    // ========================================================================
+
+    /**
+     * Creates a boost converter topology.
+     *
+     * <pre>
+     * Topology:
+     *   Vin ──[node1]── L ──[node2]── S ──[GND]
+     *                          │── D (anode=node2) ──[node3]── R_load ──[GND]
+     *                                                  │── C ──[GND]
+     * </pre>
+     *
+     * Elements: [0]=Vin, [1]=L, [2]=S, [3]=D, [4]=C, [5]=R_load
+     * Nodes: 0=GND, 1=Vin+, 2=switch node, 3=output
+     *
+     * @param vin    input voltage [V]
+     * @param l      inductance [H]
+     * @param c      output capacitance [F]
+     * @param rLoad  load resistance [Ω]
+     * @param rSwOn  switch ON resistance [Ω]
+     * @param rSwOff switch OFF resistance [Ω]
+     * @param uf     diode forward voltage [V]
+     * @param rDOn   diode ON resistance [Ω]
+     * @param rDOff  diode OFF resistance [Ω]
+     * @return configured CircuitNetlist
+     */
+    public static CircuitNetlist boostConverter(double vin, double l, double c, double rLoad,
+                                                double rSwOn, double rSwOff,
+                                                double uf, double rDOn, double rDOff) {
+        int elementCount = 6;
+        int maxNode = 3;
+        int maxVSrc = 1;
+
+        CircuitTypCore[] types = {
+            CircuitTypCore.LK_U,    // [0] Vin
+            CircuitTypCore.LK_L,    // [1] L (inductor)
+            CircuitTypCore.LK_S,    // [2] S (low-side switch to GND)
+            CircuitTypCore.LK_D,    // [3] D (boost diode, anode=node2, cathode=node3)
+            CircuitTypCore.LK_C,    // [4] C (output capacitor)
+            CircuitTypCore.LK_R     // [5] R_load
+        };
+        int[] nodeX = {1, 1, 2, 2, 3, 3};
+        int[] nodeY = {0, 2, 0, 3, 0, 0};
+        int[] vSrcNr = {1, -1, -1, -1, -1, -1};
+
+        double[][] params = new double[elementCount][];
+
+        // [0] Voltage source
+        params[0] = makeParams();
+        params[0][0] = SourceType.QUELLE_DC_NEW;
+        params[0][1] = vin;
+
+        // [1] Inductor
+        params[1] = makeParams();
+        params[1][0] = l;
+
+        // [2] Switch (LK_S): start OFF
+        params[2] = makeParams();
+        params[2][0] = rSwOff;
+        params[2][1] = rSwOn;
+        params[2][2] = rSwOff;
+        params[2][8] = 0.0;
+
+        // [3] Diode (LK_D): start OFF
+        params[3] = makeParams();
+        params[3][0] = rDOff;
+        params[3][1] = uf;
+        params[3][2] = rDOn;
+        params[3][3] = rDOff;
+
+        // [4] Capacitor
+        params[4] = makeParams();
+        params[4][0] = c;
+        params[4][6] = c;
+        params[4][7] = c;
+        params[4][10] = 0.0;
+
+        // [5] R_load
+        params[5] = makeParams();
+        params[5][0] = rLoad;
+
+        return buildNetlist(types, nodeX, nodeY, vSrcNr, params, maxNode, maxVSrc,
+                new String[]{"V_in", "L", "S", "D", "C", "R_load"});
+    }
+
+    // ========================================================================
+    // C11: Buck-Boost Converter — Vin → S → L → GND, D → Cout||R
+    // ========================================================================
+
+    /**
+     * Creates a buck-boost converter topology (inverting).
+     *
+     * <pre>
+     * Topology:
+     *   Vin ──[node1]── S ──[node2]── L ──[GND]
+     *                          │── D (anode=node3, cathode=node2)
+     *                                  [node3]── C ──[GND]
+     *                                    │── R_load ──[GND]
+     *
+     * Output voltage is inverted (node3 is negative w.r.t. GND).
+     * </pre>
+     *
+     * Elements: [0]=Vin, [1]=S, [2]=L, [3]=D, [4]=C, [5]=R_load
+     * Nodes: 0=GND, 1=Vin+, 2=switch-inductor node, 3=output (negative)
+     *
+     * @param vin    input voltage [V]
+     * @param l      inductance [H]
+     * @param c      output capacitance [F]
+     * @param rLoad  load resistance [Ω]
+     * @param rSwOn  switch ON resistance [Ω]
+     * @param rSwOff switch OFF resistance [Ω]
+     * @param uf     diode forward voltage [V]
+     * @param rDOn   diode ON resistance [Ω]
+     * @param rDOff  diode OFF resistance [Ω]
+     * @return configured CircuitNetlist
+     */
+    public static CircuitNetlist buckBoostConverter(double vin, double l, double c, double rLoad,
+                                                     double rSwOn, double rSwOff,
+                                                     double uf, double rDOn, double rDOff) {
+        int elementCount = 6;
+        int maxNode = 3;
+        int maxVSrc = 1;
+
+        CircuitTypCore[] types = {
+            CircuitTypCore.LK_U,    // [0] Vin
+            CircuitTypCore.LK_S,    // [1] S (high-side switch)
+            CircuitTypCore.LK_L,    // [2] L (inductor)
+            CircuitTypCore.LK_D,    // [3] D (freewheeling diode, anode=node3, cathode=node2)
+            CircuitTypCore.LK_C,    // [4] C (output capacitor)
+            CircuitTypCore.LK_R     // [5] R_load
+        };
+        // S: node1→node2, L: node2→GND, D: node3(anode)→node2(cathode)
+        int[] nodeX = {1, 1, 2, 3, 3, 3};
+        int[] nodeY = {0, 2, 0, 2, 0, 0};
+        int[] vSrcNr = {1, -1, -1, -1, -1, -1};
+
+        double[][] params = new double[elementCount][];
+
+        // [0] Voltage source
+        params[0] = makeParams();
+        params[0][0] = SourceType.QUELLE_DC_NEW;
+        params[0][1] = vin;
+
+        // [1] Switch (LK_S): start OFF
+        params[1] = makeParams();
+        params[1][0] = rSwOff;
+        params[1][1] = rSwOn;
+        params[1][2] = rSwOff;
+        params[1][8] = 0.0;
+
+        // [2] Inductor
+        params[2] = makeParams();
+        params[2][0] = l;
+
+        // [3] Diode (LK_D): start OFF, anode=node3, cathode=node2
+        params[3] = makeParams();
+        params[3][0] = rDOff;
+        params[3][1] = uf;
+        params[3][2] = rDOn;
+        params[3][3] = rDOff;
+
+        // [4] Capacitor
+        params[4] = makeParams();
+        params[4][0] = c;
+        params[4][6] = c;
+        params[4][7] = c;
+        params[4][10] = 0.0;
+
+        // [5] R_load
+        params[5] = makeParams();
+        params[5][0] = rLoad;
+
+        return buildNetlist(types, nodeX, nodeY, vSrcNr, params, maxNode, maxVSrc,
+                new String[]{"V_in", "S", "L", "D", "C", "R_load"});
+    }
+
+    // ========================================================================
+    // C12: Thyristor Circuit — Vin → R → THYR → GND
+    // ========================================================================
+
+    /**
+     * Creates a resistor-thyristor circuit.
+     *
+     * <pre>
+     * Topology:
+     *   Vin (LK_U, DC) ──[node1]── R ──[node2]── THYR ──[GND]
+     *   Thyristor anode = node2, cathode = GND
+     * </pre>
+     *
+     * Elements: [0]=Vin, [1]=R, [2]=THYR
+     * Nodes: 0=GND, 1=Vin+, 2=R-THYR junction
+     *
+     * @param vin  input voltage [V]
+     * @param r    series resistance [Ω]
+     * @param rOn  thyristor ON resistance [Ω]
+     * @param rOff thyristor OFF resistance [Ω]
+     * @param uf   thyristor forward voltage [V]
+     * @return configured CircuitNetlist
+     */
+    public static CircuitNetlist thyristorCircuit(double vin, double r,
+                                                   double rOn, double rOff, double uf) {
+        int elementCount = 3;
+        int maxNode = 2;
+        int maxVSrc = 1;
+
+        CircuitTypCore[] types = {CircuitTypCore.LK_U, CircuitTypCore.LK_R,
+                CircuitTypCore.LK_THYR};
+        int[] nodeX = {1, 1, 2};
+        int[] nodeY = {0, 2, 0};
+        int[] vSrcNr = {1, -1, -1};
+
+        double[][] params = new double[elementCount][];
+        params[0] = makeParams();
+        params[0][0] = SourceType.QUELLE_DC_NEW;
+        params[0][1] = vin;
+
+        params[1] = makeParams();
+        params[1][0] = r;
+
+        // Thyristor: [0]=rD (start OFF), [1]=Uf, [2]=rOn, [3]=rOff, [8]=gate,
+        // [9]=recovery time, [11]=last switch-off time
+        params[2] = makeParams();
+        params[2][0] = rOff;
+        params[2][1] = uf;
+        params[2][2] = rOn;
+        params[2][3] = rOff;
+        params[2][8] = 0.0;     // gate off
+        params[2][9] = 10e-6;   // recovery time
+        params[2][11] = -1.0;   // last switch-off time (never)
+
+        return buildNetlist(types, nodeX, nodeY, vSrcNr, params, maxNode, maxVSrc,
+                new String[]{"V_in", "R", "THYR"});
+    }
+
+    // ========================================================================
+    // C13: IGBT Circuit — Vin → R → IGBT → GND
+    // ========================================================================
+
+    /**
+     * Creates a resistor-IGBT circuit.
+     *
+     * <pre>
+     * Topology:
+     *   Vin (LK_U, DC) ──[node1]── R ──[node2]── IGBT ──[GND]
+     *   IGBT collector = node2, emitter = GND
+     * </pre>
+     *
+     * Elements: [0]=Vin, [1]=R, [2]=IGBT
+     * Nodes: 0=GND, 1=Vin+, 2=R-IGBT junction
+     *
+     * @param vin  input voltage [V]
+     * @param r    series resistance [Ω]
+     * @param rOn  IGBT ON resistance [Ω]
+     * @param rOff IGBT OFF resistance [Ω]
+     * @param uf   IGBT forward voltage [V]
+     * @return configured CircuitNetlist
+     */
+    public static CircuitNetlist igbtCircuit(double vin, double r,
+                                              double rOn, double rOff, double uf) {
+        int elementCount = 3;
+        int maxNode = 2;
+        int maxVSrc = 1;
+
+        CircuitTypCore[] types = {CircuitTypCore.LK_U, CircuitTypCore.LK_R,
+                CircuitTypCore.LK_IGBT};
+        int[] nodeX = {1, 1, 2};
+        int[] nodeY = {0, 2, 0};
+        int[] vSrcNr = {1, -1, -1};
+
+        double[][] params = new double[elementCount][];
+        params[0] = makeParams();
+        params[0][0] = SourceType.QUELLE_DC_NEW;
+        params[0][1] = vin;
+
+        params[1] = makeParams();
+        params[1][0] = r;
+
+        // IGBT: [0]=rD (start OFF), [1]=Uf, [2]=rOn, [3]=rOff, [8]=gate
+        params[2] = makeParams();
+        params[2][0] = rOff;
+        params[2][1] = uf;
+        params[2][2] = rOn;
+        params[2][3] = rOff;
+        params[2][8] = 0.0;
+
+        return buildNetlist(types, nodeX, nodeY, vSrcNr, params, maxNode, maxVSrc,
+                new String[]{"V_in", "R", "IGBT"});
+    }
+
+    // ========================================================================
+    // C14: Thermal RC Network — Psrc → Rth → Cth → Tamb
+    // ========================================================================
+
+    /**
+     * Creates a thermal RC network for temperature rise testing.
+     *
+     * <pre>
+     * Topology (thermal analogy: voltage=temperature, current=heat flow):
+     *   TH_FLOW (heat source) ──[node1]── TH_RTH ──[node2]── TH_TEMP (ambient)
+     *                              │── TH_CTH ──[GND]
+     *
+     * The TH_FLOW injects power at node1, TH_RTH connects to TH_TEMP (fixed ambient),
+     * and TH_CTH stores thermal energy at node1.
+     * </pre>
+     *
+     * Elements: [0]=TH_TEMP(ambient), [1]=TH_FLOW(power), [2]=TH_RTH, [3]=TH_CTH
+     * Nodes: 0=GND(thermal ref), 1=hot node, 2=ambient node
+     *
+     * @param power   heat flow [W]
+     * @param rth     thermal resistance [K/W]
+     * @param cth     thermal capacitance [J/K]
+     * @param tAmbient ambient temperature [K or °C]
+     * @return configured CircuitNetlist
+     */
+    public static CircuitNetlist thermalRCNetwork(double power, double rth, double cth,
+                                                   double tAmbient) {
+        int elementCount = 4;
+        int maxNode = 2;
+        int maxVSrc = 1;
+
+        CircuitTypCore[] types = {
+            CircuitTypCore.TH_TEMP,   // [0] ambient temperature source (voltage source)
+            CircuitTypCore.TH_FLOW,   // [1] heat flow source (current source)
+            CircuitTypCore.TH_RTH,    // [2] thermal resistance
+            CircuitTypCore.TH_CTH     // [3] thermal capacitance
+        };
+        // TH_TEMP: node2(+) to GND(-), TH_FLOW: GND→node1 (heat injection into node1),
+        // TH_RTH: node1→node2, TH_CTH: node1 to GND
+        // Note: buildVectorB for TH_FLOW uses bContribution = -params[1], so
+        // b[nodeX] -= power, b[nodeY] += power. To inject power INTO node1,
+        // nodeX=GND(0) and nodeY=node1(1), giving b[1] += power.
+        int[] nodeX = {2, 0, 1, 1};
+        int[] nodeY = {0, 1, 2, 0};
+        int[] vSrcNr = {1, -1, -1, -1};
+
+        double[][] params = new double[elementCount][];
+
+        // [0] Temperature source (ambient): uses voltage source stamper
+        params[0] = makeParams();
+        params[0][0] = SourceType.QUELLE_DC_NEW;
+        params[0][1] = tAmbient;
+
+        // [1] Heat flow source: uses current source stamper
+        // buildVectorB reads params[0] as sourceType and params[1] as current value,
+        // matching the same convention as LK_I (see MatrixSolver.buildVectorB TH_FLOW case).
+        params[1] = makeParams();
+        params[1][0] = SourceType.QUELLE_DC_NEW;
+        params[1][1] = power;
+
+        // [2] Thermal resistance: uses resistor stamper, params[0]=Rth
+        params[2] = makeParams();
+        params[2][0] = rth;
+
+        // [3] Thermal capacitance: uses capacitor stamper
+        params[3] = makeParams();
+        params[3][0] = cth;
+        params[3][6] = cth;
+        params[3][7] = cth;
+        params[3][10] = 0.0;
+
+        return buildNetlist(types, nodeX, nodeY, vSrcNr, params, maxNode, maxVSrc,
+                new String[]{"T_ambient", "P_source", "R_th", "C_th"});
+    }
+
+    // ========================================================================
     // Helper methods
     // ========================================================================
 
