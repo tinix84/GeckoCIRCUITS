@@ -3,6 +3,8 @@ package gecko.rest.controller;
 import gecko.rest.model.analysis.CharacteristicsResponse;
 import gecko.rest.model.analysis.FourierResponse;
 import gecko.rest.model.analysis.SignalAnalysisRequest;
+import gecko.rest.model.analysis.SteadyStateRequest;
+import gecko.rest.model.analysis.SteadyStateResponse;
 import gecko.rest.service.AnalysisService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -144,5 +146,43 @@ public class AnalysisController {
     public ResponseEntity<Double> computeRms(@RequestBody SignalAnalysisRequest request) {
         CharacteristicsResponse response = analysisService.computeCharacteristics(request);
         return ResponseEntity.ok(response.getRms());
+    }
+
+    /**
+     * Steady-state analysis.
+     *
+     * <p>Runs a transient simulation for up to {@code maxPeriods} switching periods
+     * and detects when the circuit has reached periodic steady state (i.e. signal
+     * values at period boundaries differ by less than {@code tolerance}).  Returns
+     * convergence information and the waveforms for the last complete period.</p>
+     *
+     * @param request Steady-state analysis parameters (circuit, period, tolerance, …)
+     * @return SteadyStateResponse with convergence status and steady-state waveforms
+     */
+    @PostMapping("/steady-state")
+    @Operation(
+        summary = "Steady-state analysis",
+        description = "Run a transient simulation until the circuit reaches periodic steady state. "
+                    + "Returns convergence information and signal waveforms for the last switching period."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200",
+            description = "Analysis completed (check 'converged' field for convergence status)",
+            content = @Content(schema = @Schema(implementation = SteadyStateResponse.class))
+        ),
+        @ApiResponse(
+            responseCode = "400",
+            description = "Invalid request parameters or unknown solver type"
+        ),
+        @ApiResponse(
+            responseCode = "500",
+            description = "Simulation or convergence error"
+        )
+    })
+    public ResponseEntity<SteadyStateResponse> steadyState(
+            @RequestBody SteadyStateRequest request) {
+        SteadyStateResponse response = analysisService.computeSteadyState(request);
+        return ResponseEntity.ok(response);
     }
 }
