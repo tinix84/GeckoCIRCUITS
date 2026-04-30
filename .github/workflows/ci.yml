@@ -105,7 +105,7 @@ jobs:
         with:
           name: GeckoCIRCUITS-jar
           path: target/gecko-1.0-jar-with-dependencies.jar
-          retention-days: 30
+          retention-days: 90
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -113,7 +113,7 @@ jobs:
         with:
           name: coverage-report
           path: target/site/jacoco/
-          retention-days: 30
+          retention-days: 90
 
   regression-tests:
     runs-on: ubuntu-latest
@@ -152,4 +152,4 @@ jobs:
         with:
           name: regression-surefire-reports
           path: target/surefire-reports/
-          retention-days: 30
+          retention-days: 90
