@@ -1,3 +1,5 @@
+@~/.claude/karpathy-guidelines.md
+
 # GeckoCIRCUITS — Java 21 power electronics circuit simulator with REST API
 
 **Stack**: Java 21 (Maven, Spring Boot)
@@ -109,3 +111,11 @@ python -m src.cli run sw-arch .  # Run architecture analysis
 - Docs site: https://tinix84.github.io/GeckoCIRCUITS/
 - REST API v3.0.0: 32 endpoints, Spring Boot 3.2.1, Docker-ready
 - `CorePackageValidationTest` enforces zero GUI imports in gecko-simulation-core
+
+## Python Environment
+
+**Do not create `.venv` directories.** Use conda instead:
+- `conda activate ntbees2` (default)
+- `conda activate social_env` (social media work)
+
+Never run `python -m venv`, `uv venv`, or `virtualenv`.
