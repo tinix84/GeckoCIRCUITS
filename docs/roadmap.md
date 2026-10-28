@@ -2,7 +2,7 @@
 
 Strategic roadmap for GeckoCIRCUITS development — completed milestones, future plans, and release process.
 
-**Last Updated:** 2026-02-22
+**Last Updated:** 2026-03-14
 
 ---
 
@@ -112,6 +112,35 @@ gantt
 | [#17](https://github.com/tinix84/GeckoCIRCUITS/issues/17) | Enhanced circuit parsing | Planned |
 | [#18](https://github.com/tinix84/GeckoCIRCUITS/issues/18) | RBAC (Role-Based Access Control) | Planned |
 | [#19](https://github.com/tinix84/GeckoCIRCUITS/issues/19) | Client SDKs (Python, Java, JS) | Planned |
+
+**Quality Targets:**
+
+| Issue | Target | Current |
+|-------|--------|---------|
+| [#64](https://github.com/tinix84/GeckoCIRCUITS/issues/64) | PMD violations < 400 | 496 |
+| [#65](https://github.com/tinix84/GeckoCIRCUITS/issues/65) | Checkstyle violations < 2,000 | 4,632 |
+| [#66](https://github.com/tinix84/GeckoCIRCUITS/issues/66) | Core module coverage ≥ 40% | 30%+ |
+
+**Testing:**
+
+| Issue | Feature | Status |
+|-------|---------|--------|
+| [#62](https://github.com/tinix84/GeckoCIRCUITS/issues/62) | Golden traces for 8 education circuits (Phase B) | Planned |
+| [#63](https://github.com/tinix84/GeckoCIRCUITS/issues/63) | Application test classes with per-step comparison (Phase C) | Planned |
+
+---
+
+### Solver Engine Improvements
+
+**Epic:** [#56](https://github.com/tinix84/GeckoCIRCUITS/issues/56) | **Source:** [SOLVER_GAP_ANALYSIS.md](architecture/SOLVER_GAP_ANALYSIS.md)
+
+| Issue | Feature | Priority | Status |
+|-------|---------|----------|--------|
+| [#57](https://github.com/tinix84/GeckoCIRCUITS/issues/57) | DC Operating Point Analysis | HIGH | Planned |
+| [#58](https://github.com/tinix84/GeckoCIRCUITS/issues/58) | Zero-Crossing Detection & Interpolation | HIGH | Planned |
+| [#59](https://github.com/tinix84/GeckoCIRCUITS/issues/59) | Adaptive Time Stepping (LTE-based) | HIGH | Planned |
+| [#60](https://github.com/tinix84/GeckoCIRCUITS/issues/60) | Sparse Matrix Solver (EJML/KLU) | MEDIUM | Planned |
+| [#61](https://github.com/tinix84/GeckoCIRCUITS/issues/61) | Sampled Control Mode | LOW | Planned |
 
 ---
 

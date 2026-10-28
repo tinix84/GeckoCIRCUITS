@@ -35,6 +35,17 @@ import java.util.List;
         justification = "Static fields staticTSTART/staticTEND are intentionally written for backward compatibility; public simulation status for runtime monitoring")
 public class SimulationsKern implements ISimulationEngine {
 
+    private volatile SimulationTraceLogger _traceLogger;
+
+    /** Sets the optional logger before simulation starts. */
+    public void setTraceLogger(SimulationTraceLogger logger) {
+        _traceLogger = logger;
+    }
+
+    public SimulationTraceLogger getTraceLogger() {
+        return _traceLogger;
+    }
+
     private double dt, t, tPAUSE;
     private double tSTART, tEND;
 
@@ -169,6 +180,10 @@ public class SimulationsKern implements ISimulationEngine {
             nl.berechneSubCircuitAlsDifferentialgleichung(dt, t);  // interne Berechungen in SubCircuits diverser LK-Elemente
             lkmLK.aktualisiereKnotenpotentiale(dt, t);     // pALT=p;
             dataTransferLK_Control();
+            SimulationTraceLogger traceLogger = _traceLogger;
+            if (traceLogger != null) {
+                traceLogger.logStep(t, lkmLK, nl);
+            }
         }
 
         if (simuliereThermKreis) {

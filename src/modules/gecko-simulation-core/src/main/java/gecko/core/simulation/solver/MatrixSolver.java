@@ -34,6 +34,10 @@ import gecko.core.math.Matrix;
  * - Component currents (iALT, iALTALT, iALTALTALT) for multi-step integration
  */
 public class MatrixSolver {
+    /** Large conductance added to ground node (row/col 0) to anchor the MNA system.
+     *  Without this, the KCL equations are linearly dependent and the matrix is singular. */
+    private static final double GROUND_CONDUCTANCE = 1e15;
+
     private int matrixSize;           // Matrix order (node count + voltage source count + 1)
     private double[][] a;            // System matrix A for MNA
     private double[] bVector;         // Right-hand side vector b
@@ -151,23 +155,37 @@ public class MatrixSolver {
      *
      * @param dt the time step size (seconds)
      * @param time the current simulation time (seconds)
+     * @deprecated Use {@link #shiftHistory()} followed by storing currents into iALT.
+     *             This method exists for backward compatibility with existing tests.
      */
+    @Deprecated
     public void updateNodePotentials(double dt, double time) {
-        // Shift node potential history:
-        // Move two-steps-back to three-steps-back
+        shiftHistory();
+    }
+
+    /**
+     * Shifts all history arrays one step back, matching the proven
+     * {@code aktualisiereKnotenpotentiale()} method from LKMatrices.
+     *
+     * <p>Order (critical for correctness):
+     * <ol>
+     *   <li>pALTALTALT ← pALTALT ← pALT ← p</li>
+     *   <li>iALTALTALT ← iALTALT ← iALT</li>
+     * </ol>
+     *
+     * <p>After calling this method, iALT still holds the previous step's values
+     * (now also copied into iALTALT). The caller must then overwrite iALT with
+     * the newly converged currents.
+     */
+    public void shiftHistory() {
+        // Shift node potential history
         System.arraycopy(pALTALT, 0, pALTALTALT, 0, matrixSize);
-        // Move one-step-back to two-steps-back
         System.arraycopy(pALT, 0, pALTALT, 0, matrixSize);
-        // Move current to one-step-back
         System.arraycopy(p, 0, pALT, 0, matrixSize);
 
-        // Shift component current history:
-        // Move two-steps-back to three-steps-back
+        // Shift component current history
         System.arraycopy(iALTALT, 0, iALTALTALT, 0, iALT.length);
-        // Move one-step-back to two-steps-back
         System.arraycopy(iALT, 0, iALTALT, 0, iALT.length);
-        // Note: iALT will be populated with current values by ComponentCurrentCalculator
-        // before the next call to this method
     }
 
     /**
@@ -223,10 +241,16 @@ public class MatrixSolver {
             // Step 3: Get stamper for this component type and stamp matrix A
             IMatrixStamper stamper = registry.getStamper(componentType);
             if (stamper != null) {
-                stamper.stampMatrixA(a, nodeX, nodeY, nodeZ, parameters, dt);
+                stamper.stampMatrixA(a, nodeX, nodeY, nodeZ, parameters, dt, solverType);
             }
             // If no stamper is registered, component is skipped (e.g., terminals, unimplemented types)
         }
+
+        // Step 4: Pin ground node (node 0) to anchor the MNA system.
+        // Without this, the KCL equations for nodes 0..N are linearly dependent
+        // (they sum to zero by Kirchhoff's current law), making the matrix singular.
+        // Adding a large conductance to ground forces p[0] ≈ 0.
+        a[0][0] += GROUND_CONDUCTANCE;
 
         // Note: Magnetic coupling (mutual inductance) handling is deferred for future refinement.
         // The legacy code injects coupling contributions after component stamping;

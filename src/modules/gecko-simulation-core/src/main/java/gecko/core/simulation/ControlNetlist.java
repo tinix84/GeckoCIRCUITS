@@ -13,6 +13,7 @@
  */
 package gecko.core.simulation;
 
+import gecko.core.control.NotCalculateableMarker;
 import gecko.core.control.calculators.AbstractControlCalculatable;
 
 import java.util.List;
@@ -76,7 +77,7 @@ public class ControlNetlist {
         this.simulationTime = time;
         AbstractControlCalculatable.setTime(time);
         for (AbstractControlCalculatable calc : sortedCalculators) {
-            if (calc != null) {
+            if (calc != null && !(calc instanceof NotCalculateableMarker)) {
                 calc.berechneYOUT(dt);
             }
         }

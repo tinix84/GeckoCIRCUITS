@@ -13,6 +13,8 @@
  */
 package gecko.core.circuit.matrix;
 
+import gecko.core.allg.SolverType;
+
 /**
  * Matrix stamper implementation for Thyristor (SCR) components.
  *
@@ -153,7 +155,7 @@ public class ThyristorStamper implements IStatefulStamper {
 
     @Override
     public void stampMatrixA(double[][] a, int nodeX, int nodeY, int nodeZ,
-                             double[] parameter, double dt) {
+                             double[] parameter, double dt, SolverType solverType) {
         double resistance = getCurrentResistance(parameter);
         double admittance = 1.0 / resistance;
 

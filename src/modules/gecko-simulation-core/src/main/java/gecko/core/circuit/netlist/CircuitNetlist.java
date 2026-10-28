@@ -67,6 +67,9 @@ public class CircuitNetlist implements INetList {
     // Current simulation state
     private double simulationTime;
 
+    // Component name → element index mapping (for AMP probe / gate coupling)
+    private Map<String, Integer> componentNameToIndex = Collections.emptyMap();
+
     // Result storage (Task 3.6)
     private double[] lastNodeVoltages = new double[0];
     private double[] lastComponentCurrents = new double[0];
@@ -575,6 +578,38 @@ public class CircuitNetlist implements INetList {
     }
 
     /**
+     * Sets the component name-to-element-index mapping.
+     * Built by {@code NetlistBuilder} from {@code CircuitModel.ComponentData.getName()}.
+     *
+     * @param nameToIndex map from component name (e.g. "L.1", "R.1") to element index
+     */
+    public void setComponentNameToIndex(Map<String, Integer> nameToIndex) {
+        this.componentNameToIndex = nameToIndex != null
+                ? Collections.unmodifiableMap(new LinkedHashMap<>(nameToIndex))
+                : Collections.emptyMap();
+    }
+
+    /**
+     * Looks up the element index for a component by name.
+     *
+     * @param name component name (e.g. "L.1", "C.1", "S.1")
+     * @return element index, or -1 if not found
+     */
+    public int getElementIndexByName(String name) {
+        Integer idx = componentNameToIndex.get(name);
+        return idx != null ? idx : -1;
+    }
+
+    /**
+     * Returns the component name-to-index map.
+     *
+     * @return unmodifiable map
+     */
+    public Map<String, Integer> getComponentNameToIndex() {
+        return componentNameToIndex;
+    }
+
+    /**
      * Clears all netlist data.
      * After calling this, you must call initNetlist() again to repopulate.
      */
@@ -591,6 +626,7 @@ public class CircuitNetlist implements INetList {
         simulationTime = 0.0;
         lastNodeVoltages = new double[0];
         lastComponentCurrents = new double[0];
+        componentNameToIndex = Collections.emptyMap();
     }
 
     @Override
