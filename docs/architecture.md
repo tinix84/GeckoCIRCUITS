@@ -94,7 +94,42 @@ src/main/java/gecko/
 4. **Solver**: Backward Euler (BE), Trapezoidal (TRZ), or Gear-Shichman (GS) integration
 5. **Results**: Time-domain waveforms stored in `DataContainer` classes
 
-### 3.2 Key Interfaces
+### 3.2 Runtime Ownership
+
+`HeadlessSimulationEngine` owns the simulation clock, cancellation checks, progress reporting, and result logging.
+Two internal modules concentrate numerical and CONTROL behavior behind small interfaces.
+
+| Module | Responsibility |
+|--------|----------------|
+| `ElectricalTimeStep` | Assemble matrices, solve nonlinear iterations, reconstruct currents, commit histories once, publish electrical results, and capture the step trace. |
+| `ControlRuntime` | Build and initialize the control chain, apply pending gates, transfer solved probes, execute calculators, and sample SCOPE signals. |
+| `SimulationService` | Schedule simulation jobs, own engines, commit state transitions, enforce batch limits, and publish progress through SSE and WebSocket adapters. |
+
+The engine preserves this phase order for each electrical time step:
+
+1. Apply the previous CONTROL gate values.
+2. Solve the electrical time step and publish its results and trace.
+3. Transfer solved probes, execute CONTROL, and record gates for the next time step.
+4. Sample SCOPE signals and log the results.
+
+CONTROL runtimes initialize once per simulation run.
+Simulations without electrical elements retain their existing behavior and do not advance the control chain.
+SCOPE names and samples cross the runtime interface as independent copies.
+Existing public calculator, mapping, and coupling classes remain available for compatibility.
+
+The job module returns detached snapshots with consistent status, timestamps, errors, and results.
+Cancellation remains `FAILED` with the error `Cancelled by user`.
+A durable cancellation signal also covers cancellation before the engine starts.
+Each job commits one final transition and publishes at most one logical terminal event to its progress adapters.
+Transport delivery can still fail when a subscriber disconnects.
+Progress delivery is synchronous, so a slow subscriber can delay status reads or cancellation for the same job.
+
+Batch admission enforces the requested `maxConcurrent` limit within the shared executor capacity.
+A requested value of `0` uses an effective limit of `4`, while the response retains the requested value.
+The default limit remains `4`.
+Queued jobs remain `PENDING` until execution starts.
+
+### 3.3 Key Interfaces
 
 ```java
 // Circuit component stamping (Modified Nodal Analysis)
@@ -116,7 +151,7 @@ SolverContext {
 StamperRegistry.getStamper(CircuitTyp) → IMatrixStamper
 ```
 
-### 3.3 Operating Modes
+### 3.4 Operating Modes
 
 Defined in `OperatingMode` enum, selected at startup:
 

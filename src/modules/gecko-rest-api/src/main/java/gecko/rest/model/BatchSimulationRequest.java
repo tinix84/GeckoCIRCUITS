@@ -26,7 +26,7 @@ public class BatchSimulationRequest {
     private String circuitFile;
 
     @NotNull @Min(0) @Max(100)
-    @Schema(description = "Max concurrent simulations", example = "4", defaultValue = "4")
+    @Schema(description = "Maximum concurrent simulations per batch; zero uses the default of four", example = "4", defaultValue = "4")
     private Integer maxConcurrent = 4;
 
     // One of three variation modes:
