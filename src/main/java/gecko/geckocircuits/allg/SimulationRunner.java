@@ -23,6 +23,7 @@ import gecko.geckocircuits.circuit.SchematicEditor2;
 import gecko.geckocircuits.circuit.SimulationsKern;
 import gecko.geckocircuits.circuit.SimulationsKern.SimulationStatus;
 import gecko.geckocircuits.circuit.SolverSettings;
+import gecko.geckocircuits.circuit.SimulationTraceLogger;
 import gecko.geckocircuits.control.DataSaver;
 import gecko.geckocircuits.control.NetzlisteCONTROL;
 import gecko.geckocircuits.control.ReglerOSZI;
@@ -38,6 +39,12 @@ public final class SimulationRunner {
 	final SchematicEditor2 _se;
 	public SimulationsKern simKern;
 	private NetListContainer nlContainer;
+	private SimulationTraceLogger _pendingTraceLogger;
+
+	/** Sets a trace logger for the next calculation before its thread starts. */
+	public void setPendingTraceLogger(SimulationTraceLogger logger) {
+		_pendingTraceLogger = logger;
+	}
 
 	public SimulationRunner(final MainWindow mainwindow, final SchematicEditor2 schematicEntry) {
 		_mainwindow = mainwindow;
@@ -70,6 +77,11 @@ public final class SimulationRunner {
 		simKern.setScopeMenuesStartStop();
 		solverSettings._dt_ALT = dtLoc;
 		simKern.initialisiereCONTROLatSimulationStart(dtLoc);  // wird nicht gemacht, wenn 'Continue' aktiviert wird
+
+		if (_pendingTraceLogger != null) {
+			simKern.setTraceLogger(_pendingTraceLogger);
+			_pendingTraceLogger = null;
+		}
 
 		RunThreadRun _runThread = new RunThreadRun();
 
