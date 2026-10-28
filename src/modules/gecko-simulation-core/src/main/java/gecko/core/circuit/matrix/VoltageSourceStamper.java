@@ -13,6 +13,8 @@
  */
 package gecko.core.circuit.matrix;
 
+import gecko.core.allg.SolverType;
+
 /**
  * Matrix stamper implementation for voltage source components.
  *
@@ -57,7 +59,7 @@ public class VoltageSourceStamper implements IMatrixStamper {
 
     @Override
     public void stampMatrixA(double[][] a, int nodeX, int nodeY, int nodeZ,
-                             double[] parameter, double dt) {
+                             double[] parameter, double dt, SolverType solverType) {
         // nodeZ is the index for the additional current variable
 
         // Voltage equation row: Vx - Vy = Vsource

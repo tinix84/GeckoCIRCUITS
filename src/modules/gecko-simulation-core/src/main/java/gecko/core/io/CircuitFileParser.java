@@ -166,6 +166,9 @@ public class CircuitFileParser {
         // Parse circuit components from special blocks
         parseCircuitComponents(lines, model);
 
+        // Parse control components from special blocks
+        parseControlComponents(lines, model);
+
         // Validate pre-simulation time step
         if (model.getPreSimulationTimeStep() <= 0) {
             model.setPreSimulationTimeStep(model.getTimeStep());
@@ -399,6 +402,86 @@ public class CircuitFileParser {
                 // Skip malformed blocks silently - log if needed
             }
         }
+    }
+
+    /**
+     * Parses all {@code <ElementCONTROL>} blocks from the circuit file.
+     * Mirrors {@link #parseCircuitComponents} but uses TokenMap special token {@code "c"}.
+     *
+     * @param lines the raw circuit file lines
+     * @param model the circuit model to populate with control components
+     */
+    private void parseControlComponents(String[] lines, CircuitModel model) {
+        TokenMap tokenMap = new TokenMap(lines, true);
+
+        TokenMap elementBlock;
+        while ((elementBlock = tokenMap.getSpecialBlockTokenMap("c")) != null) {
+            try {
+                // typ field: for SIGNAL sources this is the sub-type (e.g. 404)
+                // but the real control type comes from a mapping
+                int rawTyp = elementBlock.readDataLine("typ", -1);
+                if (rawTyp < 0) {
+                    continue;
+                }
+
+                String name = elementBlock.readDataLine("idStringDialog", "");
+                int x = elementBlock.readDataLine("x", 0);
+                int y = elementBlock.readDataLine("y", 0);
+                int orientation = elementBlock.readDataLine("orientierung", 0);
+
+                // Read parameter array (space-separated in real .ipes files)
+                List<Double> paramsList = readComponentParameters(elementBlock);
+                double[] params = paramsList.stream()
+                        .mapToDouble(v -> v != null ? v : Double.NaN)
+                        .toArray();
+
+                // Read parameterString[] — slash-separated string values
+                // Format: "parameterString[] /value1/value2/value3"
+                String[] paramStrings = elementBlock.readDataLine("parameterString[]", new String[0]);
+
+                // Read terminal labels (inputs = labelAnfangsKnoten, outputs = labelEndKnoten)
+                String[] xLabels = elementBlock.readDataLine("labelAnfangsKnoten[]", new String[0]);
+                String[] yLabels = elementBlock.readDataLine("labelEndKnoten[]", new String[0]);
+
+                // For SIGNAL sources, parameter[0] contains the sub-type (e.g. 404)
+                // The actual control type is determined by the typ field
+                CircuitModel.ComponentData comp = new CircuitModel.ComponentData(rawTyp, name, x, y, orientation);
+
+                // Store numeric parameters by index
+                for (int i = 0; i < params.length; i++) {
+                    comp.setParameter("param" + i, params[i]);
+                }
+                comp.setNumericParameters(params);
+
+                // Store parameterString values (critical for VOLT/AMP probe coupling)
+                comp.setParameterStrings(filterNixStrings(paramStrings));
+
+                comp.setTerminalXLabels(filterNix(xLabels));
+                comp.setTerminalYLabels(filterNix(yLabels));
+
+                model.addControlComponent(comp);
+            } catch (Exception e) {
+                // Skip malformed blocks silently
+            }
+        }
+    }
+
+    /**
+     * Filters out "NIX_NIX_NIX" placeholder strings, replacing with empty strings.
+     */
+    private static String[] filterNixStrings(String[] values) {
+        if (values == null) {
+            return new String[0];
+        }
+        String[] result = new String[values.length];
+        for (int i = 0; i < values.length; i++) {
+            if (values[i] != null && !values[i].equals("NIX_NIX_NIX")) {
+                result[i] = values[i].trim();
+            } else {
+                result[i] = "";
+            }
+        }
+        return result;
     }
 
     /**

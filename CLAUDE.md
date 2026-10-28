@@ -1,5 +1,3 @@
-@~/.claude/karpathy-guidelines.md
-
 # GeckoCIRCUITS — Java 21 power electronics circuit simulator with REST API
 
 **Stack**: Java 21 (Maven, Spring Boot)

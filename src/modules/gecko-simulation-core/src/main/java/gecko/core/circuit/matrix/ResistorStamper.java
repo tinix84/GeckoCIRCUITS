@@ -13,6 +13,8 @@
  */
 package gecko.core.circuit.matrix;
 
+import gecko.core.allg.SolverType;
+
 /**
  * Matrix stamper implementation for resistor components.
  *
@@ -35,7 +37,7 @@ public class ResistorStamper implements IMatrixStamper {
 
     @Override
     public void stampMatrixA(double[][] a, int nodeX, int nodeY, int nodeZ,
-                             double[] parameter, double dt) {
+                             double[] parameter, double dt, SolverType solverType) {
         double admittance = getAdmittanceWeight(parameter[0], dt);
 
         // Stamp the standard two-terminal admittance pattern

@@ -320,6 +320,8 @@ public class CircuitModel {
         private final int orientation;
         private String[] terminalXLabels = new String[0];  // labelAnfangsKnoten[]
         private String[] terminalYLabels = new String[0];  // labelEndKnoten[]
+        private String[] parameterStrings = new String[0]; // parameterString[]
+        private double[] numericParameters = new double[0]; // parameter[] raw values
 
         public ComponentData(int type, String name) {
             this.type = type;
@@ -375,6 +377,22 @@ public class CircuitModel {
 
         public void setTerminalYLabels(String[] terminalYLabels) {
             this.terminalYLabels = terminalYLabels != null ? terminalYLabels : new String[0];
+        }
+
+        public String[] getParameterStrings() {
+            return parameterStrings;
+        }
+
+        public void setParameterStrings(String[] parameterStrings) {
+            this.parameterStrings = parameterStrings != null ? parameterStrings : new String[0];
+        }
+
+        public double[] getNumericParameters() {
+            return numericParameters;
+        }
+
+        public void setNumericParameters(double[] numericParameters) {
+            this.numericParameters = numericParameters != null ? numericParameters : new double[0];
         }
 
         @Override

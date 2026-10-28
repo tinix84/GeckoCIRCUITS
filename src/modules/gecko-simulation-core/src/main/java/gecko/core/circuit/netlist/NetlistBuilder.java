@@ -139,11 +139,9 @@ public class NetlistBuilder {
             return buildEmpty(0, 0, 0);
         }
 
-        // Collect all components from all lists
+        // Collect only LK (circuit) components — control and thermal are handled separately
         List<CircuitModel.ComponentData> allComponents = new ArrayList<>();
         allComponents.addAll(model.getCircuitComponents());
-        allComponents.addAll(model.getControlComponents());
-        allComponents.addAll(model.getThermalComponents());
 
         if (allComponents.isEmpty()) {
             return buildEmpty(0, 0, 0);
@@ -222,7 +220,7 @@ public class NetlistBuilder {
         // Step 3: Build node arrays and parameter arrays
         int[] nodeX = new int[elementCount];
         int[] nodeY = new int[elementCount];
-        double[][] params = new double[elementCount][10]; // up to 10 params per component
+        double[][] params = new double[elementCount][];
 
         for (int i = 0; i < elementCount; i++) {
             CircuitModel.ComponentData comp = components.get(i);
@@ -235,8 +233,22 @@ public class NetlistBuilder {
             String[] yLabels = comp.getTerminalYLabels();
             nodeY[i] = yLabels.length > 0 ? labelToNode.getOrDefault(yLabels[0], 0) : 0;
 
-            // Extract numeric parameters
-            for (int p = 0; p < 10; p++) {
+            // Extract numeric parameters — use actual parsed count (some components need 11+)
+            int paramCount = 0;
+            for (String key : comp.getParameters().keySet()) {
+                if (key.startsWith("param")) {
+                    try {
+                        int idx = Integer.parseInt(key.substring(5));
+                        paramCount = Math.max(paramCount, idx + 1);
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+            // Minimum 13 slots to accommodate all component parameter indices
+            // (capacitors use [10], switches use [8]/[12])
+            paramCount = Math.max(paramCount, 13);
+            params[i] = new double[paramCount];
+
+            for (int p = 0; p < paramCount; p++) {
                 Object val = comp.getParameters().get("param" + p);
                 params[i][p] = (val instanceof Number) ? ((Number) val).doubleValue() : 0.0;
             }
@@ -249,10 +261,20 @@ public class NetlistBuilder {
             }
         }
 
-        // Step 4: Initialize and return netlist
+        // Step 4: Build component name-to-index map
+        Map<String, Integer> nameToIndex = new LinkedHashMap<>();
+        for (int i = 0; i < elementCount; i++) {
+            String name = components.get(i).getName();
+            if (name != null && !name.isEmpty()) {
+                nameToIndex.put(name, i);
+            }
+        }
+
+        // Step 5: Initialize and return netlist
         CircuitNetlist netlist = new CircuitNetlist();
         netlist.initNetlist(types, nodeX, nodeY, voltageSourceNumbers, params,
                 nodeCount - 1, voltageSourceCount, elementCount);
+        netlist.setComponentNameToIndex(nameToIndex);
         return netlist;
     }
 

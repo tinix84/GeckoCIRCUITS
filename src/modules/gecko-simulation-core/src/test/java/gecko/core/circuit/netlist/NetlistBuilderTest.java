@@ -159,14 +159,14 @@ public class NetlistBuilderTest {
         model.addCircuitComponent(new CircuitModel.ComponentData(2, "L1"));
         model.addControlComponent(new CircuitModel.ComponentData(3, "PI1"));
         model.addThermalComponent(new CircuitModel.ComponentData(4, "Th1"));
-        // Total: 4 components
+        // NetlistBuilder only includes LK (circuit) components — control/thermal are separate
 
         // Act
         CircuitNetlist netlist = NetlistBuilder.buildFromCircuitModel(model);
 
         // Assert
         assertNotNull(netlist, "Netlist should not be null");
-        assertEquals(4, netlist.getElementCount(), "Element count should be 4");
+        assertEquals(2, netlist.getElementCount(), "Element count should be 2 (only circuit components)");
     }
 
     @Test

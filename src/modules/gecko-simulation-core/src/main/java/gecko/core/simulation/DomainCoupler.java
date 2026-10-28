@@ -13,7 +13,11 @@
  */
 package gecko.core.simulation;
 
+import gecko.core.circuit.circuitcomponents.CircuitTypCore;
 import gecko.core.circuit.netlist.CircuitNetlist;
+import gecko.core.control.calculators.AbstractControlCalculatable;
+
+import java.util.List;
 
 /**
  * Manages data transfer between the three simulation domains:
@@ -53,6 +57,12 @@ public class DomainCoupler {
 
     // Temperatures from THERM fed to LK (temperature-dependent components)
     private double[] thermTemperatures = new double[0];
+
+    // ControlBlockMapping-based probe/gate coupling
+    private ControlBlockMapping controlBlockMapping;
+
+    /** Gate signal parameter index in CircuitNetlist parameter array */
+    private static final int PARAM_GATE = 8;
 
     /**
      * Creates a DomainCoupler with no coupling (all domains independent).
@@ -106,7 +116,7 @@ public class DomainCoupler {
 
     /**
      * Performs a complete domain coupling cycle for one time step.
-     * Order: solve LK → transfer LK→CTRL → execute CTRL → transfer CTRL→LK
+     * Order: LK→CONTROL probes → execute CONTROL → CONTROL→LK gates
      *
      * @param circuitNetlist circuit netlist (after LK solve)
      * @param controlNetlist control netlist (will be executed)
@@ -119,17 +129,174 @@ public class DomainCoupler {
         double dt,
         double time
     ) {
-        // 1. Transfer LK node voltages to CONTROL inputs
+        // 1. Transfer LK data to CONTROL probes (VOLT/AMP)
         transferLkToControl(circuitNetlist);
+        transferLkToControlProbes(circuitNetlist);
 
         // 2. Execute CONTROL calculators (reads LK voltages, produces outputs)
         if (controlNetlist != null && controlNetlist.hasCalculators()) {
             controlNetlist.executeTimeStep(dt, time);
         }
 
-        // 3. Transfer CONTROL outputs back to LK (sources, switches)
-        // Note: actual source/switch updates happen in next buildVectorB/buildMatrixA call
-        // (placeholder for Phase 5 full integration)
+        // 3. Transfer CONTROL gate signals back to LK switches
+        transferGateSignalsToLk(circuitNetlist);
+    }
+
+    /**
+     * Configures this coupler with the control block mapping from the factory.
+     *
+     * @param mapping the control block mapping containing probe/gate/scope info
+     */
+    public void configureFromMapping(ControlBlockMapping mapping) {
+        this.controlBlockMapping = mapping;
+    }
+
+    /**
+     * No-op kept for backward compatibility. Switch parameters are now read
+     * directly from the netlist parameter array each step.
+     *
+     * @param circuitNetlist unused
+     * @deprecated No longer needed — R_ON/R_OFF are read from params per component type.
+     */
+    @Deprecated
+    public void saveInitialSwitchParameters(CircuitNetlist circuitNetlist) {
+        // No-op: switch R_ON/R_OFF are now read from params each step in applyGateSignals()
+    }
+
+    /**
+     * Applies gate signals to switch resistance, matching the proven
+     * {@code checkForSwitchAction()} method from SimulationsKern.
+     *
+     * <p>For each gate mapping, reads the gate calculator's input signal and
+     * sets the switch's current resistance {@code params[0]} based on the component type:
+     * <ul>
+     *   <li>LK_S: {@code params[0] = gate > 0.5 ? params[1] : params[2]}</li>
+     *   <li>LK_MOSFET: {@code params[0] = gate > 0.5 ? params[2] : params[3]}</li>
+     *   <li>LK_THYR/LK_IGBT: sets {@code params[8]} gate flag only (ON/OFF handled by diode iteration)</li>
+     * </ul>
+     *
+     * <p>Must be called BEFORE building the A matrix so the solve uses the correct resistance.
+     *
+     * @param circuitNetlist the circuit netlist containing switch parameters
+     * @return true if any switch resistance changed (caller should rebuild A matrix)
+     */
+    public boolean applyGateSignals(CircuitNetlist circuitNetlist) {
+        if (controlBlockMapping == null || circuitNetlist == null) {
+            return false;
+        }
+
+        boolean anyChanged = false;
+        List<ControlBlockMapping.GateMapping> gates = controlBlockMapping.getGateMappings();
+
+        for (ControlBlockMapping.GateMapping gate : gates) {
+            AbstractControlCalculatable gateCalc = gate.getCalculator();
+            double gateValue = 0.0;
+            if (gateCalc._inputSignal.length > 0 && gateCalc._inputSignal[0] != null) {
+                gateValue = gateCalc._inputSignal[0][0];
+            }
+
+            String switchName = gate.getSwitchName();
+            int switchIndex = circuitNetlist.getElementIndexByName(switchName);
+            if (switchIndex < 0) continue;
+
+            double[] params = circuitNetlist.getParameter(switchIndex);
+            if (params == null || params.length <= PARAM_GATE) continue;
+
+            CircuitTypCore type = circuitNetlist.getType(switchIndex);
+            double oldR = params[0];
+
+            switch (type) {
+                case LK_S:
+                    // Proven: par[0] = schaltSignal > 0.5 ? par[1] : par[2]
+                    params[0] = (gateValue > 0.5) ? params[1] : params[2];
+                    break;
+                case LK_MOSFET:
+                    // Proven: par[0] = schaltSignal > 0.5 ? par[2] : par[3]
+                    params[0] = (gateValue > 0.5) ? params[2] : params[3];
+                    break;
+                case LK_THYR:
+                case LK_IGBT:
+                    // Gate only — actual ON/OFF switching handled by diode iteration
+                    params[PARAM_GATE] = (gateValue > 0.5) ? 1.0 : 0.0;
+                    break;
+                default:
+                    break;
+            }
+
+            if (params[0] != oldR) {
+                anyChanged = true;
+            }
+        }
+
+        return anyChanged;
+    }
+
+    /**
+     * Transfers LK node voltages to VOLT probe outputs and
+     * LK component currents to AMP probe outputs.
+     *
+     * <p>VOLT probe: reads {@code parameterString} → resolves to MNA node indices →
+     * computes {@code V = p[nodeA] - p[nodeB]} → writes to probe's {@code _outputSignal[0][0]}</p>
+     *
+     * <p>AMP probe: reads {@code parameterString} → resolves component name to element index →
+     * reads current from stored results → writes to probe's {@code _outputSignal[0][0]}</p>
+     */
+    void transferLkToControlProbes(CircuitNetlist circuitNetlist) {
+        if (controlBlockMapping == null || circuitNetlist == null) {
+            return;
+        }
+
+        double[] nodeVoltages = circuitNetlist.getLastNodeVoltagesRef();
+        double[] componentCurrents = circuitNetlist.getLastComponentCurrentsRef();
+
+        // VOLT probes: V = p[nodeA] - p[nodeB]
+        for (ControlBlockMapping.VoltProbeMapping probe : controlBlockMapping.getVoltProbeMappings()) {
+            int nodeA = probe.getNodeA();
+            int nodeB = probe.getNodeB();
+            double vA = (nodeA > 0 && nodeA < nodeVoltages.length) ? nodeVoltages[nodeA] : 0.0;
+            double vB = (nodeB > 0 && nodeB < nodeVoltages.length) ? nodeVoltages[nodeB] : 0.0;
+            probe.getCalculator()._outputSignal[0][0] = vA - vB;
+        }
+
+        // AMP probes: I = iALT[elementIndex]
+        for (ControlBlockMapping.AmpProbeMapping probe : controlBlockMapping.getAmpProbeMappings()) {
+            String compName = probe.getComponentName();
+            int elementIndex = circuitNetlist.getElementIndexByName(compName);
+            if (elementIndex >= 0 && elementIndex < componentCurrents.length) {
+                probe.getCalculator()._outputSignal[0][0] = componentCurrents[elementIndex];
+            }
+        }
+    }
+
+    /**
+     * Stores CONTROL gate signal values into switch parameter[8].
+     *
+     * <p>This only records the gate value — it does NOT change the switch resistance.
+     * The resistance is applied at the start of the next time step by
+     * {@link #applyGateSignals(CircuitNetlist)}.
+     */
+    void transferGateSignalsToLk(CircuitNetlist circuitNetlist) {
+        if (controlBlockMapping == null || circuitNetlist == null) {
+            return;
+        }
+
+        List<ControlBlockMapping.GateMapping> gates = controlBlockMapping.getGateMappings();
+        for (ControlBlockMapping.GateMapping gate : gates) {
+            AbstractControlCalculatable gateCalc = gate.getCalculator();
+            double gateValue = 0.0;
+            if (gateCalc._inputSignal.length > 0 && gateCalc._inputSignal[0] != null) {
+                gateValue = gateCalc._inputSignal[0][0];
+            }
+
+            String switchName = gate.getSwitchName();
+            int switchIndex = circuitNetlist.getElementIndexByName(switchName);
+            if (switchIndex >= 0) {
+                double[] params = circuitNetlist.getParameter(switchIndex);
+                if (params != null && params.length > PARAM_GATE) {
+                    params[PARAM_GATE] = gateValue;
+                }
+            }
+        }
     }
 
     // --- Accessors ---
