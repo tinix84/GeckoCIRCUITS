@@ -1,12 +1,19 @@
 package gecko.rest.service;
 
+import gecko.core.allg.SolverSettingsCore;
+import gecko.core.allg.SolverType;
 import gecko.core.datacontainer.DataContainerSimple;
 import gecko.core.signal.CharacteristicsCalculator;
 import gecko.core.signal.FourierGUIless;
 import gecko.core.GeckoInvalidArgumentException;
+import gecko.core.simulation.SimulationConfig;
+import gecko.core.simulation.SteadyStateAnalyzer;
+import gecko.core.simulation.SteadyStateResult;
 import gecko.rest.model.analysis.CharacteristicsResponse;
 import gecko.rest.model.analysis.FourierResponse;
 import gecko.rest.model.analysis.SignalAnalysisRequest;
+import gecko.rest.model.analysis.SteadyStateRequest;
+import gecko.rest.model.analysis.SteadyStateResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -242,6 +249,78 @@ public class AnalysisService {
             throw new ResponseStatusException(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "Analysis failed: " + e.getMessage(),
+                e
+            );
+        }
+    }
+
+    /**
+     * Run a steady-state analysis for a circuit.
+     *
+     * <p>The method delegates to {@link SteadyStateAnalyzer}, which simulates up to
+     * {@code request.getMaxPeriods()} switching periods and declares convergence when
+     * the maximum relative change in any signal between consecutive period boundaries
+     * falls below {@code request.getTolerance()}.</p>
+     *
+     * @param request steady-state analysis parameters
+     * @return {@link SteadyStateResponse} with convergence info and last-period waveforms
+     * @throws ResponseStatusException on invalid request or simulation failure
+     */
+    public SteadyStateResponse computeSteadyState(SteadyStateRequest request) {
+        try {
+            // Resolve solver type (default: SOLVER_BE)
+            SolverType solverType = SolverType.SOLVER_BE;
+            if (request.getSolverType() != null && !request.getSolverType().isBlank()) {
+                try {
+                    solverType = SolverType.valueOf(request.getSolverType().toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Unknown solverType: " + request.getSolverType()
+                    );
+                }
+            }
+
+            SolverSettingsCore settings = new SolverSettingsCore();
+            settings.setSolverType(solverType);
+            settings.setStepWidth(request.getTimeStep());
+            // simulationDuration is overridden internally by SteadyStateAnalyzer
+            settings.setSimulationDuration(request.getPeriod() * request.getMaxPeriods());
+
+            SimulationConfig.Builder configBuilder = SimulationConfig.builder()
+                    .solverSettings(settings)
+                    .circuitFile(request.getCircuitFile());
+
+            if (request.getParameters() != null) {
+                configBuilder.withParameters(request.getParameters());
+            }
+
+            SimulationConfig config = configBuilder.build();
+
+            SteadyStateAnalyzer analyzer = new SteadyStateAnalyzer();
+            SteadyStateResult result = analyzer.analyze(
+                    config,
+                    request.getPeriod(),
+                    request.getMaxPeriods(),
+                    request.getTolerance()
+            );
+
+            if (result.getStatus() == SteadyStateResult.Status.FAILED) {
+                throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Steady-state analysis failed: " + result.getErrorMessage()
+                );
+            }
+
+            return SteadyStateResponse.from(result);
+
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Unexpected error in computeSteadyState", e);
+            throw new ResponseStatusException(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Steady-state analysis failed: " + e.getMessage(),
                 e
             );
         }
