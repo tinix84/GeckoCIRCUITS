@@ -45,6 +45,9 @@ jobs:
           mvn -f pom.xml jacoco:report --no-transfer-progress
           mvn -f src/modules/gecko-simulation-core/pom.xml jacoco:report --no-transfer-progress
 
+      - name: Verify application traces
+        run: mvn -f src/modules/gecko-simulation-core/pom.xml test -Papplication --no-transfer-progress
+
       - name: Check test results
         run: |
           if grep -rq "Failures: [1-9]" target/surefire-reports/*.txt 2>/dev/null; then

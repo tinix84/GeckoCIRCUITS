@@ -119,7 +119,10 @@ public class SimulationTraceLogger implements Closeable {
         // Component currents
         int elementCount = nl.elementANZAHLneu;
         for (int i = 0; i < elementCount; i++) {
-            sb.append(',').append(String.format(Locale.ROOT, "%.12e", lkm.iALT[i]));
+            // Ideal-source current is an MNA unknown, not a reactive history value.
+            double current = nl.typ[i] == CircuitTyp.LK_U
+                    ? lkm.p[nl.knotenMAX + nl.spgQuelleNr[i]] : lkm.iALT[i];
+            sb.append(',').append(String.format(Locale.ROOT, "%.12e", current));
         }
 
         // Switch/diode state
