@@ -42,6 +42,7 @@ public enum I18nKeys {
     SHORT_CIRCUIT_COMPONENT("Short-Circuit Component"),
     IMPORT("Import"),
     IMPORT_FROM_FILE("Import from File"),
+    IMPORT_FROM_LTSPICE("Import from LTspice (.asc)..."),
     EXPORT("Export"),
     SIMULATION("Simulation"),
     VIEW("View"),
