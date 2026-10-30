@@ -86,6 +86,24 @@ class SimulationTraceLoggerTest {
     }
 
     @Test
+    void exportsSolvedVoltageSourceCurrentInsteadOfUnusedHistorySlot() throws Exception {
+        NetListLK netlist = netlist(new CircuitTyp[]{CircuitTyp.LK_U}, new double[][]{{401, 12}});
+        netlist.knotenMAX = 1;
+        netlist.spgQuelleNr[0] = 1;
+        LKMatrices matrices = new LKMatrices(SolverType.SOLVER_BE);
+        matrices.matrixSize = 3;
+        matrices.p = new double[]{0, 12, -0.25};
+        matrices.iALT = new double[]{0};
+        Path output = directory.resolve("source-current.csv");
+
+        try (SimulationTraceLogger logger = new SimulationTraceLogger(output.toFile())) {
+            logger.logStep(0, matrices, netlist);
+        }
+
+        assertEquals(-0.25, Double.parseDouble(Files.readAllLines(output).get(1).split(",")[4]));
+    }
+
+    @Test
     void refusesToReplaceAnExistingTrace() throws Exception {
         Path output = directory.resolve("existing.csv");
         Files.writeString(output, "preserved trace");

@@ -16,6 +16,21 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ElectricalTimeStepTest {
 
+    @Test
+    void voltageSourceCurrentBalancesItsLoadWithoutChangingSourceVoltage() {
+        CircuitNetlist netlist = SyntheticCircuitBuilder.rcCircuit(10.0, 1000.0, 1e-6);
+        ElectricalTimeStep step = new ElectricalTimeStep(netlist, SolverType.SOLVER_BE);
+
+        for (int index = 0; index < 3; index++) {
+            step.advance(1e-5, index * 1e-5, null);
+            double[] currents = netlist.getLastComponentCurrents();
+            assertEquals(-currents[1], currents[0], 1e-12,
+                    "The voltage source must supply the resistor current");
+            assertEquals(10.0, netlist.getParameter(0)[1], 0.0,
+                    "Current reconstruction must preserve the source voltage");
+        }
+    }
+
     @ParameterizedTest
     @EnumSource(SolverType.class)
     void capacitorHistoryProducesTheExpectedTimeConstant(SolverType solverType) {

@@ -219,6 +219,10 @@ public class ComponentCurrentCalculator {
                 }
 
                 case LK_U:
+                    // MNA stores ideal-source currents after the node potentials.
+                    current = p[netlist.getNodeMax() + netlist.getVoltageSourceNumber(elementIdx)];
+                    break;
+
                 case REL_MMF:
                 case TH_TEMP:
                     break;
