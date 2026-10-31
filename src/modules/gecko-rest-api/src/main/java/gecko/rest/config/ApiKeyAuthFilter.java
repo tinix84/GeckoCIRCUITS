@@ -27,6 +27,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             "/actuator/health",
             "/api/v1/health",
             "/swagger-ui",
+            "/swagger-ui.html",
             "/v3/api-docs",
             "/ws",
             "/ws-raw"
@@ -72,7 +73,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
     private boolean isPublicPath(String path) {
         for (String prefix : PUBLIC_PATH_PREFIXES) {
-            if (path.startsWith(prefix)) {
+            if (path.equals(prefix) || path.startsWith(prefix + "/")) {
                 return true;
             }
         }

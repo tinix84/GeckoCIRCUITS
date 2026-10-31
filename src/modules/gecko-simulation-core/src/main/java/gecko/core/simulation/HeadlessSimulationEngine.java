@@ -65,6 +65,7 @@ public class HeadlessSimulationEngine {
 
     private final AtomicReference<EngineState> state = new AtomicReference<>(EngineState.IDLE);
     private final AtomicBoolean cancelRequested = new AtomicBoolean(false);
+    private final Object pauseMonitor = new Object();
 
     // Progress tracking
     private volatile double currentTime = 0;
@@ -111,11 +112,12 @@ public class HeadlessSimulationEngine {
             return SimulationResult.failed("Simulation configuration is required");
         }
 
-        if (!state.compareAndSet(EngineState.IDLE, EngineState.RUNNING)) {
-            return SimulationResult.failed("Engine is already running a simulation");
+        synchronized (pauseMonitor) {
+            if (!state.compareAndSet(EngineState.IDLE, EngineState.RUNNING)) {
+                return SimulationResult.failed("Engine is already running a simulation");
+            }
+            cancelRequested.set(false);
         }
-
-        cancelRequested.set(false);
         long startTime = System.currentTimeMillis();
         simulationStartTime = startTime;
 
@@ -125,7 +127,10 @@ public class HeadlessSimulationEngine {
             e.printStackTrace();
             return SimulationResult.failed("Simulation error: " + e.getMessage());
         } finally {
-            state.set(EngineState.IDLE);
+            synchronized (pauseMonitor) {
+                state.set(EngineState.IDLE);
+                pauseMonitor.notifyAll();
+            }
         }
     }
 
@@ -151,14 +156,7 @@ public class HeadlessSimulationEngine {
     private SimulationResult executeSimulation(SimulationConfig config, long startTime,
             BooleanSupplier cancellationSignal) {
         CircuitModel circuitModel = parseCircuitModel(config);
-        SolverSettingsCore settings = config.getSolverSettings();
-
-        // Apply .ipes file solver settings (matches SimulationsKern behavior)
-        if (circuitModel != null && circuitModel.hasValidSimulationParameters()) {
-            settings.setSolverType(circuitModel.getSolverType());
-            settings.setStepWidth(circuitModel.getTimeStep());
-            settings.setSimulationDuration(circuitModel.getSimulationDuration());
-        }
+        SolverSettingsCore settings = config.resolveSolverSettings(circuitModel);
 
         double dt = settings.getStepWidth();
         double duration = settings.getSimulationDuration();
@@ -202,7 +200,8 @@ public class HeadlessSimulationEngine {
         float[] values = new float[signalNames.length];
 
         while (currentTime <= duration) {
-            if (cancelRequested.get() || cancellationSignal.getAsBoolean()) {
+            awaitResumeOrCancellation(cancellationSignal);
+            if (cancelRequested.get() || Thread.currentThread().isInterrupted() || cancellationSignal.getAsBoolean()) {
                 dataContainer.setContainerStatus(ContainerStatus.PAUSED);
                 return SimulationResult.builder()
                         .status(SimulationResult.Status.CANCELLED)
@@ -266,8 +265,29 @@ public class HeadlessSimulationEngine {
      * The simulation will stop at the next opportunity.
      */
     public void cancel() {
-        if (state.get() == EngineState.RUNNING) {
-            cancelRequested.set(true);
+        synchronized (pauseMonitor) {
+            if (state.get() != EngineState.IDLE) {
+                cancelRequested.set(true);
+                pauseMonitor.notifyAll();
+            }
+        }
+    }
+
+    private void awaitResumeOrCancellation(BooleanSupplier cancellationSignal) {
+        // Invoke the owner's signal outside this monitor to avoid lock inversion.
+        while (state.get() == EngineState.PAUSED && !cancelRequested.get()
+                && !Thread.currentThread().isInterrupted() && !cancellationSignal.getAsBoolean()) {
+            synchronized (pauseMonitor) {
+                if (state.get() == EngineState.PAUSED && !cancelRequested.get()) {
+                    try {
+                        // The external cancellation signal does not own this monitor.
+                        pauseMonitor.wait(50);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            }
         }
     }
 
@@ -336,7 +356,9 @@ public class HeadlessSimulationEngine {
      * @return true if pause was requested, false if simulation is not running
      */
     public boolean pause() {
-        return state.compareAndSet(EngineState.RUNNING, EngineState.PAUSED);
+        synchronized (pauseMonitor) {
+            return !cancelRequested.get() && state.compareAndSet(EngineState.RUNNING, EngineState.PAUSED);
+        }
     }
 
     /**
@@ -346,7 +368,13 @@ public class HeadlessSimulationEngine {
      * @return true if resume was successful, false if simulation was not paused
      */
     public boolean resume() {
-        return state.compareAndSet(EngineState.PAUSED, EngineState.RUNNING);
+        synchronized (pauseMonitor) {
+            boolean resumed = !cancelRequested.get() && state.compareAndSet(EngineState.PAUSED, EngineState.RUNNING);
+            if (resumed) {
+                pauseMonitor.notifyAll();
+            }
+            return resumed;
+        }
     }
 
     /**
