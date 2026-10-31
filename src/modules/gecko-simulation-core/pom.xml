@@ -124,7 +124,37 @@
                                         <limit>
                                             <counter>INSTRUCTION</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.18</minimum>
+                                            <minimum>0.95</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.90</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes>
+                                        <include>gecko.core.control.calculators.SparseMatrixCalculator</include>
+                                        <include>gecko.core.control.calculators.SmallSignalCalculator</include>
+                                        <include>gecko.core.control.calculators.DelayCalculator</include>
+                                        <include>gecko.core.control.calculators.PmsmControlCalculator</include>
+                                        <include>gecko.core.control.calculators.PmsmModulatorCalculator</include>
+                                        <include>gecko.core.control.calculators.ThyristorControlCalculator*</include>
+                                        <include>gecko.core.control.calculators.ABCDQCalculator</include>
+                                        <include>gecko.core.control.calculators.DQABCDCalculator</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.95</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.85</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
@@ -157,6 +187,54 @@
                                             <counter>BRANCH</counter>
                                             <value>COVEREDRATIO</value>
                                             <minimum>0.90</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes>
+                                        <include>gecko.core.control.calculators.SignalCalculatorImport</include>
+                                        <include>gecko.core.control.calculators.PDCalculator</include>
+                                        <include>gecko.core.control.calculators.PT2Calculator</include>
+                                        <include>gecko.core.control.calculators.CounterCalculatable</include>
+                                        <include>gecko.core.control.calculators.SampleHoldCalculator</include>
+                                        <include>gecko.core.control.calculators.HysteresisCalculator*</include>
+                                        <include>gecko.core.control.calculators.LimitCalculator*</include>
+                                        <include>gecko.core.control.calculators.*MultiInput*</include>
+                                        <include>gecko.core.control.calculators.AndTwoPortCalculator</include>
+                                        <include>gecko.core.control.calculators.OrCalculator*</include>
+                                        <include>gecko.core.control.calculators.XORCalculator</include>
+                                        <include>gecko.core.control.calculators.NotCalculator</include>
+                                        <include>gecko.core.control.calculators.Subtraction*</include>
+                                        <include>gecko.core.control.calculators.MUXControlCalculatable</include>
+                                        <include>gecko.core.control.calculators.TimeCalculator</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.95</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.90</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes><include>gecko.core.control.calculators.SignalCalculatorExternalWrapper</include></includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.75</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.85</minimum>
                                         </limit>
                                     </limits>
                                 </rule>

@@ -69,24 +69,32 @@ public final class DelayCalculator extends AbstractSingleInputSingleOutputCalcul
         int newBufferSize = Math.max(1, (int) (_delayTime / deltaT));
         double[] newBuffer = new double[newBufferSize];
 
-        // Interpolate old buffer values into new buffer
+        // Sample the old chronological history at the new output timestamps.
         if (_delayBuffer != null && _delayBuffer.length > 0) {
             final double ratio = deltaT / _originalDt;
-            final int newStartIndex = Math.min(Math.max(0, (int) (_bufferIndex / ratio)), newBuffer.length - 1);
-
             for (int i = 0; i < newBuffer.length; i++) {
-                int oldIndex = (int) (ratio * i);
-                if (oldIndex >= 0 && oldIndex < _delayBuffer.length) {
-                    newBuffer[i] = _delayBuffer[oldIndex];
-                }
+                double position = _delayBuffer.length - 1 - (newBuffer.length - 1 - i) * ratio;
+                int lower = (int) Math.floor(position);
+                double fraction = position - lower;
+                newBuffer[i] = historyValue(lower) * (1 - fraction) + historyValue(lower + 1) * fraction;
             }
-            _bufferIndex = newStartIndex;
-        } else {
-            _bufferIndex = 0;
         }
 
         _delayBuffer = newBuffer;
+        _bufferIndex = 0;
+        _bufferEmpty = false;
         _originalDt = deltaT;
+    }
+
+    private double historyValue(int position) {
+        if (position == -1) {
+            // The last output retains the sample immediately before the oldest buffered sample.
+            return _outputSignal[0][0];
+        }
+        if (position < 0 || position >= _delayBuffer.length) {
+            return 0;
+        }
+        return _delayBuffer[(_bufferIndex + position) % _delayBuffer.length];
     }
 
     @Override
@@ -94,6 +102,7 @@ public final class DelayCalculator extends AbstractSingleInputSingleOutputCalcul
         _delayTime = _initDelayTime;
         _originalDt = deltaT;
         _bufferEmpty = true;
+        _outputSignal[0][0] = 0;
 
         // Create buffer sized for delay time
         int bufferSize = Math.max(1, (int) (_delayTime / deltaT));
@@ -103,14 +112,12 @@ public final class DelayCalculator extends AbstractSingleInputSingleOutputCalcul
 
     @Override
     public void berechneYOUT(final double deltaT) {
+        if (deltaT > _delayTime) {
+            _outputSignal[0][0] = _inputSignal[0][0];
+            return;
+        }
         if (_bufferEmpty) {
             // Buffer is still being filled
-            if (deltaT > _delayTime) {
-                // Minimal delay - just pass through input
-                _outputSignal[0][0] = _inputSignal[0][0];
-                return;
-            }
-
             // Output zero while filling
             _outputSignal[0][0] = 0;
 
