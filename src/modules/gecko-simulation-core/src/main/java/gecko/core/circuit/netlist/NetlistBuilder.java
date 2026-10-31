@@ -14,6 +14,7 @@
 package gecko.core.circuit.netlist;
 
 import gecko.core.circuit.circuitcomponents.CircuitTypCore;
+import gecko.core.circuit.matrix.StamperRegistry;
 import gecko.core.io.CircuitModel;
 
 import java.util.ArrayList;
@@ -147,6 +148,21 @@ public class NetlistBuilder {
             return buildEmpty(0, 0, 0);
         }
 
+        StamperRegistry registry = StamperRegistry.createDefault();
+        for (CircuitModel.ComponentData component : allComponents) {
+            CircuitTypCore type;
+            try {
+                type = CircuitTypCore.fromTypeNumber(component.getType());
+            } catch (IllegalArgumentException error) {
+                throw new IllegalArgumentException("Unsupported electrical component '" + component.getName()
+                        + "' with type " + component.getType(), error);
+            }
+            if (!registry.hasStamper(type)) {
+                throw new IllegalArgumentException("Unsupported electrical component '" + component.getName()
+                        + "' with type " + component.getType() + " (" + type + ")");
+            }
+        }
+
         // Check if any component has terminal labels (indicates parsed from file)
         boolean hasLabels = allComponents.stream()
                 .anyMatch(comp -> comp.getTerminalXLabels().length > 0 || comp.getTerminalYLabels().length > 0);
@@ -201,13 +217,7 @@ public class NetlistBuilder {
 
         for (int i = 0; i < elementCount; i++) {
             CircuitModel.ComponentData comp = components.get(i);
-            CircuitTypCore typ;
-            try {
-                typ = CircuitTypCore.fromTypeNumber(comp.getType());
-            } catch (IllegalArgumentException e) {
-                // Unknown type - default to resistor
-                typ = CircuitTypCore.LK_R;
-            }
+            CircuitTypCore typ = CircuitTypCore.fromTypeNumber(comp.getType());
             types[i] = typ;
 
             if (typ == CircuitTypCore.LK_U || typ == CircuitTypCore.LK_LKOP2) {

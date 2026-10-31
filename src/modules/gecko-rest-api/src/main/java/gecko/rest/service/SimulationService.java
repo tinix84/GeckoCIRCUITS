@@ -5,6 +5,7 @@ import gecko.core.simulation.HeadlessSimulationEngine;
 import gecko.core.simulation.SimulationConfig;
 import gecko.core.simulation.SimulationProgress;
 import gecko.core.simulation.SimulationResult;
+import gecko.rest.config.SimulationJobLimits;
 import gecko.rest.model.BatchJobStatus;
 import gecko.rest.model.BatchSimulationRequest;
 import gecko.rest.model.BatchSimulationResponse;
@@ -16,6 +17,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.Instant;
@@ -30,14 +33,17 @@ import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.LongFunction;
 import java.util.function.Supplier;
 
 /**
  * Owns simulation scheduling, state transitions, and progress subscriptions.
- * Each job commits its state and notifications under the same monitor.
+ * Each job commits state under its monitor and delivers ordered notifications separately.
  */
 @Service
 public class SimulationService {
@@ -50,13 +56,25 @@ public class SimulationService {
     private final ExecutorService executorService;
     private final Supplier<HeadlessSimulationEngine> engineFactory;
     private final LongFunction<SseEmitter> emitterFactory;
+    private final SimulationJobLimits limits;
+    private final Executor deliveryExecutor;
+    private final Object admissionMonitor = new Object();
 
     @Autowired(required = false)
     private WebSocketProgressService webSocketProgressService;
 
     public SimulationService() {
-        this(Executors.newFixedThreadPool(Math.max(2, Runtime.getRuntime().availableProcessors() - 1)),
-                HeadlessSimulationEngine::new);
+        this(new SimulationJobLimits());
+    }
+
+    @Autowired
+    public SimulationService(SimulationJobLimits limits) {
+        this(new ThreadPoolExecutor(limits.getWorkers(), limits.getWorkers(), 0, TimeUnit.MILLISECONDS,
+                        new ArrayBlockingQueue<>(limits.getQueued())), HeadlessSimulationEngine::new,
+                SseEmitter::new, null, limits,
+                new ThreadPoolExecutor(limits.getDeliveryWorkers(), limits.getDeliveryWorkers(), 0, TimeUnit.MILLISECONDS,
+                        new ArrayBlockingQueue<>(limits.getRetained()),
+                        Thread.ofPlatform().daemon().name("gecko-progress-", 0).factory()));
     }
 
     SimulationService(ExecutorService executorService, Supplier<HeadlessSimulationEngine> engineFactory) {
@@ -65,16 +83,39 @@ public class SimulationService {
 
     SimulationService(ExecutorService executorService, Supplier<HeadlessSimulationEngine> engineFactory,
                       LongFunction<SseEmitter> emitterFactory, WebSocketProgressService webSocketProgressService) {
+        this(executorService, engineFactory, emitterFactory, webSocketProgressService,
+                new SimulationJobLimits(), Runnable::run);
+    }
+
+    SimulationService(ExecutorService executorService, Supplier<HeadlessSimulationEngine> engineFactory,
+                      LongFunction<SseEmitter> emitterFactory, WebSocketProgressService webSocketProgressService,
+                      SimulationJobLimits limits, Executor deliveryExecutor) {
         this.executorService = executorService;
         this.engineFactory = engineFactory;
         this.emitterFactory = emitterFactory;
         this.webSocketProgressService = webSocketProgressService;
+        this.limits = limits;
+        this.deliveryExecutor = deliveryExecutor;
     }
 
     public SimulationResponse submitSimulation(SimulationRequest request) {
-        SimulationJob job = createJob(request, null);
-        dispatch(job);
-        return snapshot(job);
+        synchronized (admissionMonitor) {
+            requireCapacity(1, false);
+            SimulationJob job = createJob(request, null);
+            if (!dispatch(job) && !executorService.isShutdown()) {
+                jobs.remove(job.response.getSimulationId(), job);
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Simulation queue is full");
+            }
+            return snapshot(job);
+        }
+    }
+
+    private void requireCapacity(int requestedJobs, boolean batch) {
+        if (requestedJobs > limits.getRetained() - jobs.size()
+                || (batch && batches.size() >= limits.getBatches())) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Simulation capacity is full. Existing results are retained.");
+        }
     }
 
     private SimulationJob createJob(SimulationRequest request, BatchJob batch) {
@@ -84,7 +125,7 @@ public class SimulationService {
         if (request.getParameters() != null) {
             ownedRequest.setParameters(new HashMap<>(request.getParameters()));
         }
-        SimulationJob job = new SimulationJob(ownedRequest, batch);
+        SimulationJob job = new SimulationJob(ownedRequest, batch, deliveryExecutor);
         jobs.put(job.response.getSimulationId(), job);
         return job;
     }
@@ -95,7 +136,8 @@ public class SimulationService {
             return true;
         } catch (RejectedExecutionException e) {
             synchronized (job) {
-                if (applyFailureResult(job.response, "Simulation executor is shut down")) {
+                if (applyFailureResult(job.response, executorService.isShutdown()
+                        ? "Simulation executor is shut down" : "Simulation queue is full")) {
                     publishTerminal(job);
                 }
             }
@@ -282,15 +324,24 @@ public class SimulationService {
             return null;
         }
         synchronized (job) {
+            if (!isTerminal(job.response) && job.emitters.size() >= limits.getStreamsPerJob()) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many progress streams for this job");
+            }
             SseEmitter emitter = emitterFactory.apply(timeoutMs);
             if (isTerminal(job.response)) {
+                String data = "{\"status\":\"" + job.response.getStatus()
+                        + "\",\"simulationId\":\"" + simulationId + "\"}";
                 try {
-                    emitter.send(SseEmitter.event().name("status").data(
-                            "{\"status\":\"" + job.response.getStatus()
-                                    + "\",\"simulationId\":\"" + simulationId + "\"}"));
-                    emitter.complete();
-                } catch (Exception ignored) {
-                    // The subscriber disconnected before receiving the terminal state.
+                    deliveryExecutor.execute(() -> {
+                        try {
+                            emitter.send(SseEmitter.event().name("status").data(data));
+                            emitter.complete();
+                        } catch (Exception ignored) {
+                            // The subscriber disconnected before receiving the terminal state.
+                        }
+                    });
+                } catch (RejectedExecutionException full) {
+                    throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Progress delivery is busy");
                 }
             } else {
                 job.emitters.add(emitter);
@@ -321,25 +372,26 @@ public class SimulationService {
             String data = String.format(Locale.ROOT,
                     "{\"progress\":%.3f,\"currentTime\":%.6f,\"endTime\":%.6f,\"simulationId\":\"%s\"}",
                     progress, currentTime, endTime, simulationId);
-            List<SseEmitter> dead = new ArrayList<>();
-            for (SseEmitter emitter : new ArrayList<>(job.emitters)) {
-                try {
-                    emitter.send(SseEmitter.event().name("progress").data(data));
-                } catch (Exception e) {
-                    dead.add(emitter);
+            List<SseEmitter> emitters = new ArrayList<>(job.emitters);
+            SimulationResponse.ProgressDetails details = job.response.getProgressDetails();
+            job.mailbox.progress(() -> {
+                for (SseEmitter emitter : emitters) {
+                    try {
+                        emitter.send(SseEmitter.event().name("progress").data(data));
+                    } catch (Exception e) {
+                        removeEmitter(job, emitter);
+                    }
                 }
-            }
-            job.emitters.removeAll(dead);
-            if (webSocketProgressService != null) {
-                SimulationResponse.ProgressDetails details = job.response.getProgressDetails();
-                try {
-                    webSocketProgressService.broadcastProgress(simulationId, progress, currentTime, endTime,
-                            details == null ? 0 : details.currentStep(), details == null ? 0 : details.totalSteps(),
-                            "RUNNING");
-                } catch (Exception e) {
-                    logger.debug("WebSocket progress delivery failed for {}", simulationId, e);
+                if (webSocketProgressService != null) {
+                    try {
+                        webSocketProgressService.broadcastProgress(simulationId, progress, currentTime, endTime,
+                                details == null ? 0 : details.currentStep(), details == null ? 0 : details.totalSteps(),
+                                "RUNNING");
+                    } catch (Exception e) {
+                        logger.debug("WebSocket progress delivery failed for {}", simulationId, e);
+                    }
                 }
-            }
+            });
         }
     }
 
@@ -362,49 +414,68 @@ public class SimulationService {
         String simulationId = job.response.getSimulationId();
         List<SseEmitter> emitters = new ArrayList<>(job.emitters);
         job.emitters.clear();
-        for (SseEmitter emitter : emitters) {
-            try {
-                emitter.send(SseEmitter.event().name(success ? "complete" : "error")
-                        .data("{\"simulationId\":\"" + simulationId + "\"}"));
-                emitter.complete();
-            } catch (Exception ignored) {
-                // Delivery is attempted once for each subscribed transport.
+        String errorMessage = job.response.getErrorMessage();
+        job.mailbox.terminal(() -> {
+            for (SseEmitter emitter : emitters) {
+                try {
+                    emitter.send(SseEmitter.event().name(success ? "complete" : "error")
+                            .data("{\"simulationId\":\"" + simulationId + "\"}"));
+                    emitter.complete();
+                } catch (Exception ignored) {
+                    // Delivery is attempted once for each subscribed transport.
+                }
             }
-        }
-        if (webSocketProgressService != null) {
-            try {
-                webSocketProgressService.broadcastCompletion(simulationId, success, job.response.getErrorMessage());
-            } catch (Exception e) {
-                logger.debug("WebSocket terminal delivery failed for {}", simulationId, e);
+            if (webSocketProgressService != null) {
+                try {
+                    webSocketProgressService.broadcastCompletion(simulationId, success, errorMessage);
+                } catch (Exception e) {
+                    logger.debug("WebSocket terminal delivery failed for {}", simulationId, e);
+                }
             }
-        }
+        }, () -> {
+            for (SseEmitter emitter : emitters) {
+                try {
+                    emitter.completeWithError(new RejectedExecutionException("Progress delivery is busy. Poll job status."));
+                } catch (RuntimeException ignored) {
+                    // The subscriber can already be disconnected.
+                }
+            }
+            logger.debug("Terminal delivery rejected for {}. Final status remains available.", simulationId);
+        });
     }
 
     public void clearAll() {
-        for (BatchJob batch : batches.values()) {
-            synchronized (batch) {
-                batch.cancelled = true;
+        synchronized (admissionMonitor) {
+            for (BatchJob batch : batches.values()) {
+                synchronized (batch) {
+                    batch.cancelled = true;
+                }
             }
+            for (String simulationId : jobs.keySet()) {
+                cancelSimulation(simulationId);
+            }
+            jobs.clear();
+            batches.clear();
         }
-        for (String simulationId : jobs.keySet()) {
-            cancelSimulation(simulationId);
-        }
-        jobs.clear();
-        batches.clear();
     }
 
     @PreDestroy
     public void shutdown() {
         clearAll();
         executorService.shutdownNow();
+        if (deliveryExecutor instanceof ExecutorService pool) {
+            pool.shutdownNow();
+        }
     }
 
     SimulationConfig buildSimulationConfig(SimulationRequest request) {
         SimulationConfig.Builder builder = SimulationConfig.builder()
                 .circuitFile(request.getCircuitFile())
                 .stepWidth(request.getTimeStep())
-                .simulationDuration(request.getSimulationTime())
-                .solverType(parseSolverType(request.getSolverType()));
+                .simulationDuration(request.getSimulationTime());
+        if (request.getSolverType() != null) {
+            builder.solverType(parseSolverType(request.getSolverType()));
+        }
         if (request.getParameters() != null) {
             builder.withParameters(request.getParameters());
         }
@@ -491,17 +562,21 @@ public class SimulationService {
         BatchSimulationRequest.SimulationSettings settings = request.getSimulationSettings();
         double duration = settings != null && settings.getSimulationTime() != null ? settings.getSimulationTime() : 0.02;
         double dt = settings != null && settings.getTimeStep() != null ? settings.getTimeStep() : 1e-6;
-        List<String> ids = new ArrayList<>();
-        for (Map<String, Double> parameters : expandParameterSets(request)) {
-            SimulationRequest child = new SimulationRequest(request.getCircuitFile(), duration, dt);
-            child.setParameters(parameters);
-            child.setSolverType(settings == null ? null : settings.getSolverType());
-            SimulationJob job = createJob(child, batch);
-            batch.pending.add(job);
-            ids.add(job.response.getSimulationId());
+        List<Map<String, Double>> parameterSets = expandParameterSets(request);
+        synchronized (admissionMonitor) {
+            requireCapacity(parameterSets.size(), true);
+            List<String> ids = new ArrayList<>();
+            for (Map<String, Double> parameters : parameterSets) {
+                SimulationRequest child = new SimulationRequest(request.getCircuitFile(), duration, dt);
+                child.setParameters(parameters);
+                child.setSolverType(settings == null ? null : settings.getSolverType());
+                SimulationJob job = createJob(child, batch);
+                batch.pending.add(job);
+                ids.add(job.response.getSimulationId());
+            }
+            batch.response = new BatchSimulationResponse(UUID.randomUUID().toString(), List.copyOf(ids), requestedLimit);
+            batches.put(batch.response.getBatchId(), batch);
         }
-        batch.response = new BatchSimulationResponse(UUID.randomUUID().toString(), List.copyOf(ids), requestedLimit);
-        batches.put(batch.response.getBatchId(), batch);
         dispatchBatch(batch);
         return batchSnapshot(batch);
     }
@@ -619,8 +694,10 @@ public class SimulationService {
         private final List<SseEmitter> emitters = new ArrayList<>();
         private HeadlessSimulationEngine engine;
         private boolean terminalPublished;
+        private final ProgressMailbox mailbox;
 
-        private SimulationJob(SimulationRequest request, BatchJob batch) {
+        private SimulationJob(SimulationRequest request, BatchJob batch, Executor deliveryExecutor) {
+            mailbox = new ProgressMailbox(deliveryExecutor);
             this.request = request;
             this.batch = batch;
             response = new SimulationResponse(UUID.randomUUID().toString());

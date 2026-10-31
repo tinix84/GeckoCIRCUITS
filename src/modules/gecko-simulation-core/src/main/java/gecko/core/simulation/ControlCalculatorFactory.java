@@ -188,8 +188,8 @@ public class ControlCalculatorFactory {
         String[] xLabels = comp.getTerminalXLabels();
 
         if (!ControlTypCore.isKnown(type)) {
-            LOG.warning("Unknown control type " + type + " for " + comp.getName());
-            return null;
+            throw new IllegalArgumentException("Unsupported CONTROL component '" + comp.getName()
+                    + "' with type " + type);
         }
 
         ControlTypCore controlType = ControlTypCore.fromTypeNumber(type);

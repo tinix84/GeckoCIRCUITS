@@ -42,7 +42,7 @@ public class AnalysisService {
     private double[] resolveData(SignalAnalysisRequest request) {
         // Priority: raw data
         if (request.getData() != null && request.getData().length > 0) {
-            return request.getData();
+            return validateData(request.getData());
         }
 
         // Fallback: server-side simulation lookup
@@ -54,7 +54,7 @@ public class AnalysisService {
                     "Signal '" + request.getSignalName() + "' not found in simulation " + request.getSimulationId()
                 );
             }
-            return data;
+            return validateData(data);
         }
 
         // No data source
@@ -62,6 +62,25 @@ public class AnalysisService {
             HttpStatus.BAD_REQUEST,
             "Either supply 'data' with 'sampleRate', or provide 'simulationId' + 'signalName'"
         );
+    }
+
+    private double[] validateData(double[] data) {
+        for (double value : data) {
+            if (!Float.isFinite((float) value)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Signal values must be finite and within the float storage range");
+            }
+        }
+        return data;
+    }
+
+    private double validateSampleRate(Double sampleRate, int samples) {
+        if (sampleRate == null || !Double.isFinite(sampleRate) || sampleRate <= 0
+                || !Double.isFinite((samples - 1) / sampleRate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "A finite sampleRate > 0 and finite signal duration are required");
+        }
+        return sampleRate;
     }
 
     /**
@@ -100,13 +119,7 @@ public class AnalysisService {
             }
 
             // Determine sample rate
-            Double sampleRate = request.getSampleRate();
-            if (sampleRate == null || sampleRate <= 0) {
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Valid sampleRate > 0 is required for raw data analysis"
-                );
-            }
+            double sampleRate = validateSampleRate(request.getSampleRate(), data.length);
 
             // Build data container
             DataContainerSimple container = buildContainer(data, sampleRate);
@@ -182,13 +195,7 @@ public class AnalysisService {
             }
 
             // Determine sample rate
-            Double sampleRate = request.getSampleRate();
-            if (sampleRate == null || sampleRate <= 0) {
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Valid sampleRate > 0 is required for raw data analysis"
-                );
-            }
+            double sampleRate = validateSampleRate(request.getSampleRate(), data.length);
 
             // Build data container
             DataContainerSimple container = buildContainer(data, sampleRate);

@@ -15,6 +15,7 @@ package gecko.core.simulation;
 
 import gecko.core.allg.SolverSettingsCore;
 import gecko.core.allg.SolverType;
+import gecko.core.io.CircuitModel;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -27,6 +28,9 @@ import java.util.Map;
 public final class SimulationConfig {
 
     private final SolverSettingsCore solverSettings;
+    private final boolean solverTypeExplicit;
+    private final boolean stepWidthExplicit;
+    private final boolean durationExplicit;
     private final String circuitFilePath;
     private final Map<String, Double> parameterOverrides;
     private final boolean enableDataLogging;
@@ -34,6 +38,9 @@ public final class SimulationConfig {
 
     private SimulationConfig(Builder builder) {
         this.solverSettings = builder.solverSettings.copy();
+        this.solverTypeExplicit = builder.solverTypeExplicit;
+        this.stepWidthExplicit = builder.stepWidthExplicit;
+        this.durationExplicit = builder.durationExplicit;
         this.circuitFilePath = builder.circuitFilePath;
         this.parameterOverrides = Collections.unmodifiableMap(new HashMap<>(builder.parameterOverrides));
         this.enableDataLogging = builder.enableDataLogging;
@@ -47,6 +54,23 @@ public final class SimulationConfig {
      */
     public SolverSettingsCore getSolverSettings() {
         return solverSettings.copy();
+    }
+
+    /** Uses file defaults only for settings the caller did not supply. */
+    SolverSettingsCore resolveSolverSettings(CircuitModel model) {
+        SolverSettingsCore resolved = solverSettings.copy();
+        if (model != null && model.hasValidSimulationParameters()) {
+            if (!solverTypeExplicit) {
+                resolved.setSolverType(model.getSolverType());
+            }
+            if (!stepWidthExplicit) {
+                resolved.setStepWidth(model.getTimeStep());
+            }
+            if (!durationExplicit) {
+                resolved.setSimulationDuration(model.getSimulationDuration());
+            }
+        }
+        return resolved;
     }
 
     /**
@@ -100,6 +124,9 @@ public final class SimulationConfig {
      */
     public static class Builder {
         private SolverSettingsCore solverSettings = new SolverSettingsCore();
+        private boolean solverTypeExplicit;
+        private boolean stepWidthExplicit;
+        private boolean durationExplicit;
         private String circuitFilePath;
         private Map<String, Double> parameterOverrides = new HashMap<>();
         private boolean enableDataLogging = true;
@@ -119,6 +146,9 @@ public final class SimulationConfig {
                 throw new IllegalArgumentException("solverSettings cannot be null");
             }
             this.solverSettings = solverSettings.copy();
+            solverTypeExplicit = true;
+            stepWidthExplicit = true;
+            durationExplicit = true;
             return this;
         }
 
@@ -130,6 +160,7 @@ public final class SimulationConfig {
          */
         public Builder solverType(SolverType solverType) {
             this.solverSettings.setSolverType(solverType);
+            solverTypeExplicit = true;
             return this;
         }
 
@@ -141,6 +172,7 @@ public final class SimulationConfig {
          */
         public Builder stepWidth(double dt) {
             this.solverSettings.setStepWidth(dt);
+            stepWidthExplicit = true;
             return this;
         }
 
@@ -152,6 +184,7 @@ public final class SimulationConfig {
          */
         public Builder simulationDuration(double duration) {
             this.solverSettings.setSimulationDuration(duration);
+            durationExplicit = true;
             return this;
         }
 
