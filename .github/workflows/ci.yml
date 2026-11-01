@@ -23,7 +23,7 @@ jobs:
       - name: Build
         run: |
           mvn -f pom-reactor.xml clean install -DskipTests --no-transfer-progress
-          mvn assembly:single -DskipTests --no-transfer-progress
+          mvn package assembly:single -DskipTests --no-transfer-progress
 
       - name: Install test dependencies
         run: |
@@ -38,7 +38,7 @@ jobs:
 
       - name: Verify tests and coverage (all modules)
         run: |
-          python3 -m unittest discover -s scripts/tests -p 'test_ci_gate.py' -v
+          python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
           bash scripts/verify-ci.sh
 
       - name: Verify application traces
@@ -82,10 +82,7 @@ jobs:
           fi
 
       - name: Validate example circuits
-        continue-on-error: true
-        run: |
-          export DISPLAY=:99
-          python3 scripts/run-examples.py
+        run: xvfb-run -a python3 scripts/run-examples.py
 
       - name: Upload JAR
         uses: actions/upload-artifact@v4
