@@ -37,7 +37,7 @@ import java.util.Map;
  * <ul>
  *   <li>Empty netlist creation for testing matrix solvers</li>
  *   <li>Netlist construction from CircuitModel with topology extraction via label matching</li>
- *   <li>Graceful fallback to dimension estimation when labels are unavailable</li>
+ *   <li>Coordinate-wire resolution when saved terminal labels are missing</li>
  * </ul>
  *
  * @author Phase 3 - Circuit Extraction Refactoring
@@ -169,13 +169,26 @@ public class NetlistBuilder {
             }
         }
 
-        // Check if any component has terminal labels (indicates parsed from file)
+        String[][] terminalLabels = new String[allComponents.size()][2];
+        boolean missingLabel = false;
+        for (int i = 0; i < allComponents.size(); i++) {
+            terminalLabels[i][0] = terminalLabel(allComponents.get(i), true);
+            terminalLabels[i][1] = terminalLabel(allComponents.get(i), false);
+            missingLabel |= terminalLabels[i][0].isEmpty() || terminalLabels[i][1].isEmpty();
+        }
+        boolean hasElectricalWires = model.getConnections().stream()
+                .anyMatch(connection -> "LK".equals(connection.getType()));
+        if (hasElectricalWires && missingLabel) {
+            terminalLabels = CoordinateTopologyResolver.resolve(allComponents, model.getConnections(), terminalLabels);
+        }
+
+        // Keep legacy label-only models working without inferring geometry at default positions.
         boolean hasLabels = allComponents.stream()
                 .anyMatch(comp -> comp.getTerminalXLabels().length > 0 || comp.getTerminalYLabels().length > 0);
 
-        if (hasLabels) {
+        if (hasLabels || hasElectricalWires) {
             // Use label-based topology extraction
-            return buildFromComponentsWithLabels(allComponents);
+            return buildFromComponentsWithLabels(allComponents, terminalLabels);
         } else {
             throw new IllegalArgumentException("Component '" + allComponents.get(0).getName()
                     + "' has no terminal topology. Use buildEmpty for explicit preallocation.");
@@ -192,7 +205,8 @@ public class NetlistBuilder {
      *   <li>Assigns voltage source numbers</li>
      * </ul>
      */
-    private static CircuitNetlist buildFromComponentsWithLabels(List<CircuitModel.ComponentData> components) {
+    private static CircuitNetlist buildFromComponentsWithLabels(List<CircuitModel.ComponentData> components,
+                                                               String[][] terminalLabels) {
         // Step 1: Build node label → index map
         // Ground reference: label "0" or "" → node 0
         Map<String, Integer> labelToNode = new LinkedHashMap<>();
@@ -200,8 +214,8 @@ public class NetlistBuilder {
         labelToNode.put("", 0);  // Empty label also maps to ground
         int nextNode = 1;
 
-        for (CircuitModel.ComponentData comp : components) {
-            for (String label : new String[]{terminalLabel(comp, true), terminalLabel(comp, false)}) {
+        for (String[] labels : terminalLabels) {
+            for (String label : labels) {
                 if (!labelToNode.containsKey(label)) {
                     labelToNode.put(label, nextNode++);
                 }
@@ -237,8 +251,8 @@ public class NetlistBuilder {
         for (int i = 0; i < elementCount; i++) {
             CircuitModel.ComponentData comp = components.get(i);
 
-            nodeX[i] = labelToNode.get(terminalLabel(comp, true));
-            nodeY[i] = labelToNode.get(terminalLabel(comp, false));
+            nodeX[i] = labelToNode.get(terminalLabels[i][0]);
+            nodeY[i] = labelToNode.get(terminalLabels[i][1]);
             if (nodeX[i] == nodeY[i] && (types[i] == CircuitTypCore.LK_U
                     || types[i] == CircuitTypCore.TH_TEMP || types[i] == CircuitTypCore.REL_MMF)) {
                 throw new IllegalArgumentException("Voltage source '" + comp.getName()
@@ -301,7 +315,12 @@ public class NetlistBuilder {
                     + "' requires one valid label per electrical terminal");
         }
         // Parsed legacy files represent the implicit reference node with an absent label.
-        return labels.length == 0 ? "" : labels[0].trim();
+        return labels.length == 0 ? "" : normalizeLabel(labels[0]);
+    }
+
+    static String normalizeLabel(String label) {
+        String trimmed = label.trim();
+        return trimmed.equalsIgnoreCase("gnd") ? "0" : trimmed;
     }
 
     private static void validateGroundConnectivity(List<CircuitModel.ComponentData> components,

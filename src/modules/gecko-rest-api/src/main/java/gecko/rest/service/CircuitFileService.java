@@ -346,7 +346,7 @@ public class CircuitFileService {
      * Creates a deep copy of a CircuitModel by copying all essential fields.
      * Component lists are copied element-by-element.
      */
-    private CircuitModel copyCircuitModel(CircuitModel source) {
+    CircuitModel copyCircuitModel(CircuitModel source) {
         CircuitModel copy = new CircuitModel();
 
         // Copy simulation parameters
@@ -414,6 +414,11 @@ public class CircuitFileService {
             source.getOrientation()
         );
 
+        copy.setTerminalXLabels(source.getTerminalXLabels().clone());
+        copy.setTerminalYLabels(source.getTerminalYLabels().clone());
+        copy.setParameterStrings(source.getParameterStrings().clone());
+        copy.setNumericParameters(source.getNumericParameters().clone());
+
         // Deep copy parameters
         if (source.getParameters() != null) {
             source.getParameters().forEach((key, value) -> copy.setParameter(key, value));
@@ -430,7 +435,7 @@ public class CircuitFileService {
         for (int i = 0; i < source.getPoints().length; i++) {
             pointsCopy[i] = source.getPoints()[i].clone();
         }
-        return new CircuitModel.ConnectionData(source.getType(), pointsCopy);
+        return new CircuitModel.ConnectionData(source.getType(), pointsCopy, source.getLabel());
     }
 
     private ComponentInfo componentDataToInfo(CircuitModel.ComponentData comp, String domain) {

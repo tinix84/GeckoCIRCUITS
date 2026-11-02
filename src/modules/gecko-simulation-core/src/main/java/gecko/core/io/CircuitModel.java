@@ -406,11 +406,21 @@ public class CircuitModel {
      */
     public static class ConnectionData {
         private final String type; // LK, CONTROL, THERMAL
+        private final String label;
         private final int[][] points;
 
         public ConnectionData(String type, int[][] points) {
+            this(type, points, "");
+        }
+
+        public ConnectionData(String type, int[][] points, String label) {
             this.type = type;
             this.points = points;
+            this.label = label;
+        }
+
+        public String getLabel() {
+            return label;
         }
 
         public String getType() {
