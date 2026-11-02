@@ -160,6 +160,35 @@
                                 </rule>
                                 <rule>
                                     <element>PACKAGE</element>
+                                    <includes><include>gecko.core.circuit.netlist</include></includes>
+                                    <limits>
+                                        <limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.75</minimum></limit>
+                                        <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.70</minimum></limit>
+                                    </limits>
+                                </rule>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes><include>gecko.core.circuit.netlist.NetlistBuilder</include></includes>
+                                    <limits>
+                                        <limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.95</minimum></limit>
+                                        <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.85</minimum></limit>
+                                    </limits>
+                                </rule>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes>
+                                        <include>gecko.core.circuit.netlist.NodeIndexer</include>
+                                        <include>gecko.core.circuit.netlist.LabelResolver</include>
+                                        <include>gecko.core.circuit.netlist.CircuitNetlist</include>
+                                    </includes>
+                                    <limits>
+                                        <limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.85</minimum></limit>
+                                        <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.85</minimum></limit>
+                                    </limits>
+                                </rule>
+
+                                <rule>
+                                    <element>PACKAGE</element>
                                     <includes><include>gecko.core.circuit.matrix</include></includes>
                                     <limits>
                                         <limit>
