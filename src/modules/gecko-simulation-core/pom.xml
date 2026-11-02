@@ -158,6 +158,23 @@
                                         </limit>
                                     </limits>
                                 </rule>
+                                <!-- Saved circuit topology must stay covered through parser and solver contracts. -->
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes><include>gecko.core.io.CircuitFileParser</include></includes>
+                                    <limits>
+                                        <limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.95</minimum></limit>
+                                        <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.80</minimum></limit>
+                                    </limits>
+                                </rule>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes><include>gecko.core.circuit.netlist.CoordinateTopologyResolver</include></includes>
+                                    <limits>
+                                        <limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.95</minimum></limit>
+                                        <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.90</minimum></limit>
+                                    </limits>
+                                </rule>
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes><include>gecko.core.circuit.netlist</include></includes>

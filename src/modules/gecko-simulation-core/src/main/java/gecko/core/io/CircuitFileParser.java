@@ -55,8 +55,7 @@ public class CircuitFileParser {
             throw new FileNotFoundException("Circuit file not found: " + filePath);
         }
 
-        String[] lines = readFileLines(file);
-        return parseLines(lines, filePath);
+        return parse(new FileInputStream(file), filePath);
     }
 
     /**
@@ -88,50 +87,16 @@ public class CircuitFileParser {
      * @throws CircuitParseException if the format is invalid
      */
     public CircuitModel parse(InputStream inputStream, String sourceName) throws IOException, CircuitParseException {
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-            return parse(reader, sourceName);
-        }
-    }
-
-    /**
-     * Reads all lines from a .ipes file (handles gzip compression).
-     */
-    private String[] readFileLines(File file) throws IOException {
-        try (InputStream fis = new FileInputStream(file)) {
-            InputStream inputStream;
-
-            // Check if file is gzip compressed
-            if (isGzipCompressed(file)) {
-                inputStream = new GZIPInputStream(fis);
-            } else {
-                inputStream = fis;
+        try (BufferedInputStream buffered = new BufferedInputStream(inputStream)) {
+            buffered.mark(2);
+            int first = buffered.read();
+            int second = buffered.read();
+            buffered.reset();
+            InputStream decoded = first == 0x1f && second == 0x8b
+                    ? new GZIPInputStream(buffered) : buffered;
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(decoded, StandardCharsets.UTF_8))) {
+                return parse(reader, sourceName);
             }
-
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-                List<String> lines = new ArrayList<>();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    lines.add(line);
-                }
-                return lines.toArray(new String[0]);
-            }
-        }
-    }
-
-    /**
-     * Checks if a file is gzip compressed by examining magic bytes.
-     */
-    private boolean isGzipCompressed(File file) throws IOException {
-        try (FileInputStream fis = new FileInputStream(file)) {
-            byte[] signature = new byte[2];
-            int read = fis.read(signature);
-            if (read < 2) {
-                return false;
-            }
-            // GZIP magic number: 0x1f 0x8b
-            return (signature[0] == (byte) 0x1f) && (signature[1] == (byte) 0x8b);
         }
     }
 
@@ -165,6 +130,7 @@ public class CircuitFileParser {
 
         // Parse circuit components from special blocks
         parseCircuitComponents(lines, model);
+        parseConnections(lines, model, filePath);
 
         // Parse control components from special blocks
         parseControlComponents(lines, model);
@@ -402,6 +368,58 @@ public class CircuitFileParser {
                 // Skip malformed blocks silently - log if needed
             }
         }
+    }
+
+    private void parseConnections(String[] lines, CircuitModel model, String sourceName)
+            throws CircuitParseException {
+        TokenMap tokens = new TokenMap(lines, true);
+        String[] domains = {"LK", "CONTROL", "THERM"};
+        for (String domain : domains) {
+            TokenMap block;
+            while ((block = tokens.getSpecialBlockTokenMap("verbindung" + domain)) != null) {
+                if (!block.readDataLine("enabled", true)) {
+                    continue;
+                }
+                try {
+                    int[] xs = readWireCoordinates(block, "x[]");
+                    int[] ys = readWireCoordinates(block, "y[]");
+                    if (xs.length < 2 || xs.length != ys.length) {
+                        throw new IllegalArgumentException("coordinate arrays must have equal lengths of at least two");
+                    }
+                    int[][] points = new int[xs.length][2];
+                    for (int i = 0; i < xs.length; i++) {
+                        points[i][0] = xs[i];
+                        points[i][1] = ys[i];
+                    }
+                    String label = block.readDataLine("label", "").trim();
+                    if (label.equals(NIX)) {
+                        label = "";
+                    }
+                    model.addConnection(new CircuitModel.ConnectionData(
+                            domain.equals("THERM") ? "THERMAL" : domain, points, label));
+                } catch (IllegalArgumentException error) {
+                    throw new CircuitParseException(sourceName + ": invalid " + domain
+                            + " wire: " + error.getMessage(), error);
+                }
+            }
+        }
+    }
+
+    private int[] readWireCoordinates(TokenMap block, String key) {
+        String line = block.getLineString(key, "");
+        if (line.isEmpty()) {
+            throw new IllegalArgumentException("missing " + key);
+        }
+        String value = line.substring(key.length()).trim();
+        if (value.isEmpty()) {
+            return new int[0];
+        }
+        String[] parts = value.split("\\s+");
+        int[] coordinates = new int[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            coordinates[i] = Integer.parseInt(parts[i]);
+        }
+        return coordinates;
     }
 
     /**
