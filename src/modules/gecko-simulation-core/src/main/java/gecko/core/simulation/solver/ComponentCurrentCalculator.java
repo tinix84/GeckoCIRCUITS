@@ -230,7 +230,7 @@ public class ComponentCurrentCalculator {
                 // ===== DIODE-FAMILY: params[1] is Uf — NEVER overwrite it =====
                 case LK_D: {
                     double rD = parameters[0];
-                    double uf = parameters[1];  // Uf — must be preserved
+                    double uf = parameters[1];  // Preserve the legacy diode trace convention
                     current = (p[nodeX] - p[nodeY] - uf) / rD;
                     parameters[4] = current;    // proven convention: params[4] = current
                     parameters[5] = p[nodeX] - p[nodeY];  // params[5] = voltage
@@ -239,7 +239,7 @@ public class ComponentCurrentCalculator {
 
                 case LK_THYR: {
                     double rDThyr = parameters[0];
-                    double ufThyr = parameters[1];  // Uf — must be preserved
+                    double ufThyr = rDThyr < 10000 ? parameters[1] : 0;  // Match the stamped forward-voltage source
                     current = (p[nodeX] - p[nodeY] - ufThyr) / rDThyr;
                     parameters[4] = current;
                     parameters[5] = p[nodeX] - p[nodeY];
@@ -248,7 +248,7 @@ public class ComponentCurrentCalculator {
 
                 case LK_IGBT: {
                     double rDIgbt = parameters[0];
-                    double ufIgbt = parameters[1];  // Uf — must be preserved
+                    double ufIgbt = rDIgbt < 10000 ? parameters[1] : 0;  // Match the stamped forward-voltage source
                     current = (p[nodeX] - p[nodeY] - ufIgbt) / rDIgbt;
                     parameters[4] = current;
                     parameters[5] = p[nodeX] - p[nodeY];

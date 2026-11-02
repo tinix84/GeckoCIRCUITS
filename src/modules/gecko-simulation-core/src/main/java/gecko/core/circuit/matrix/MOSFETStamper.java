@@ -136,9 +136,7 @@ public class MOSFETStamper implements IStatefulStamper {
 
     @Override
     public double getAdmittanceWeight(double parameterValue, double dt) {
-        double resistance = isOn ? rOn : rOff;
-        resistance = Math.max(resistance, MIN_RESISTANCE);
-        return 1.0 / resistance;
+        return 1.0 / Math.max(parameterValue, MIN_RESISTANCE);
     }
 
     @Override
