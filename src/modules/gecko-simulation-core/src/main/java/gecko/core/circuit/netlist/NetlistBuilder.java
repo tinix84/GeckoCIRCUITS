@@ -17,7 +17,10 @@ import gecko.core.circuit.circuitcomponents.CircuitTypCore;
 import gecko.core.circuit.matrix.StamperRegistry;
 import gecko.core.io.CircuitModel;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -119,16 +122,16 @@ public class NetlistBuilder {
      *
      * <p>Implementation:
      * <ul>
-     *   <li>Collects all components from circuit, control, and thermal lists</li>
-     *   <li>Attempts topology extraction via label matching if labels are present</li>
-     *   <li>Falls back to dimension estimation if labels are unavailable</li>
+     *   <li>Collects electrical components from the circuit list</li>
+     *   <li>Resolves terminal labels and validates connectivity to the reference node</li>
+     *   <li>Rejects missing or ambiguous terminal topology</li>
      *   <li>Assigns voltage source numbers to voltage sources and coupable inductors</li>
      *   <li>Extracts component parameters from parsed model</li>
      *   <li>Initializes netlist with proper node and voltage source counts</li>
      * </ul>
      *
      * @param model circuit model from CircuitFileParser, may be null
-     * @return configured CircuitNetlist with extracted or estimated topology, or empty netlist if model is null
+     * @return netlist with validated topology, or an empty netlist for a null or empty model
      *
      * @see CircuitModel#getCircuitComponents()
      * @see CircuitModel#getControlComponents()
@@ -150,6 +153,9 @@ public class NetlistBuilder {
 
         StamperRegistry registry = StamperRegistry.createDefault();
         for (CircuitModel.ComponentData component : allComponents) {
+            if (component == null) {
+                throw new IllegalArgumentException("Circuit component cannot be null");
+            }
             CircuitTypCore type;
             try {
                 type = CircuitTypCore.fromTypeNumber(component.getType());
@@ -171,8 +177,8 @@ public class NetlistBuilder {
             // Use label-based topology extraction
             return buildFromComponentsWithLabels(allComponents);
         } else {
-            // Fall back to dimension estimation for backward compatibility
-            return buildWithEstimatedDimensions(allComponents);
+            throw new IllegalArgumentException("Component '" + allComponents.get(0).getName()
+                    + "' has no terminal topology. Use buildEmpty for explicit preallocation.");
         }
     }
 
@@ -195,12 +201,7 @@ public class NetlistBuilder {
         int nextNode = 1;
 
         for (CircuitModel.ComponentData comp : components) {
-            for (String label : comp.getTerminalXLabels()) {
-                if (!labelToNode.containsKey(label)) {
-                    labelToNode.put(label, nextNode++);
-                }
-            }
-            for (String label : comp.getTerminalYLabels()) {
+            for (String label : new String[]{terminalLabel(comp, true), terminalLabel(comp, false)}) {
                 if (!labelToNode.containsKey(label)) {
                     labelToNode.put(label, nextNode++);
                 }
@@ -220,7 +221,8 @@ public class NetlistBuilder {
             CircuitTypCore typ = CircuitTypCore.fromTypeNumber(comp.getType());
             types[i] = typ;
 
-            if (typ == CircuitTypCore.LK_U || typ == CircuitTypCore.LK_LKOP2) {
+            if (typ == CircuitTypCore.LK_U || typ == CircuitTypCore.LK_LKOP2
+                    || typ == CircuitTypCore.TH_TEMP || typ == CircuitTypCore.REL_MMF) {
                 voltageSourceNumbers[i] = ++voltageSourceCount;
             } else {
                 voltageSourceNumbers[i] = -1;
@@ -235,13 +237,13 @@ public class NetlistBuilder {
         for (int i = 0; i < elementCount; i++) {
             CircuitModel.ComponentData comp = components.get(i);
 
-            // Assign X terminal (positive/start)
-            String[] xLabels = comp.getTerminalXLabels();
-            nodeX[i] = xLabels.length > 0 ? labelToNode.getOrDefault(xLabels[0], 0) : 0;
-
-            // Assign Y terminal (negative/end)
-            String[] yLabels = comp.getTerminalYLabels();
-            nodeY[i] = yLabels.length > 0 ? labelToNode.getOrDefault(yLabels[0], 0) : 0;
+            nodeX[i] = labelToNode.get(terminalLabel(comp, true));
+            nodeY[i] = labelToNode.get(terminalLabel(comp, false));
+            if (nodeX[i] == nodeY[i] && (types[i] == CircuitTypCore.LK_U
+                    || types[i] == CircuitTypCore.TH_TEMP || types[i] == CircuitTypCore.REL_MMF)) {
+                throw new IllegalArgumentException("Voltage source '" + comp.getName()
+                        + "' has both terminals on the same node");
+            }
 
             // Extract numeric parameters — use actual parsed count (some components need 11+)
             int paramCount = 0;
@@ -276,9 +278,13 @@ public class NetlistBuilder {
         for (int i = 0; i < elementCount; i++) {
             String name = components.get(i).getName();
             if (name != null && !name.isEmpty()) {
-                nameToIndex.put(name, i);
+                if (nameToIndex.putIfAbsent(name, i) != null) {
+                    throw new IllegalArgumentException("Duplicate component name '" + name + "'");
+                }
             }
         }
+
+        validateGroundConnectivity(components, nodeX, nodeY);
 
         // Step 5: Initialize and return netlist
         CircuitNetlist netlist = new CircuitNetlist();
@@ -288,32 +294,44 @@ public class NetlistBuilder {
         return netlist;
     }
 
-    /**
-     * Build netlist with estimated dimensions (backward compatible mode).
-     *
-     * <p>Used when components don't have terminal labels (created programmatically).
-     * Estimates node and voltage source counts based on component count.</p>
-     */
-    private static CircuitNetlist buildWithEstimatedDimensions(List<CircuitModel.ComponentData> components) {
-        int totalComponents = components.size();
-
-        // Dimension estimation:
-        // - Nodes: assume ~1 node per 2 components (conservative estimate)
-        // - Voltage sources: estimate ~1 per 5 components
-        // - Elements: use actual component count
-        int estimatedNodeCount = Math.max(1, totalComponents / 2 + 1);
-        int estimatedVoltageSourceCount = Math.max(0, totalComponents / 5);
-
-        return buildEmpty(
-            estimatedNodeCount,
-            estimatedVoltageSourceCount,
-            totalComponents
-        );
+    private static String terminalLabel(CircuitModel.ComponentData component, boolean xTerminal) {
+        String[] labels = xTerminal ? component.getTerminalXLabels() : component.getTerminalYLabels();
+        if (labels.length > 1 || (labels.length == 1 && labels[0] == null)) {
+            throw new IllegalArgumentException("Component '" + component.getName()
+                    + "' requires one valid label per electrical terminal");
+        }
+        // Parsed legacy files represent the implicit reference node with an absent label.
+        return labels.length == 0 ? "" : labels[0].trim();
     }
 
-    /**
-     * Returns the semantic parameter key for the primary value of a component type.
-     */
+    private static void validateGroundConnectivity(List<CircuitModel.ComponentData> components,
+                                                    int[] nodeX, int[] nodeY) {
+        Map<Integer, List<Integer>> adjacency = new NodeIndexer(nodeX, nodeY).buildNodeToElementsMap();
+        Set<Integer> connected = new HashSet<>();
+        ArrayDeque<Integer> pending = new ArrayDeque<>();
+        connected.add(0);
+        pending.add(0);
+        while (!pending.isEmpty()) {
+            int node = pending.removeFirst();
+            for (int element : adjacency.getOrDefault(node, List.of())) {
+                CircuitTypCore type = CircuitTypCore.fromTypeNumber(components.get(element).getType());
+                if (type == CircuitTypCore.LK_I || type == CircuitTypCore.TH_FLOW) {
+                    continue; // An ideal current source adds no voltage constraint or conductance.
+                }
+                int other = nodeX[element] == node ? nodeY[element] : nodeX[element];
+                if (connected.add(other)) {
+                    pending.addLast(other);
+                }
+            }
+        }
+        for (int element = 0; element < components.size(); element++) {
+            if (!connected.contains(nodeX[element]) || !connected.contains(nodeY[element])) {
+                throw new IllegalArgumentException("Component '" + components.get(element).getName()
+                        + "' is not connected to ground (node 0)");
+            }
+        }
+    }
+
     private static String resolveParameterKey(int type) {
         return switch (type) {
             case 1 -> "resistance";

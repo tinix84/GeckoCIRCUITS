@@ -154,8 +154,12 @@ public class CircuitNetlist implements INetList {
         this.voltageSourceCount = maxVoltageSourceIndex;
         this.elementCount = elementCount;
 
-        // Clear any previous couplings when reinitializing
+        // A new circuit must not inherit results, probe mappings or simulation history.
         couplingRegistry.clear();
+        simulationTime = 0.0;
+        componentNameToIndex = Collections.emptyMap();
+        lastNodeVoltages = new double[0];
+        lastComponentCurrents = new double[0];
     }
 
     /**
@@ -559,6 +563,7 @@ public class CircuitNetlist implements INetList {
             return false;
         }
 
+        Set<Integer> usedSourceNumbers = new HashSet<>();
         for (int i = 0; i < elementCount; i++) {
             if (componentTypes[i] == null) {
                 return false;
@@ -569,8 +574,16 @@ public class CircuitNetlist implements INetList {
             if (nodeY[i] < 0 || nodeY[i] > nodeCount) {
                 return false;
             }
-            if (parameters[i] == null) {
+            if (parameters[i] == null || parameters[i].length == 0) {
                 return false;
+            }
+            CircuitTypCore type = componentTypes[i];
+            if (type == CircuitTypCore.LK_U || type == CircuitTypCore.LK_LKOP2
+                    || type == CircuitTypCore.TH_TEMP || type == CircuitTypCore.REL_MMF) {
+                int source = voltageSourceNumbers[i];
+                if (source < 1 || source > voltageSourceCount || !usedSourceNumbers.add(source)) {
+                    return false;
+                }
             }
         }
 
@@ -584,6 +597,14 @@ public class CircuitNetlist implements INetList {
      * @param nameToIndex map from component name (e.g. "L.1", "R.1") to element index
      */
     public void setComponentNameToIndex(Map<String, Integer> nameToIndex) {
+        if (nameToIndex != null) {
+            for (Map.Entry<String, Integer> entry : nameToIndex.entrySet()) {
+                if (entry.getKey() == null || entry.getKey().isEmpty() || entry.getValue() == null
+                        || entry.getValue() < 0 || entry.getValue() >= elementCount) {
+                    throw new IllegalArgumentException("Invalid component mapping for '" + entry.getKey() + "'");
+                }
+            }
+        }
         this.componentNameToIndex = nameToIndex != null
                 ? Collections.unmodifiableMap(new LinkedHashMap<>(nameToIndex))
                 : Collections.emptyMap();
