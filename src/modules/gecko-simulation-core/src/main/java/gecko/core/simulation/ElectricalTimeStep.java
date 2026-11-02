@@ -116,7 +116,8 @@ final class ElectricalTimeStep {
                     double bOLD = uf / rD;
                     params[0] = rOff; // Switch to OFF
                     double aNEW = 1.0 / params[0];
-                    double bNEW = uf / params[0];
+                    // Retain diode trace compatibility; controlled devices block without a source.
+                    double bNEW = type == CircuitTypCore.LK_D ? uf / params[0] : 0;
 
                     // Incremental patch A matrix
                     a[x][x] += (-aOLD + aNEW);
@@ -138,7 +139,7 @@ final class ElectricalTimeStep {
                     }
 
                     double aOLD = 1.0 / rD;
-                    double bOLD = uf / rD;
+                    double bOLD = type == CircuitTypCore.LK_D ? uf / rD : 0;
                     params[0] = rOn; // Switch to ON
                     double aNEW = 1.0 / params[0];
                     double bNEW = uf / params[0];
