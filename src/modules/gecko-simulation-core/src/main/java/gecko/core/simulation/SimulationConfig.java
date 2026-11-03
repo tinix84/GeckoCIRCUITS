@@ -59,7 +59,7 @@ public final class SimulationConfig {
     /** Uses file defaults only for settings the caller did not supply. */
     SolverSettingsCore resolveSolverSettings(CircuitModel model) {
         SolverSettingsCore resolved = solverSettings.copy();
-        if (model != null && model.hasValidSimulationParameters()) {
+        if (model != null) {
             if (!solverTypeExplicit) {
                 resolved.setSolverType(model.getSolverType());
             }

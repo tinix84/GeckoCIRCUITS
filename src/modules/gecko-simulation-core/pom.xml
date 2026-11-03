@@ -192,8 +192,8 @@
                                     <element>CLASS</element>
                                     <includes><include>gecko.core.simulation.solver.MatrixSolver</include></includes>
                                     <limits>
-                                        <limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.80</minimum></limit>
-                                        <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.65</minimum></limit>
+                                        <limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.84</minimum></limit>
+                                        <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.70</minimum></limit>
                                     </limits>
                                 </rule>
                                 <rule>
@@ -267,7 +267,6 @@
                                         <include>gecko.core.control.calculators.PICalculator</include>
                                         <include>gecko.core.control.calculators.IntegratorCalculation</include>
                                         <include>gecko.core.control.calculators.PT1Calculator</include>
-                                        <include>gecko.core.simulation.solver.InitialConditionSolver</include>
                                     </includes>
                                     <limits>
                                         <limit>
@@ -328,6 +327,30 @@
                                             <value>COVEREDRATIO</value>
                                             <minimum>0.85</minimum>
                                         </limit>
+                                    </limits>
+                                </rule>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes><include>gecko.core.simulation.solver.InitialConditionSolver</include></includes>
+                                    <limits>
+                                        <limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.98</minimum></limit>
+                                        <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.92</minimum></limit>
+                                    </limits>
+                                </rule>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes><include>gecko.core.simulation.ElectricalTimeStep</include></includes>
+                                    <limits>
+                                        <limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.95</minimum></limit>
+                                        <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.90</minimum></limit>
+                                    </limits>
+                                </rule>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes><include>gecko.core.simulation.HeadlessSimulationEngine</include></includes>
+                                    <limits>
+                                        <limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.95</minimum></limit>
+                                        <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.85</minimum></limit>
                                     </limits>
                                 </rule>
                             </rules>

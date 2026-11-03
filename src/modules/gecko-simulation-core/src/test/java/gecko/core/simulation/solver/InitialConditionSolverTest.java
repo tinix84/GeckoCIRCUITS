@@ -16,7 +16,7 @@ class InitialConditionSolverTest {
     @ParameterizedTest
     @EnumSource(value = CircuitTypCore.class, names = {"LK_C", "TH_CTH", "REL_MMF", "TH_TEMP", "LK_L",
             "NONLIN_REL", "LK_LKOP2", "LK_I", "TH_FLOW", "LK_R"})
-    void restoresSavedStateAndClearsOldHistory(CircuitTypCore type) {
+    void restoresSavedStateAndSeedsEveryHistory(CircuitTypCore type) {
         double[] parameters = new double[10];
         parameters[2] = 3;
         parameters[4] = 4;
@@ -47,16 +47,13 @@ class InitialConditionSolverTest {
             case LK_I, TH_FLOW -> 6;
             default -> 0;
         };
-        double expectedOlderCurrent = switch (type) {
-            case LK_L, NONLIN_REL, LK_LKOP2 -> 3;
-            default -> 0;
-        };
         assertArrayEquals(expectedPotentials, matrix.getPALT());
-        assertArrayEquals(new double[4], matrix.getPALTALT());
-        assertArrayEquals(new double[4], matrix.getPALTALTALT());
+        assertArrayEquals(expectedPotentials, matrix.getP());
+        assertArrayEquals(expectedPotentials, matrix.getPALTALT());
+        assertArrayEquals(expectedPotentials, matrix.getPALTALTALT());
         assertArrayEquals(new double[]{expectedCurrent}, matrix.getIALT());
-        assertArrayEquals(new double[]{expectedOlderCurrent}, matrix.getIALTALT());
-        assertArrayEquals(new double[1], matrix.getIALTALTALT());
+        assertArrayEquals(new double[]{expectedCurrent}, matrix.getIALTALT());
+        assertArrayEquals(new double[]{expectedCurrent}, matrix.getIALTALTALT());
     }
 
     @ParameterizedTest

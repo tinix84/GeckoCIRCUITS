@@ -151,7 +151,7 @@ public class ComponentCurrentCalculator {
                                     4.0 / 3.0 * iALT[elementIdx] - 1.0 / 3.0 * iALTALT[elementIdx];
                         }
                     }
-                    parameters[1] = current;
+                    // Keep the configured initial current in params[1].
                     // Proven convention: params[2] = inductor current
                     parameters[2] = current;
                     break;
@@ -180,7 +180,7 @@ public class ComponentCurrentCalculator {
                     }
                     parameters[10] = current;
                     current += nonLinearCorrectionCurrent;
-                    parameters[1] = current;
+                    parameters[2] = current;
                     break;
                 }
 
@@ -259,7 +259,7 @@ public class ComponentCurrentCalculator {
                     int voltageSourceNumber = netlist.getVoltageSourceNumber(elementIdx);
                     int voltageSourceIdx = netlist.getNodeMax() + voltageSourceNumber;
                     current = p[voltageSourceIdx];
-                    parameters[1] = current;
+                    parameters[2] = current;
                     break;
                 }
 
