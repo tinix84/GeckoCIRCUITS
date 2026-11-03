@@ -60,6 +60,9 @@ public class MatrixSolver {
      * @param solverType the numerical integration method (e.g., Backward Euler, Trapezoidal)
      */
     public MatrixSolver(SolverType solverType) {
+        if (solverType == null) {
+            throw new IllegalArgumentException("Solver type cannot be null");
+        }
         this.solverType = solverType;
         this.matrixSolverA = null;
         this.matrixChanged = true;
@@ -77,8 +80,12 @@ public class MatrixSolver {
      * @param elementCount the total number of circuit elements
      */
     public void initializeMatrices(int nodeCount, int voltageSourceCount, int elementCount) {
+        long requiredSize = (long) nodeCount + voltageSourceCount + 1;
+        if (nodeCount < 0 || voltageSourceCount < 0 || elementCount < 0 || requiredSize > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("Matrix dimensions must be non-negative and fit an integer");
+        }
         // Matrix size includes all nodes, voltage source variables, plus ground reference
-        matrixSize = nodeCount + voltageSourceCount + 1;
+        matrixSize = (int) requiredSize;
 
         // Allocate system matrix A and solution vector b
         a = new double[matrixSize][matrixSize];
@@ -94,6 +101,8 @@ public class MatrixSolver {
         iALT = new double[elementCount];
         iALTALT = new double[elementCount];
         iALTALTALT = new double[elementCount];
+        matrixSolverA = null;
+        matrixChanged = true;
     }
 
     // Getters for matrix components
@@ -569,6 +578,22 @@ public class MatrixSolver {
                     "Matrices not initialized. Call initializeMatrices() first.");
         }
 
+        for (int row = 0; row < matrixSize; row++) {
+            if (!Double.isFinite(bVector[row])) {
+                throw new IllegalStateException("Nonfinite right-hand side at row " + row);
+            }
+            if (matrixChanged || matrixSolverA == null) {
+                if (a[row] == null || a[row].length != matrixSize) {
+                    throw new IllegalStateException("Invalid system matrix row " + row);
+                }
+                for (double value : a[row]) {
+                    if (!Double.isFinite(value)) {
+                        throw new IllegalStateException("Nonfinite system matrix at row " + row);
+                    }
+                }
+            }
+        }
+
         // Step 1: Create or update Matrix wrapper for A (only if matrix changed)
         if (matrixSolverA == null) {
             // First time: create Matrix wrapper from a[][]
@@ -594,6 +619,11 @@ public class MatrixSolver {
 
         // Step 4: Extract solution back to p[] array
         double[][] x = xMatrix.getArray();
+        for (int i = 0; i < matrixSize; i++) {
+            if (!Double.isFinite(x[i][0])) {
+                throw new IllegalStateException("Nonfinite solution at row " + i);
+            }
+        }
         for (int i = 0; i < matrixSize; i++) {
             p[i] = x[i][0];
         }

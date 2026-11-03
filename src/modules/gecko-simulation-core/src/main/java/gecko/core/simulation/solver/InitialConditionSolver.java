@@ -16,6 +16,9 @@ package gecko.core.simulation.solver;
 import gecko.core.allg.SolverType;
 import gecko.core.circuit.circuitcomponents.CircuitTypCore;
 import gecko.core.circuit.netlist.INetList;
+import gecko.core.circuit.netlist.CircuitNetlist;
+import gecko.core.circuit.SourceType;
+import java.util.Arrays;
 
 /**
  * Solver for setting initial conditions in circuit simulation.
@@ -32,7 +35,7 @@ import gecko.core.circuit.netlist.INetList;
  * - Uses INetList interface instead of concrete NetListLK
  * - Works with MatrixSolver which provides getter/setter access
  * - Throws exceptions instead of showing GUI dialogs
- * - Foundational version (full logic can be added as netlist integration complete)
+ * - Seeds all integration histories from either configured states or saved states
  *
  * @author GeckoCIRCUITS Team
  */
@@ -49,16 +52,15 @@ public class InitialConditionSolver {
      * @param solverType the numerical integration method
      */
     public InitialConditionSolver(SolverType solverType) {
+        if (solverType == null) {
+            throw new IllegalArgumentException("Solver type cannot be null");
+        }
         this.solverType = solverType;
     }
 
     /**
-     * Sets initial conditions for the simulation.
-     *
-     * Initializes node potentials (pALT) and component currents (iALT) based on:
-     * - Capacitor initial voltages from netlist parameters
-     * - Inductor initial currents
-     * - Voltage and current source parameters
+     * Restores saved node potentials and currents, then seeds all integration histories.
+     * Configured dialog values remain separate from these saved runtime values.
      *
      * @param matrixSolver the matrix solver containing state arrays to initialize
      * @param netlist the circuit netlist interface
@@ -77,6 +79,12 @@ public class InitialConditionSolver {
             throw new IllegalStateException("INetList cannot be null");
         }
 
+        validateState(matrixSolver, netlist);
+        if (solverType != this.solverType) {
+            throw new IllegalArgumentException("Initialization solver types must match");
+        }
+        validateSavedParameters(netlist);
+
         // Initialize all potential arrays to zero
         initializePotentials(matrixSolver);
 
@@ -88,6 +96,140 @@ public class InitialConditionSolver {
 
         // Restore saved currents from netlist parameters
         restoreCurrentsFromNetlist(matrixSolver, netlist);
+        double[] potentials = matrixSolver.getPALT();
+        double reference = potentials[0];
+        for (int node = 0; node <= netlist.getNodeMax(); node++) {
+            potentials[node] -= reference;
+        }
+        seedHistories(matrixSolver, potentials, matrixSolver.getIALT());
+    }
+
+    /**
+     * Initializes configured dynamic states. Zero-start circuits retain their existing startup convention.
+     * A nonzero state is held fixed while the surrounding instantaneous resistive/source network is solved.
+     */
+    public void setDialogInitialConditions(MatrixSolver matrixSolver, INetList netlist) {
+        validateState(matrixSolver, netlist);
+        boolean hasInitialState = false;
+        for (int i = 0; i < netlist.getElementCount(); i++) {
+            if (isDynamic(netlist.getType(i))) {
+                double[] parameters = netlist.getParameter(i);
+                double value = parameters.length > 1 ? parameters[1] : 0;
+                if (!Double.isFinite(value)) {
+                    throw new IllegalArgumentException("Nonfinite initial state for element " + i);
+                }
+                hasInitialState |= value != 0;
+            }
+        }
+        if (!hasInitialState) {
+            seedHistories(matrixSolver, new double[matrixSolver.getMatrixSize()],
+                    new double[netlist.getElementCount()]);
+            return;
+        }
+
+        int count = netlist.getElementCount();
+        CircuitTypCore[] types = new CircuitTypCore[count];
+        int[] x = new int[count], y = new int[count], sources = new int[count];
+        double[][] parameters = new double[count][];
+        int sourceCount = 0;
+        for (int i = 0; i < count; i++) {
+            CircuitTypCore original = netlist.getType(i);
+            types[i] = original;
+            x[i] = netlist.getNodeX(i);
+            y[i] = netlist.getNodeY(i);
+            double[] values = netlist.getParameter(i);
+            parameters[i] = Arrays.copyOf(values, Math.max(13, values.length));
+            if (isDynamic(original)) {
+                double initial = parameters[i][1];
+                types[i] = original == CircuitTypCore.LK_C || original == CircuitTypCore.TH_CTH
+                        ? CircuitTypCore.LK_U : CircuitTypCore.LK_I;
+                parameters[i] = new double[13];
+                parameters[i][0] = SourceType.QUELLE_DC_NEW;
+                parameters[i][1] = initial;
+            }
+            boolean voltageSource = types[i] == CircuitTypCore.LK_U || types[i] == CircuitTypCore.TH_TEMP
+                    || types[i] == CircuitTypCore.REL_MMF;
+            sources[i] = voltageSource ? ++sourceCount : -1;
+        }
+        CircuitNetlist initialNetwork = new CircuitNetlist();
+        initialNetwork.initNetlist(types, x, y, sources, parameters,
+                netlist.getNodeMax(), sourceCount, count);
+        MatrixSolver initialSolver = new MatrixSolver(SolverType.SOLVER_BE);
+        initialSolver.initializeMatrices(netlist.getNodeMax(), sourceCount, count);
+        initialSolver.buildMatrixA(initialNetwork, 1, 0, false);
+        initialSolver.buildVectorB(initialNetwork, 1, 0, false);
+        initialSolver.solve();
+        double[] currents = new double[count];
+        new ComponentCurrentCalculator().calculateComponentCurrents(
+                initialSolver, initialNetwork, currents, 0, 1, 0, true);
+        double[] potentials = new double[matrixSolver.getMatrixSize()];
+        System.arraycopy(initialSolver.getP(), 0, potentials, 0, netlist.getNodeMax() + 1);
+        for (int i = 0; i < count; i++) {
+            if (!Double.isFinite(currents[i])) {
+                throw new IllegalStateException("Nonfinite initial current for element " + i);
+            }
+            int source = netlist.getVoltageSourceNumber(i);
+            if (source > 0) {
+                potentials[netlist.getNodeMax() + source] = currents[i];
+            }
+        }
+        seedHistories(matrixSolver, potentials, currents);
+    }
+
+    private static boolean isDynamic(CircuitTypCore type) {
+        return type == CircuitTypCore.LK_C || type == CircuitTypCore.TH_CTH
+                || type == CircuitTypCore.LK_L || type == CircuitTypCore.NONLIN_REL
+                || type == CircuitTypCore.LK_LKOP2;
+    }
+
+    private void validateState(MatrixSolver matrix, INetList netlist) {
+        if (matrix == null || netlist == null || matrix.getP() == null || matrix.getIALT() == null) {
+            throw new IllegalStateException("Initialized matrices and a netlist are required");
+        }
+        if (matrix.getSolverType() != solverType
+                || (long) netlist.getNodeMax() + netlist.getVoltageSourceMax() + 1 != matrix.getMatrixSize()
+                || netlist.getElementCount() != matrix.getIALT().length) {
+            throw new IllegalArgumentException("Initialization dimensions and solver types must match");
+        }
+        for (int i = 0; i < netlist.getElementCount(); i++) {
+            if (netlist.getType(i) == null || netlist.getParameter(i) == null
+                    || netlist.getNodeX(i) < 0 || netlist.getNodeX(i) > netlist.getNodeMax()
+                    || netlist.getNodeY(i) < 0 || netlist.getNodeY(i) > netlist.getNodeMax()) {
+                throw new IllegalArgumentException("Invalid initialization element " + i);
+            }
+            int source = netlist.getVoltageSourceNumber(i);
+            if (source > netlist.getVoltageSourceMax()) {
+                throw new IllegalArgumentException("Invalid initialization auxiliary number for element " + i);
+            }
+        }
+    }
+
+    private static void validateSavedParameters(INetList netlist) {
+        for (int i = 0; i < netlist.getElementCount(); i++) {
+            int[] fields = switch (netlist.getType(i)) {
+                case LK_C, TH_CTH -> new int[]{2, 4, 5};
+                case REL_MMF, TH_TEMP -> new int[]{8, 9};
+                case LK_L, NONLIN_REL, LK_LKOP2 -> new int[]{2};
+                case LK_I, TH_FLOW -> new int[]{6};
+                default -> new int[0];
+            };
+            double[] values = netlist.getParameter(i);
+            for (int field : fields) {
+                if (field >= values.length || !Double.isFinite(values[field])) {
+                    throw new IllegalArgumentException("Invalid saved state for element " + i);
+                }
+            }
+        }
+    }
+
+    private static void seedHistories(MatrixSolver matrix, double[] potentials, double[] currents) {
+        for (double[] target : new double[][]{matrix.getP(), matrix.getPALT(),
+                matrix.getPALTALT(), matrix.getPALTALTALT()}) {
+            System.arraycopy(potentials, 0, target, 0, potentials.length);
+        }
+        for (double[] target : new double[][]{matrix.getIALT(), matrix.getIALTALT(), matrix.getIALTALTALT()}) {
+            System.arraycopy(currents, 0, target, 0, currents.length);
+        }
     }
 
     /**
@@ -212,6 +354,10 @@ public class InitialConditionSolver {
      * @return the calculated coefficient aW for matrix stamping
      */
     public double getAWForInductance(double inductance, double timeStep) {
+        if (!Double.isFinite(inductance) || inductance < 0
+                || !Double.isFinite(timeStep) || timeStep <= 0) {
+            throw new IllegalArgumentException("Inductance must be finite and non-negative; time step must be finite and positive");
+        }
         double aW = 0;
 
         if (inductance < FAST_NULL_L) {
@@ -234,6 +380,9 @@ public class InitialConditionSolver {
             }
         }
 
+        if (!Double.isFinite(aW)) {
+            throw new IllegalArgumentException("Inductance coefficient is not finite");
+        }
         return aW;
     }
 }

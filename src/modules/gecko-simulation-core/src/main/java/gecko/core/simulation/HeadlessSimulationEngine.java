@@ -71,6 +71,7 @@ public class HeadlessSimulationEngine {
     private volatile double currentTime = 0;
     private volatile double endTime = 0;
     private volatile int currentStep = 0;
+    private volatile int expectedStepCount = 0;
     private volatile long simulationStartTime = 0;
 
     // Event listener
@@ -117,6 +118,11 @@ public class HeadlessSimulationEngine {
                 return SimulationResult.failed("Engine is already running a simulation");
             }
             cancelRequested.set(false);
+            currentTime = 0;
+            currentStep = 0;
+            endTime = 0;
+            expectedStepCount = 0;
+            circuitNetlist = null;
         }
         long startTime = System.currentTimeMillis();
         simulationStartTime = startTime;
@@ -186,6 +192,7 @@ public class HeadlessSimulationEngine {
 
         // Calculate expected number of steps
         int expectedSteps = calculateExpectedSteps(dt, duration);
+        expectedStepCount = (int) Math.floor(duration / dt) + 1;
 
         // Create data container for results
         DataContainerGlobal dataContainer = new DataContainerGlobal();
@@ -199,10 +206,12 @@ public class HeadlessSimulationEngine {
         // Main simulation loop
         float[] values = new float[signalNames.length];
 
+        double lastSolvedTime = 0;
         while (currentTime <= duration) {
             awaitResumeOrCancellation(cancellationSignal);
             if (cancelRequested.get() || Thread.currentThread().isInterrupted() || cancellationSignal.getAsBoolean()) {
                 dataContainer.setContainerStatus(ContainerStatus.PAUSED);
+                currentTime = lastSolvedTime;
                 return SimulationResult.builder()
                         .status(SimulationResult.Status.CANCELLED)
                         .dataContainer(dataContainer)
@@ -235,15 +244,17 @@ public class HeadlessSimulationEngine {
                 dataContainer.insertValuesAtEnd(values, currentTime);
             }
 
+            lastSolvedTime = currentTime;
             currentTime += dt;
             currentStep++;
 
             // Report progress
             if (progressListener != null && currentStep % 1000 == 0) {
-                progressListener.onProgress(currentTime, duration, currentStep);
+                progressListener.onProgress(lastSolvedTime, duration, currentStep);
             }
         }
 
+        currentTime = lastSolvedTime;
         dataContainer.setContainerStatus(ContainerStatus.FINISHED);
         long executionTimeMs = System.currentTimeMillis() - startTime;
 
@@ -412,11 +423,7 @@ public class HeadlessSimulationEngine {
             estimatedRemainingMs = totalEstimatedMs - elapsedMs;
         }
 
-        // Calculate expected total steps
-        int totalSteps = (int) Math.ceil(endTime / (currentTime / Math.max(1, currentStep)));
-        if (totalSteps <= 0) {
-            totalSteps = currentStep + 1000; // Fallback estimate
-        }
+        int totalSteps = expectedStepCount;
 
         return new SimulationProgress(
             overallProgress,

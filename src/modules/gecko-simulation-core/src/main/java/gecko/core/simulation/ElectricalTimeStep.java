@@ -18,6 +18,7 @@ import gecko.core.circuit.circuitcomponents.CircuitTypCore;
 import gecko.core.circuit.netlist.CircuitNetlist;
 import gecko.core.simulation.solver.ComponentCurrentCalculator;
 import gecko.core.simulation.solver.MatrixSolver;
+import gecko.core.simulation.solver.InitialConditionSolver;
 
 /** Owns one converged electrical step and commits its histories exactly once. */
 final class ElectricalTimeStep {
@@ -33,9 +34,13 @@ final class ElectricalTimeStep {
         matrixSolver.initializeMatrices(netlist.getNodeMax(), netlist.getVoltageSourceMax(),
                 netlist.getElementCount());
         computedCurrents = new double[netlist.getElementCount()];
+        new InitialConditionSolver(solverType).setDialogInitialConditions(matrixSolver, netlist);
     }
 
     void advance(double dt, double time, HeadlessSimulationEngine.StepTraceListener traceListener) {
+        if (!Double.isFinite(dt) || dt <= 0 || !Double.isFinite(time) || time < 0) {
+            throw new IllegalArgumentException("Time step must be finite and positive; time must be finite and non-negative");
+        }
         matrixSolver.buildMatrixA(netlist, dt, time, false);
         matrixSolver.buildVectorB(netlist, dt, time, false);
         matrixSolver.solve();
