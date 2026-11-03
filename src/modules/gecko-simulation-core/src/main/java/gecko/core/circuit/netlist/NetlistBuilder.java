@@ -143,19 +143,33 @@ public class NetlistBuilder {
             return buildEmpty(0, 0, 0);
         }
 
-        // Collect only LK (circuit) components — control and thermal are handled separately
         List<CircuitModel.ComponentData> allComponents = new ArrayList<>();
-        allComponents.addAll(model.getCircuitComponents());
-
+        List<CircuitModel.ComponentData> couplingComponents = new ArrayList<>();
+        Set<String> names = new HashSet<>();
+        for (CircuitModel.ComponentData component : model.getCircuitComponents()) {
+            if (component == null) {
+                throw new IllegalArgumentException("Circuit component cannot be null");
+            }
+            if (component.getName() != null && !component.getName().isEmpty()
+                    && !names.add(component.getName())) {
+                throw new IllegalArgumentException("Duplicate component name '" + component.getName() + "'");
+            }
+            if (component.getType() == CircuitTypCore.LK_M.getTypeNumber()) {
+                couplingComponents.add(component);
+            } else {
+                allComponents.add(component);
+            }
+        }
         if (allComponents.isEmpty()) {
+            if (!couplingComponents.isEmpty()) {
+                throw new IllegalArgumentException("Coupling '" + couplingComponents.get(0).getName()
+                        + "' has no windings");
+            }
             return buildEmpty(0, 0, 0);
         }
 
         StamperRegistry registry = StamperRegistry.createDefault();
         for (CircuitModel.ComponentData component : allComponents) {
-            if (component == null) {
-                throw new IllegalArgumentException("Circuit component cannot be null");
-            }
             CircuitTypCore type;
             try {
                 type = CircuitTypCore.fromTypeNumber(component.getType());
@@ -188,7 +202,9 @@ public class NetlistBuilder {
 
         if (hasLabels || hasElectricalWires) {
             // Use label-based topology extraction
-            return buildFromComponentsWithLabels(allComponents, terminalLabels);
+            CircuitNetlist netlist = buildFromComponentsWithLabels(allComponents, terminalLabels);
+            registerMagneticCouplings(netlist, allComponents, couplingComponents);
+            return netlist;
         } else {
             throw new IllegalArgumentException("Component '" + allComponents.get(0).getName()
                     + "' has no terminal topology. Use buildEmpty for explicit preallocation.");
@@ -287,14 +303,20 @@ public class NetlistBuilder {
             }
         }
 
+        for (int i = 0; i < elementCount; i++) {
+            if (types[i] == CircuitTypCore.LK_LKOP2
+                    && (!Double.isFinite(params[i][0]) || params[i][0] <= 0)) {
+                throw new IllegalArgumentException("Winding '" + components.get(i).getName()
+                        + "' requires finite positive inductance");
+            }
+        }
+
         // Step 4: Build component name-to-index map
         Map<String, Integer> nameToIndex = new LinkedHashMap<>();
         for (int i = 0; i < elementCount; i++) {
             String name = components.get(i).getName();
             if (name != null && !name.isEmpty()) {
-                if (nameToIndex.putIfAbsent(name, i) != null) {
-                    throw new IllegalArgumentException("Duplicate component name '" + name + "'");
-                }
+                nameToIndex.put(name, i);
             }
         }
 
@@ -306,6 +328,47 @@ public class NetlistBuilder {
                 nodeCount - 1, voltageSourceCount, elementCount);
         netlist.setComponentNameToIndex(nameToIndex);
         return netlist;
+    }
+
+    private static void registerMagneticCouplings(CircuitNetlist netlist,
+            List<CircuitModel.ComponentData> components, List<CircuitModel.ComponentData> couplings) {
+        if (couplings.isEmpty()) {
+            return;
+        }
+        Map<Long, Integer> identifiers = new LinkedHashMap<>();
+        for (int i = 0; i < components.size(); i++) {
+            Object identifier = components.get(i).getParameters().get("uniqueObjectIdentifier");
+            if (identifier instanceof Number number && number.longValue() != 0
+                    && identifiers.putIfAbsent(number.longValue(), i) != null) {
+                throw new IllegalArgumentException("Duplicate component identifier " + identifier);
+            }
+        }
+        for (CircuitModel.ComponentData coupling : couplings) {
+            try {
+                int[] windings = new int[2];
+                for (int end = 0; end < 2; end++) {
+                    Object identifier = coupling.getParameters().get("coupledReferenceID" + end);
+                    if (identifier instanceof Number number) {
+                        windings[end] = identifiers.getOrDefault(number.longValue(), -1);
+                    } else {
+                        String[] references = coupling.getParameterStrings();
+                        windings[end] = end < references.length
+                                ? netlist.getElementIndexByName(references[end]) : -1;
+                    }
+                    if (windings[end] < 0) {
+                        throw new IllegalArgumentException("Missing winding reference " + (end + 1));
+                    }
+                }
+                Object coefficient = coupling.getParameters().get("param0");
+                if (!(coefficient instanceof Number number)) {
+                    throw new IllegalArgumentException("Missing coupling coefficient");
+                }
+                netlist.registerMutualCoupling(windings[0], windings[1], number.doubleValue(),
+                        netlist.getParameter(windings[0])[0], netlist.getParameter(windings[1])[0]);
+            } catch (IllegalArgumentException error) {
+                throw new IllegalArgumentException("Coupling '" + coupling.getName() + "': " + error.getMessage(), error);
+            }
+        }
     }
 
     private static String terminalLabel(CircuitModel.ComponentData component, boolean xTerminal) {

@@ -203,7 +203,7 @@ public class MatrixSolver {
      * - Clears the matrix
      * - Iterates through netlist components
      * - Uses stampers from the registry for component contributions
-     * - Skips magnetic couplings (future refinement)
+     * - Adds symmetric mutual-inductance constraints between winding currents
      *
      * @param netlist the circuit netlist containing components and topology
      * @param dt the time step size (used for dynamic components like capacitors)
@@ -252,9 +252,15 @@ public class MatrixSolver {
         // Adding a large conductance to ground forces p[0] ≈ 0.
         a[0][0] += GROUND_CONDUCTANCE;
 
-        // Note: Magnetic coupling (mutual inductance) handling is deferred for future refinement.
-        // The legacy code injects coupling contributions after component stamping;
-        // this will be added when LKOP2 coupling arrays are integrated into the netlist.
+        double alpha = solverType == SolverType.SOLVER_BE ? 1
+                : solverType == SolverType.SOLVER_TRZ ? 2 : 1.5;
+        for (var coupling : netlist.getAllCouplings()) {
+            int first = netlist.getNodeMax() + netlist.getVoltageSourceNumber(coupling.getInductor1Index());
+            int second = netlist.getNodeMax() + netlist.getVoltageSourceNumber(coupling.getInductor2Index());
+            double weight = alpha * coupling.getMutualInductance() / dt;
+            a[first][second] -= weight;
+            a[second][first] -= weight;
+        }
 
         // Mark matrix as changed so LU decomposition will be recalculated
         matrixChanged = true;
@@ -344,20 +350,11 @@ public class MatrixSolver {
                 // ===== Coupled Inductors (LKOP2 with mutual inductance) =====
                 case LK_LKOP2:
                     params = netlist.getParameter(elementIdx);
-                    double inductanceInAMatrix = params[10];  // Inductance stored in parameter[10]
-
-                    if (solverType == SolverType.SOLVER_BE) {
-                        bContribution = -iALT[elementIdx] * (inductanceInAMatrix / dt);
-                    } else if (solverType == SolverType.SOLVER_TRZ) {
-                        bContribution = -(pALT[nodeX] - pALT[nodeY]) - iALT[elementIdx] * (2 * inductanceInAMatrix / dt);
-                    } else if (solverType == SolverType.SOLVER_GS) {
-                        bContribution = (-2.0 * iALT[elementIdx] + 0.5 * iALTALT[elementIdx]) * (inductanceInAMatrix / dt);
+                    bContribution = params[0] / dt * windingHistory(elementIdx);
+                    if (solverType == SolverType.SOLVER_TRZ) {
+                        bContribution -= pALT[nodeX] - pALT[nodeY];
                     }
-
                     bVector[voltageSourceIdx] += bContribution;
-
-                    // Apply mutual inductance coupling terms if present
-                    // (zuLKOP2gehoerigeM_spgQnr and zuLKOP2gehoerigeM_kWerte would be passed separately)
                     break;
 
                 // ===== Capacitors (with history terms) =====
@@ -517,6 +514,22 @@ public class MatrixSolver {
                     break;
             }
         }
+        for (var coupling : netlist.getAllCouplings()) {
+            int first = coupling.getInductor1Index();
+            int second = coupling.getInductor2Index();
+            double weight = coupling.getMutualInductance() / dt;
+            bVector[netlist.getNodeMax() + netlist.getVoltageSourceNumber(first)] += weight * windingHistory(second);
+            bVector[netlist.getNodeMax() + netlist.getVoltageSourceNumber(second)] += weight * windingHistory(first);
+        }
+
+    }
+
+    private double windingHistory(int element) {
+        return switch (solverType) {
+            case SOLVER_BE -> -iALT[element];
+            case SOLVER_TRZ -> -2 * iALT[element];
+            case SOLVER_GS -> -2 * iALT[element] + 0.5 * iALTALT[element];
+        };
     }
 
     /**

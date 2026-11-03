@@ -263,7 +263,7 @@ public class CircuitNetlist implements INetList {
      * Registers a magnetic coupling between two inductors.
      *
      * <p>This is extracted from NetListLK.definiere_magnetischeKopplungen_im_LK().
-     * The coupling is defined by a coupling coefficient k (0 to 1) and the inductance
+     * The coupling is defined by a coupling signed coefficient k (-1 to 1) and the inductance
      * values of both coupled inductors. The mutual inductance is calculated as:
      * M = k * sqrt(L1 * L2)
      *
@@ -272,7 +272,7 @@ public class CircuitNetlist implements INetList {
      *
      * @param inductor1Index element index of first inductor in netlist
      * @param inductor2Index element index of second inductor in netlist
-     * @param couplingCoefficient k value (typically 0 to 1, where 1 = perfect coupling)
+     * @param couplingCoefficient signed k value (-1 to 1, where absolute value 1 = perfect coupling)
      * @param inductance1 inductance value of first inductor (Henries)
      * @param inductance2 inductance value of second inductor (Henries)
      *
@@ -296,6 +296,19 @@ public class CircuitNetlist implements INetList {
         if (inductor2Index < 0 || inductor2Index >= elementCount) {
             throw new IndexOutOfBoundsException(
                 String.format("Inductor2 index %d out of range [0, %d)", inductor2Index, elementCount));
+        }
+
+        if (getType(inductor1Index) != CircuitTypCore.LK_LKOP2
+                || getType(inductor2Index) != CircuitTypCore.LK_LKOP2
+                || voltageSourceNumbers[inductor1Index] <= 0
+                || voltageSourceNumbers[inductor2Index] <= 0
+                || voltageSourceNumbers[inductor1Index] > voltageSourceCount
+                || voltageSourceNumbers[inductor2Index] > voltageSourceCount
+                || voltageSourceNumbers[inductor1Index] == voltageSourceNumbers[inductor2Index]) {
+            throw new IllegalArgumentException("Magnetic coupling requires two auxiliary-current LK_LKOP2 windings");
+        }
+        if (parameters[inductor1Index][0] != inductance1 || parameters[inductor2Index][0] != inductance2) {
+            throw new IllegalArgumentException("Coupling inductance must match the winding parameters");
         }
 
         // Delegate to registry

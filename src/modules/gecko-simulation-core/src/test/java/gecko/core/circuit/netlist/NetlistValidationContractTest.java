@@ -54,8 +54,8 @@ class NetlistValidationContractTest {
     @Test
     void reinitializationDropsMappingsResultsTimeAndCouplingsFromThePriorCircuit() {
         CircuitNetlist netlist=new CircuitNetlist();
-        netlist.initNetlist(new CircuitTypCore[]{CircuitTypCore.LK_L,CircuitTypCore.LK_L},
-                new int[]{1,2},new int[]{0,0},new int[]{-1,-1},new double[][]{{1},{2}},2,0,2);
+        netlist.initNetlist(new CircuitTypCore[]{CircuitTypCore.LK_LKOP2,CircuitTypCore.LK_LKOP2},
+                new int[]{1,2},new int[]{0,0},new int[]{1,2},new double[][]{{1},{2}},2,2,2);
         netlist.registerMutualCoupling(0,1,0.5,1,2);
         netlist.setComponentNameToIndex(Map.of("old",1));
         netlist.storeResults(new double[]{0,1,2},new double[]{3,4});
