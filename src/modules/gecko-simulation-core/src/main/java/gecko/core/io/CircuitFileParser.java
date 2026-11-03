@@ -320,7 +320,7 @@ public class CircuitFileParser {
      * @param lines the raw circuit file lines
      * @param model the circuit model to populate with components
      */
-    private void parseCircuitComponents(String[] lines, CircuitModel model) {
+    private void parseCircuitComponents(String[] lines, CircuitModel model) throws CircuitParseException {
         TokenMap tokenMap = new TokenMap(lines, true);
 
         TokenMap elementBlock;
@@ -362,10 +362,27 @@ public class CircuitFileParser {
 
                 comp.setTerminalXLabels(filterNix(xLabels));
                 comp.setTerminalYLabels(filterNix(yLabels));
+                comp.setParameterStrings(filterNixStrings(
+                        elementBlock.readDataLine("parameterString[]", new String[0])));
+                if (elementBlock.containsToken("uniqueObjectIdentifier")) {
+                    String value = elementBlock.getLineString("uniqueObjectIdentifier", "")
+                            .substring("uniqueObjectIdentifier".length()).trim();
+                    comp.setParameter("uniqueObjectIdentifier", Long.parseLong(value));
+                }
+                if (type == 9 && elementBlock.containsToken("coupledReferenceID[]")) {
+                    String[] references = elementBlock.getLineString("coupledReferenceID[]", "")
+                            .substring("coupledReferenceID[]".length()).trim().split("\\s+");
+                    if (references.length != 2) {
+                        throw new IllegalArgumentException("A magnetic coupling requires exactly two winding references");
+                    }
+                    comp.setParameter("coupledReferenceID0", Long.parseLong(references[0]));
+                    comp.setParameter("coupledReferenceID1", Long.parseLong(references[1]));
+                }
 
                 model.addCircuitComponent(comp);
             } catch (Exception e) {
-                // Skip malformed blocks silently - log if needed
+                throw new CircuitParseException(model.getFilePath() + ": invalid electrical component: "
+                        + e.getMessage(), e);
             }
         }
     }

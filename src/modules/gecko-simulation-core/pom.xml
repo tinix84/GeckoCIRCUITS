@@ -175,12 +175,33 @@
                                         <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.90</minimum></limit>
                                     </limits>
                                 </rule>
+                                <!-- Magnetic contracts cover registry validation, winding stamps and solver histories. -->
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes>
+                                        <include>gecko.core.circuit.netlist.MutualCouplingRegistry</include>
+                                        <include>gecko.core.circuit.netlist.MutualCouplingRegistry$Coupling</include>
+                                        <include>gecko.core.circuit.matrix.CoupledInductorStamper</include>
+                                    </includes>
+                                    <limits>
+                                        <limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.95</minimum></limit>
+                                        <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.90</minimum></limit>
+                                    </limits>
+                                </rule>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes><include>gecko.core.simulation.solver.MatrixSolver</include></includes>
+                                    <limits>
+                                        <limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.80</minimum></limit>
+                                        <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.65</minimum></limit>
+                                    </limits>
+                                </rule>
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes><include>gecko.core.circuit.netlist</include></includes>
                                     <limits>
-                                        <limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.75</minimum></limit>
-                                        <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.70</minimum></limit>
+                                        <limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.90</minimum></limit>
+                                        <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.85</minimum></limit>
                                     </limits>
                                 </rule>
                                 <rule>

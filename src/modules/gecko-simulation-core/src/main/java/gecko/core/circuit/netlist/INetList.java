@@ -111,4 +111,8 @@ public interface INetList {
      * @return simulation time in seconds
      */
     double getSimulationTime();
+    /** Magnetic metadata is optional for netlist implementations without coupled windings. */
+    default java.util.List<MutualCouplingRegistry.Coupling> getAllCouplings() {
+        return java.util.List.of();
+    }
 }
