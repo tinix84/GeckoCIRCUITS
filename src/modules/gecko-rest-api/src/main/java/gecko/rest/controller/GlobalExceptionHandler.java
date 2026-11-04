@@ -5,9 +5,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -38,6 +40,24 @@ public class GlobalExceptionHandler {
         response.put("message", ex.getReason());
 
         return ResponseEntity.status(ex.getStatusCode()).body(response);
+    }
+
+    /**
+     * Handle missing multipart request parts (e.g. required file upload not provided).
+     */
+    @ExceptionHandler({MissingServletRequestPartException.class,
+                       MissingServletRequestParameterException.class})
+    public ResponseEntity<Map<String, Object>> handleMissingRequestPart(
+            Exception ex,
+            WebRequest request) {
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("timestamp", Instant.now());
+        response.put("status", HttpStatus.BAD_REQUEST.value());
+        response.put("error", "Bad Request");
+        response.put("message", ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
     /**
