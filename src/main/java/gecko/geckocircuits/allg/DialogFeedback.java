@@ -24,7 +24,7 @@ import javax.swing.JFrame;
 
 public class DialogFeedback extends javax.swing.JDialog {
 
-    private static final String BUGZILLA_URL = "www.bugs.gecko-simulations.org";
+    private static final String ISSUES_URL = "https://github.com/tinix84/GeckoCIRCUITS/issues";
 
     public DialogFeedback(final JFrame parentFrame) {
         super(parentFrame, true);
@@ -35,7 +35,7 @@ public class DialogFeedback extends javax.swing.JDialog {
         } catch (Exception ex) {
             ex.printStackTrace();
         }
-        this.setTitle("Gecko-Simulations Bug-Reporting / Feedback");
+        this.setTitle("GeckoCIRCUITS Bug-Reporting / Feedback");
         initComponents();
         this.setVisible(true);
     }
@@ -70,7 +70,7 @@ public class DialogFeedback extends javax.swing.JDialog {
         jLabel5.setFont(new java.awt.Font("Dialog", 0, 12)); // NOI18N
         jLabel5.setText("<html>We want to improve our software! If you would like to submit a bug-report, <br>give us suggestions about features that we should implement in the software, <br>or you have other issues, then please visit our bugtracking homepage:");
 
-        jLabelURL.setText("<html><a href=\"www.bugs.gecko-simulations.org\">www.bugs.gecko-simulations.org</a></html>");
+        jLabelURL.setText("<html><a href=\"https://github.com/tinix84/GeckoCIRCUITS/issues\">github.com/tinix84/GeckoCIRCUITS/issues</a></html>");
         jLabelURL.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent evt) {
                 jLabelURLMouseClicked(evt);
@@ -127,11 +127,11 @@ public class DialogFeedback extends javax.swing.JDialog {
     }//GEN-LAST:event_jButtonCloseActionPerformed
 
     private void jButtonLaunchActionPerformed(java.awt.event.ActionEvent evt) {//NOPMD//GEN-FIRST:event_jButtonLaunchActionPerformed
-        LaunchBrowser.launch(BUGZILLA_URL);
+        LaunchBrowser.launch(ISSUES_URL);
     }//GEN-LAST:event_jButtonLaunchActionPerformed
 
     private void jLabelURLMouseClicked(java.awt.event.MouseEvent evt) {//NOPMD//GEN-FIRST:event_jLabelURLMouseClicked
-        LaunchBrowser.launch(BUGZILLA_URL);
+        LaunchBrowser.launch(ISSUES_URL);
     }//GEN-LAST:event_jLabelURLMouseClicked
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
