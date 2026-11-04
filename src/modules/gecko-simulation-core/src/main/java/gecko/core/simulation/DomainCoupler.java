@@ -84,9 +84,8 @@ public class DomainCoupler {
         double[] nodeVoltages = circuitNetlist.getLastNodeVoltagesRef();
         for (int i = 0; i < lkNodeForControlInput.length; i++) {
             int nodeIdx = lkNodeForControlInput[i];
-            if (nodeIdx >= 0 && nodeIdx < nodeVoltages.length) {
-                lkNodeVoltagesForControl[i] = nodeVoltages[nodeIdx];
-            }
+            lkNodeVoltagesForControl[i] = nodeIdx >= 0 && nodeIdx < nodeVoltages.length
+                    ? nodeVoltages[nodeIdx] : 0.0;
         }
     }
 
@@ -102,15 +101,13 @@ public class DomainCoupler {
         }
         for (int i = 0; i < controlOutputForLkSource.length; i++) {
             int ctrlIdx = controlOutputForLkSource[i];
-            if (ctrlIdx >= 0 && ctrlIdx < controlOutputValues.length) {
-                controlSignalsForLkSources[i] = controlOutputValues[ctrlIdx];
-            }
+            controlSignalsForLkSources[i] = ctrlIdx >= 0 && ctrlIdx < controlOutputValues.length
+                    ? controlOutputValues[ctrlIdx] : 0.0;
         }
         for (int i = 0; i < controlOutputForLkSwitch.length; i++) {
             int ctrlIdx = controlOutputForLkSwitch[i];
-            if (ctrlIdx >= 0 && ctrlIdx < controlOutputValues.length) {
-                switchGateSignals[i] = controlOutputValues[ctrlIdx] > 0.5;
-            }
+            switchGateSignals[i] = ctrlIdx >= 0 && ctrlIdx < controlOutputValues.length
+                    && controlOutputValues[ctrlIdx] > AbstractControlCalculatable.SIGNAL_THRESHOLD;
         }
     }
 
@@ -190,19 +187,22 @@ public class DomainCoupler {
 
         for (ControlBlockMapping.GateMapping gate : gates) {
             AbstractControlCalculatable gateCalc = gate.getCalculator();
-            double gateValue = 0.0;
-            if (gateCalc._inputSignal.length > 0 && gateCalc._inputSignal[0] != null) {
-                gateValue = gateCalc._inputSignal[0][0];
-            }
+            double gateValue = readGateValue(gateCalc);
 
             String switchName = gate.getSwitchName();
             int switchIndex = circuitNetlist.getElementIndexByName(switchName);
             if (switchIndex < 0) continue;
 
             double[] params = circuitNetlist.getParameter(switchIndex);
-            if (params == null || params.length <= PARAM_GATE) continue;
-
             CircuitTypCore type = circuitNetlist.getType(switchIndex);
+            int requiredLength = switch (type) {
+                case LK_S -> 3;
+                case LK_MOSFET -> 4;
+                case LK_THYR, LK_IGBT -> PARAM_GATE + 1;
+                default -> 1;
+            };
+            if (params == null || params.length < requiredLength) continue;
+
             double oldR = params[0];
 
             switch (type) {
@@ -262,9 +262,9 @@ public class DomainCoupler {
         for (ControlBlockMapping.AmpProbeMapping probe : controlBlockMapping.getAmpProbeMappings()) {
             String compName = probe.getComponentName();
             int elementIndex = circuitNetlist.getElementIndexByName(compName);
-            if (elementIndex >= 0 && elementIndex < componentCurrents.length) {
-                probe.getCalculator()._outputSignal[0][0] = componentCurrents[elementIndex];
-            }
+            probe.getCalculator()._outputSignal[0][0] =
+                    elementIndex >= 0 && elementIndex < componentCurrents.length
+                            ? componentCurrents[elementIndex] : 0.0;
         }
     }
 
@@ -283,10 +283,7 @@ public class DomainCoupler {
         List<ControlBlockMapping.GateMapping> gates = controlBlockMapping.getGateMappings();
         for (ControlBlockMapping.GateMapping gate : gates) {
             AbstractControlCalculatable gateCalc = gate.getCalculator();
-            double gateValue = 0.0;
-            if (gateCalc._inputSignal.length > 0 && gateCalc._inputSignal[0] != null) {
-                gateValue = gateCalc._inputSignal[0][0];
-            }
+            double gateValue = readGateValue(gateCalc);
 
             String switchName = gate.getSwitchName();
             int switchIndex = circuitNetlist.getElementIndexByName(switchName);
@@ -297,6 +294,18 @@ public class DomainCoupler {
                 }
             }
         }
+    }
+
+    private static double readGateValue(AbstractControlCalculatable calculator) {
+        if (calculator._inputSignal.length == 0 || calculator._inputSignal[0] == null
+                || calculator._inputSignal[0].length == 0) {
+            return 0.0;
+        }
+        double value = calculator._inputSignal[0][0];
+        if (!Double.isFinite(value)) {
+            throw new IllegalArgumentException("Gate signal must be finite");
+        }
+        return value;
     }
 
     // --- Accessors ---

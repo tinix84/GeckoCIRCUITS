@@ -75,7 +75,7 @@ final class ElectricalTimeStep {
      *
      * <p>Voltage-based criteria (matching proven code):
      * <ul>
-     *   <li>ON→OFF: {@code V_diode < stoergroesse * Uf} AND currently ON (rD &lt; 10000)</li>
+     *   <li>ON→OFF: voltage below threshold or IGBT gate OFF, while currently ON (rD &lt; 10000)</li>
      *   <li>OFF→ON: {@code V_diode > stoergroesse * Uf} AND currently OFF (rD &gt; 10000)</li>
      * </ul>
      *
@@ -115,8 +115,9 @@ final class ElectricalTimeStep {
                 double rOn = params[2];
                 double rOff = params[3];
 
-                // ON → OFF: diode voltage below threshold while currently ON
-                if ((diodeVoltage < stoergroesse * uf) && (rD < 10000)) {
+                // An IGBT also turns off when its gate is removed. A thyristor remains latched.
+                boolean gateRemoved = type == CircuitTypCore.LK_IGBT && params[8] < 0.5;
+                if ((diodeVoltage < stoergroesse * uf || gateRemoved) && (rD < 10000)) {
                     double aOLD = 1.0 / rD;
                     double bOLD = uf / rD;
                     params[0] = rOff; // Switch to OFF
