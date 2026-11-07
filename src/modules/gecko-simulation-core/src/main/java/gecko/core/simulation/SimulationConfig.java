@@ -16,6 +16,7 @@ package gecko.core.simulation;
 import gecko.core.allg.SolverSettingsCore;
 import gecko.core.allg.SolverType;
 import gecko.core.io.CircuitModel;
+import gecko.core.preparation.SolverOverrides;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -56,6 +57,12 @@ public final class SimulationConfig {
         return solverSettings.copy();
     }
 
+    /** Returns only settings that the caller explicitly supplies. */
+    SolverOverrides explicitSolverOverrides() {
+        return new SolverOverrides(solverTypeExplicit ? solverSettings.getSolverType() : null,
+                stepWidthExplicit ? solverSettings.getStepWidth() : null,
+                durationExplicit ? solverSettings.getSimulationDuration() : null);
+    }
     /** Uses file defaults only for settings the caller did not supply. */
     SolverSettingsCore resolveSolverSettings(CircuitModel model) {
         SolverSettingsCore resolved = solverSettings.copy();

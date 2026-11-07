@@ -295,7 +295,7 @@ public class NetlistBuilder {
                 params[i][p] = (val instanceof Number) ? ((Number) val).doubleValue() : 0.0;
             }
             // Ensure primary value is set (safety)
-            if (params[i][0] == 0.0) {
+            if (!comp.getParameters().containsKey("param0")) {
                 Object primary = comp.getParameters().get(resolveParameterKey(comp.getType()));
                 if (primary instanceof Number) {
                     params[i][0] = ((Number) primary).doubleValue();
@@ -408,7 +408,7 @@ public class NetlistBuilder {
         }
         for (int element = 0; element < components.size(); element++) {
             if (!connected.contains(nodeX[element]) || !connected.contains(nodeY[element])) {
-                throw new IllegalArgumentException("Component '" + components.get(element).getName()
+                throw new TopologyValidationException("UNCONNECTED_GROUND", components.get(element).getName(), "Component '" + components.get(element).getName()
                         + "' is not connected to ground (node 0)");
             }
         }

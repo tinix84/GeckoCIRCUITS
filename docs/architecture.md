@@ -94,6 +94,8 @@ src/main/java/gecko/
 4. **Solver**: Backward Euler (BE), Trapezoidal (TRZ), or Gear-Shichman (GS) integration
 5. **Results**: Time-domain waveforms stored in `DataContainer` classes
 
+Design reference: [Circuit preparation interface](adr/ADR-0002-circuit-preparation-interface.md).
+
 ### 3.2 Runtime Ownership
 
 `HeadlessSimulationEngine` owns the simulation clock, cancellation checks, progress reporting, and result logging.
@@ -333,6 +335,8 @@ These files are NOT overwritten by `sync-docs.py` (path convention mismatch):
 - Used for Simulink co-simulation with minimal latency
 
 ### 6.3 REST API (v3.0.0 — 32 Live Endpoints)
+
+Design references: [Circuit preparation admission](adr/ADR-0001-circuit-preparation-admission.md) and [Circuit preparation interface](adr/ADR-0002-circuit-preparation-interface.md).
 
 **Loss Calculation (3 endpoints):**
 ```

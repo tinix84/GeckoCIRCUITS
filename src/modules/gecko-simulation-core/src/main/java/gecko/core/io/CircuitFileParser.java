@@ -108,7 +108,8 @@ public class CircuitFileParser {
         model.setFilePath(filePath);
 
         // Build token map for fast lookup
-        Map<String, Integer> tokenMap = buildTokenMap(lines);
+        String[] simulationLines = inspectSimulationStructure(maskOpaqueContent(lines), model);
+        Map<String, Integer> tokenMap = buildTokenMap(simulationLines);
 
         // Parse simulation parameters
         parseSimulationParameters(model, lines, tokenMap);
@@ -129,11 +130,13 @@ public class CircuitFileParser {
         parseSignalNames(model, lines, tokenMap);
 
         // Parse circuit components from special blocks
-        parseCircuitComponents(lines, model);
-        parseConnections(lines, model, filePath);
+        parseCircuitComponents(simulationLines, model);
+        parseConnections(simulationLines, model, filePath);
 
         // Parse control components from special blocks
-        parseControlComponents(lines, model);
+        parseControlComponents(simulationLines, model);
+        parseThermalComponents(simulationLines, model);
+        inspectUnrecognizedSimulationBlocks(simulationLines, model);
 
         // Validate pre-simulation time step
         if (model.getPreSimulationTimeStep() <= 0) {
@@ -188,11 +191,11 @@ public class CircuitFileParser {
     private void parseSimulationParameters(CircuitModel model, String[] lines,
                                            Map<String, Integer> tokenMap) throws CircuitParseException {
         if (tokenMap.containsKey("tDURATION")) {
-            model.setSimulationDuration(readDouble(lines, tokenMap, "tDURATION", 0.02));
+            model.setSimulationDuration(readSavedTiming(model, lines, tokenMap, "tDURATION", "duration", 0.02));
         }
 
         if (tokenMap.containsKey("dt")) {
-            model.setTimeStep(readDouble(lines, tokenMap, "dt", 1e-6));
+            model.setTimeStep(readSavedTiming(model, lines, tokenMap, "dt", "timeStep", 1e-6));
         }
 
         if (tokenMap.containsKey("tPAUSE")) {
@@ -208,8 +211,16 @@ public class CircuitFileParser {
         }
 
         if (tokenMap.containsKey("solverType")) {
-            int solverIndex = readInt(lines, tokenMap, "solverType", 0);
-            model.setSolverType(SolverType.fromOldGeckoIndex(solverIndex));
+            SolverType solver = null;
+            try {
+                int index = Integer.parseInt(savedSettingValue(lines, tokenMap, "solverType"));
+                solver = Arrays.stream(SolverType.values()).filter(value -> value.getOldGeckoIndex() == index)
+                        .findFirst().orElse(null);
+            } catch (NumberFormatException error) {
+                // Keep the inspection default and retain the invalid saved input.
+            }
+            if (solver == null) addInvalidSavedSetting(model, tokenMap, "solverType", "solver");
+            else model.setSolverType(solver);
         }
     }
 
@@ -328,7 +339,8 @@ public class CircuitFileParser {
             try {
                 int type = elementBlock.readDataLine("typ", -1);
                 if (type < 0) {
-                    continue;  // skip invalid
+                    addComponentIssue(model, elementBlock, "LK", "The component type is missing or invalid.");
+                    continue;
                 }
 
                 String name = elementBlock.readDataLine("idStringDialog", "");
@@ -349,6 +361,8 @@ public class CircuitFileParser {
 
                 // Build ComponentData
                 CircuitModel.ComponentData comp = new CircuitModel.ComponentData(type, name, x, y, orientation);
+
+                retainImportEvidence(comp, elementBlock, params, model);
 
                 // Store numeric parameters by index
                 for (int i = 0; i < params.length; i++) {
@@ -384,6 +398,175 @@ public class CircuitFileParser {
                 throw new CircuitParseException(model.getFilePath() + ": invalid electrical component: "
                         + e.getMessage(), e);
             }
+        }
+    }
+
+    private static final Map<String, String> SIMULATION_MARKERS = Map.of(
+            "e", "ElementLK", "c", "ElementCONTROL", "eTH", "ElementTHERM", "sp", "ElementSPECIAL",
+            "verbindungLK", "Verbindung", "verbindungCONTROL", "Verbindung", "verbindungTHERM", "Verbindung");
+
+    private String[] maskOpaqueContent(String[] lines) {
+        String[] result = lines.clone();
+        Set<String> tags = Set.of("scripterCode", "scripterImports", "scripterDeclarations",
+                "extraScriptSourceFiles", "sourceCode", "staticCode", "importCode", "staticVariables",
+                "extraSourceFiles", "GeckoFileManager", "GeckoFile");
+        String closing = null;
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i].trim();
+            if (closing != null) {
+                if (line.equals(closing)) {
+                    closing = null;
+                } else {
+                    result[i] = "";
+                }
+            } else if (line.startsWith("<") && line.endsWith(">")
+                    && tags.contains(line.substring(1, line.length() - 1))) {
+                closing = "<\\" + line.substring(1);
+            }
+        }
+        return result;
+    }
+
+    private String[] inspectSimulationStructure(String[] lines, CircuitModel model) {
+        String[] result = lines.clone();
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i].trim();
+            String marker = line.split("\\s+", 2)[0];
+            String markedTag = SIMULATION_MARKERS.get(marker);
+            if (markedTag != null && (i + 1 == lines.length
+                    || !lines[i + 1].trim().equals("<" + markedTag + ">"))) {
+                addStructureIssue(model, markedTag, marker, i, "The simulation marker has no opening tag.");
+                result[i] = "";
+            }
+            boolean element = line.startsWith("<Element") && line.endsWith(">");
+            boolean wire = line.equals("<Verbindung>");
+            if (element || wire) {
+                String tag = line.substring(1, line.length() - 1);
+                String previous = i > 0 ? lines[i - 1].trim().split("\\s+", 2)[0] : "";
+                boolean knownTag = SIMULATION_MARKERS.containsValue(tag);
+                boolean hasMarker = tag.equals(SIMULATION_MARKERS.get(previous));
+                int start = hasMarker ? i - 1 : i;
+                if (knownTag && !hasMarker) {
+                    addStructureIssue(model, tag, previous, i, "The simulation block has no matching marker.");
+                }
+                String closing = "<\\" + tag + ">";
+                int end = i + 1;
+                while (end < lines.length && !lines[end].trim().equals(closing)) {
+                    String next = lines[end].trim();
+                    if (!tag.equals("ElementSPECIAL") && knownTag
+                            && (next.startsWith("<Element") || SIMULATION_MARKERS.containsKey(next))) {
+                        break;
+                    }
+                    end++;
+                }
+                boolean closed = end < lines.length && lines[end].trim().equals(closing);
+                if (!closed) {
+                    addStructureIssue(model, tag, previous, i, "The simulation block has no closing tag.");
+                }
+                if (!closed || (knownTag && !hasMarker)) {
+                    Arrays.fill(result, start, closed ? end + 1 : end, "");
+                }
+                i = closed ? end : end - 1;
+            } else if ((line.startsWith("<\\Element") && line.endsWith(">"))
+                    || line.equals("<\\Verbindung>")) {
+                String tag = line.substring(2, line.length() - 1);
+                addStructureIssue(model, tag, "", i, "The closing tag has no simulation block.");
+                result[i] = "";
+            }
+        }
+        return result;
+    }
+
+    private void addStructureIssue(CircuitModel model, String tag, String marker, int line, String message) {
+        String domain = tag.startsWith("Element") ? tag.substring("Element".length())
+                : marker.startsWith("verbindung") ? marker.substring("verbindung".length()) : "";
+        if (domain.equals("THERM")) {
+            domain = "THERMAL";
+        }
+        model.getImportIssues().add(new ImportIssue("MALFORMED_SIMULATION_BLOCK", domain, "", message,
+                model.getFilePath() + ": line " + (line + 1) + " " + tag, false));
+    }
+    private void inspectUnrecognizedSimulationBlocks(String[] lines, CircuitModel model) {
+        for (int start = 0; start < lines.length; start++) {
+            String opening = lines[start].trim();
+            if (!opening.startsWith("<Element") || !opening.endsWith(">")) {
+                continue;
+            }
+            String tag = opening.substring(1, opening.length() - 1);
+            if (Set.of("ElementLK", "ElementCONTROL", "ElementTHERM").contains(tag)) {
+                continue;
+            }
+            String closing = "<\\" + tag + ">";
+            int end = start + 1;
+            while (end < lines.length && !lines[end].trim().equals(closing)) {
+                end++;
+            }
+            TokenMap block = new TokenMap(Arrays.copyOfRange(lines, start + 1, end));
+            if (tag.equals("ElementSPECIAL") && block.readDataLine("typ", -1) == 70) {
+                continue;
+            }
+            String name = block.containsToken("idStringDialog") ? block.readDataLine("idStringDialog", "") : "";
+            model.getImportIssues().add(new ImportIssue("UNSUPPORTED_SIMULATION_BLOCK",
+                    tag.substring("Element".length()), name,
+                    "The saved block is unsupported by the headless engine.",
+                    model.getFilePath() + ": line " + (start + 1) + " " + tag, true));
+        }
+    }
+    private void parseThermalComponents(String[] lines, CircuitModel model) {
+        TokenMap tokens = new TokenMap(lines, true);
+        TokenMap block;
+        while ((block = tokens.getSpecialBlockTokenMap("eTH")) != null) {
+            try {
+                int type = block.readDataLine("typ", -1);
+                if (type < 0) {
+                    addComponentIssue(model, block, "THERMAL", "The component type is missing or invalid.");
+                    continue;
+                }
+                String name = block.readDataLine("idStringDialog", "");
+                CircuitModel.ComponentData component = new CircuitModel.ComponentData(type, name,
+                        block.readDataLine("x", 0), block.readDataLine("y", 0),
+                        block.readDataLine("orientierung", 0));
+                double[] parameters = readComponentParameters(block).stream()
+                        .mapToDouble(value -> value != null ? value : Double.NaN).toArray();
+                retainImportEvidence(component, block, parameters, model);
+                for (int i = 0; i < parameters.length; i++) {
+                    component.setParameter("param" + i, parameters[i]);
+                }
+                component.setTerminalXLabels(filterNix(block.readDataLine("labelAnfangsKnoten[]", new String[0])));
+                component.setTerminalYLabels(filterNix(block.readDataLine("labelEndKnoten[]", new String[0])));
+                component.setParameterStrings(filterNixStrings(block.readDataLine("parameterString[]", new String[0])));
+                if (block.containsToken("uniqueObjectIdentifier")) {
+                    component.setParameter("uniqueObjectIdentifier", Long.parseLong(
+                            component.getImportTokens().get("uniqueObjectIdentifier")));
+                }
+                model.addThermalComponent(component);
+                model.getImportIssues().add(new ImportIssue("UNSUPPORTED_DOMAIN", "THERMAL", name,
+                        "Saved thermal elements cannot run in the headless engine.",
+                        component.getSourceLocation(), true));
+            } catch (RuntimeException error) {
+                addComponentIssue(model, block, "THERMAL", "The component block is invalid: " + error.getMessage());
+            }
+        }
+    }
+    private void addComponentIssue(CircuitModel model, TokenMap block, String domain, String message) {
+        String name = block.containsToken("idStringDialog") ? block.readDataLine("idStringDialog", "") : "";
+        model.getImportIssues().add(new ImportIssue("MALFORMED_COMPONENT", domain, name, message,
+                model.getFilePath() + ": " + domain + " component " + name, false));
+    }
+
+    private void retainImportEvidence(CircuitModel.ComponentData component, TokenMap block,
+                                      double[] parameters, CircuitModel model) {
+        component.setParsedInput(true);
+        component.setNumericParameters(parameters);
+        component.setImportedParameterCount(parameters.length);
+        component.setSourceLocation(model.getFilePath() + ": component " + component.getName());
+        for (String line : block.getLines()) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty() || trimmed.startsWith("<")) {
+                continue;
+            }
+            String[] pair = trimmed.split("\\s+", 2);
+            component.getImportTokens().put(pair[0], pair.length == 2 ? pair[1].trim() : "");
         }
     }
 
@@ -456,6 +639,7 @@ public class CircuitFileParser {
                 // but the real control type comes from a mapping
                 int rawTyp = elementBlock.readDataLine("typ", -1);
                 if (rawTyp < 0) {
+                    addComponentIssue(model, elementBlock, "CONTROL", "The component type is missing or invalid.");
                     continue;
                 }
 
@@ -474,13 +658,14 @@ public class CircuitFileParser {
                 // Format: "parameterString[] /value1/value2/value3"
                 String[] paramStrings = elementBlock.readDataLine("parameterString[]", new String[0]);
 
-                // Read terminal labels (inputs = labelAnfangsKnoten, outputs = labelEndKnoten)
+                // SCOPE inputs define the connected channel list.
                 String[] xLabels = elementBlock.readDataLine("labelAnfangsKnoten[]", new String[0]);
-                String[] yLabels = elementBlock.readDataLine("labelEndKnoten[]", new String[0]);
 
                 // For SIGNAL sources, parameter[0] contains the sub-type (e.g. 404)
                 // The actual control type is determined by the typ field
                 CircuitModel.ComponentData comp = new CircuitModel.ComponentData(rawTyp, name, x, y, orientation);
+
+                retainImportEvidence(comp, elementBlock, params, model);
 
                 // Store numeric parameters by index
                 for (int i = 0; i < params.length; i++) {
@@ -491,19 +676,26 @@ public class CircuitFileParser {
                 // Store parameterString values (critical for VOLT/AMP probe coupling)
                 comp.setParameterStrings(filterNixStrings(paramStrings));
 
-                comp.setTerminalXLabels(filterNix(xLabels));
-                comp.setTerminalYLabels(filterNix(yLabels));
+                comp.setTerminalXLabels(rawTyp == 5 ? filterNix(xLabels)
+                        : readControlPortLabels(elementBlock, "labelAnfangsKnoten[]"));
+                comp.setTerminalYLabels(readControlPortLabels(elementBlock, "labelEndKnoten[]"));
 
                 model.addControlComponent(comp);
             } catch (Exception e) {
-                // Skip malformed blocks silently
+                addComponentIssue(model, elementBlock, "CONTROL", "The component block is invalid: " + e.getMessage());
             }
         }
     }
 
-    /**
-     * Filters out "NIX_NIX_NIX" placeholder strings, replacing with empty strings.
-     */
+    /** Preserves the saved indices of fixed CONTROL ports. */
+    private static String[] readControlPortLabels(TokenMap block, String token) {
+        String line = block.getLineString(token, "");
+        int separator = line.indexOf(SEPARATOR_ASCII_STRINGARRAY);
+        return separator < 0 ? new String[0]
+                : filterNixStrings(line.substring(separator + 1).split(SEPARATOR_ASCII_STRINGARRAY, -1));
+    }
+
+    /** Replaces saved placeholder strings with empty strings. */
     private static String[] filterNixStrings(String[] values) {
         if (values == null) {
             return new String[0];
@@ -539,6 +731,10 @@ public class CircuitFileParser {
             String arrayPart = line.substring(arrayStart + 3).trim();
             if (arrayPart.equals("null")) {
                 return result;
+            }
+
+            if (arrayPart.startsWith(SEPARATOR_ASCII_STRINGARRAY)) {
+                arrayPart = arrayPart.substring(1);
             }
 
             // Split by "/" separator
@@ -606,6 +802,29 @@ public class CircuitFileParser {
             }
         }
         return filtered.toArray(new String[0]);
+    }
+
+    private double readSavedTiming(CircuitModel model, String[] lines, Map<String, Integer> tokenMap,
+                                   String token, String path, double fallback) {
+        try {
+            double value = Double.parseDouble(savedSettingValue(lines, tokenMap, token));
+            if (Double.isFinite(value)) return value;
+        } catch (NumberFormatException error) {
+            // Keep a finite inspection value and retain the invalid saved input.
+        }
+        addInvalidSavedSetting(model, tokenMap, token, path);
+        return fallback;
+    }
+
+    private String savedSettingValue(String[] lines, Map<String, Integer> tokenMap, String token) {
+        String[] parts = lines[tokenMap.get(token)].trim().split("\\s+");
+        return parts.length > 1 ? parts[1] : "";
+    }
+
+    private void addInvalidSavedSetting(CircuitModel model, Map<String, Integer> tokenMap, String token, String path) {
+        model.getImportIssues().add(new ImportIssue("INVALID_SETTING", null, null,
+                "The saved setting is invalid.", model.getFilePath() + ": line " + (tokenMap.get(token) + 1) + " " + token,
+                false, path));
     }
 
     // ==================== Utility methods ====================

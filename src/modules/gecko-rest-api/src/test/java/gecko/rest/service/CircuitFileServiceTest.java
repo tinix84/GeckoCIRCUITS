@@ -130,9 +130,9 @@ class CircuitFileServiceTest {
     }
 
     @Test
-    void testValidateCircuit_valid() {
-        // Load a circuit first
-        CircuitLoadResponse loadResponse = service.loadCircuit(validIpesBase64, "test-circuit.ipes");
+    void testValidateCircuit_valid() throws IOException {
+        CircuitLoadResponse loadResponse = service.loadCircuit(Base64.getEncoder().encodeToString(
+                gecko.rest.support.PreparationCircuitFixtures.resistorCircuit(10)), "ready-circuit.ipes");
         String circuitId = loadResponse.circuitId();
 
         // Validate
@@ -147,9 +147,34 @@ class CircuitFileServiceTest {
     }
 
     @Test
+    void validationRetainsInspectableLegacyCircuitAndItsReadinessFindings() {
+        String id = service.loadCircuit(validIpesBase64, "legacy-circuit.ipes").circuitId();
+        ValidationResponse response = service.validateCircuit(id);
+        assertFalse(response.valid());
+        assertFalse(response.readyForHeadless());
+        assertFalse(response.errors().isEmpty());
+        assertTrue(response.diagnostics().stream().anyMatch(item ->
+                item.category() == gecko.core.preparation.Diagnostic.Category.CAPABILITY));
+        assertEquals(24, service.getComponents(id).components().size());
+    }
+
+    @Test
     void testValidateCircuit_notFound() {
         ValidationResponse response = service.validateCircuit("nonexistent-id");
         assertNull(response);
+    }
+
+    @Test
+    void settingUpdatesReplaceTheCompleteStoredSnapshot() {
+        String id = service.loadCircuit(validIpesBase64, "owned-settings.ipes").circuitId();
+        var captured = service.resolveSource(id, null).snapshot().toModel();
+        service.updateCircuitParameters(id, new CircuitParameterUpdate(0.25, 0.125, "gear"));
+        var updated = service.resolveSource(id, null).snapshot().toModel();
+        assertEquals(0.25, updated.getSimulationDuration());
+        assertEquals(0.125, updated.getTimeStep());
+        assertEquals(gecko.core.allg.SolverType.SOLVER_GS, updated.getSolverType());
+        assertEquals(8e-4, captured.getSimulationDuration());
+        assertEquals(1e-8, captured.getTimeStep());
     }
 
     @Test

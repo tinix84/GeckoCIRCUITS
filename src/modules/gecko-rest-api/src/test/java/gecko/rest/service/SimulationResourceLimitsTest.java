@@ -1,13 +1,19 @@
 package gecko.rest.service;
 
 import gecko.core.simulation.HeadlessSimulationEngine;
-import gecko.core.simulation.SimulationConfig;
+import gecko.core.preparation.ExecutionOptions;
+import gecko.core.preparation.PreparedCircuit;
+import gecko.rest.support.PreparationCircuitFixtures;
 import gecko.core.simulation.SimulationResult;
 import gecko.rest.config.SimulationJobLimits;
 import gecko.rest.model.BatchSimulationRequest;
 import gecko.rest.model.SimulationRequest;
 import gecko.rest.model.SimulationResponse;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -22,12 +28,23 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Timeout(10)
 class SimulationResourceLimitsTest {
-    private SimulationRequest request() { return new SimulationRequest("unused.ipes", 0.001, 1e-6); }
+    @TempDir
+    Path temporaryDirectory;
+
+    private String circuitFile;
+
+    @BeforeEach
+    void createCircuit() throws IOException {
+        circuitFile = Files.write(temporaryDirectory.resolve("ready.ipes"),
+                PreparationCircuitFixtures.resistorCircuit(10)).toString();
+    }
+
+    private SimulationRequest request() { return new SimulationRequest(circuitFile, 0.001, 1e-6); }
 
     private BatchSimulationRequest batch(int count) {
         BatchSimulationRequest request = new BatchSimulationRequest();
-        request.setCircuitFile("unused.ipes");
-        request.setParameterSets(Collections.nCopies(count, Map.of("R", 10.0)));
+        request.setCircuitFile(circuitFile);
+        request.setParameterSets(Collections.nCopies(count, Map.of("R.1.resistance", 10.0)));
         return request;
     }
 
@@ -106,7 +123,7 @@ class SimulationResourceLimitsTest {
             engines.incrementAndGet();
             return new HeadlessSimulationEngine() {
                 @Override
-                public SimulationResult runSimulation(SimulationConfig config, BooleanSupplier cancelled) {
+                public SimulationResult runSimulation(PreparedCircuit circuit, ExecutionOptions options, BooleanSupplier cancelled) {
                     started.countDown();
                     try { release.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
                     return SimulationResult.failed("stopped");

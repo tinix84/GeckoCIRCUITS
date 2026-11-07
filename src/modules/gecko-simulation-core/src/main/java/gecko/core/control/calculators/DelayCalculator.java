@@ -116,28 +116,28 @@ public final class DelayCalculator extends AbstractSingleInputSingleOutputCalcul
             _outputSignal[0][0] = _inputSignal[0][0];
             return;
         }
-        if (_bufferEmpty) {
-            // Buffer is still being filled
-            // Output zero while filling
-            _outputSignal[0][0] = 0;
+        publishDelayedOutput();
+        captureCurrentInput();
+    }
 
-            // Store input in buffer
-            _delayBuffer[_bufferIndex] = _inputSignal[0][0];
-            _bufferIndex++;
+    /**
+     * Publishes the historical sample without reading the current input.
+     * Use after initialization. The time step must not exceed the active delay.
+     */
+    public void publishDelayedOutput() {
+        _outputSignal[0][0] = _bufferEmpty ? 0 : _delayBuffer[_bufferIndex];
+    }
 
-            // Check if buffer is now full
-            if (_bufferIndex >= _delayBuffer.length) {
-                _bufferEmpty = false;
-                _bufferIndex = 0;
-            }
-        } else {
-            // Normal operation - output oldest value, store new input
-            _outputSignal[0][0] = _delayBuffer[_bufferIndex];
-            _delayBuffer[_bufferIndex] = _inputSignal[0][0];
-
-            // Advance circular buffer index
-            _bufferIndex++;
-            _bufferIndex %= _delayBuffer.length;
+    /**
+     * Stores the settled current input and advances history by one sample.
+     * Call after all combinational calculators execute, following {@link #publishDelayedOutput()}.
+     */
+    public void captureCurrentInput() {
+        _delayBuffer[_bufferIndex] = _inputSignal[0][0];
+        _bufferIndex++;
+        if (_bufferIndex >= _delayBuffer.length) {
+            _bufferEmpty = false;
+            _bufferIndex = 0;
         }
     }
 

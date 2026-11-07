@@ -1,8 +1,8 @@
 package gecko.rest.service;
 
 import gecko.core.allg.SolverType;
+import gecko.core.preparation.*;
 import gecko.core.simulation.HeadlessSimulationEngine;
-import gecko.core.simulation.SimulationConfig;
 import gecko.core.simulation.SimulationProgress;
 import gecko.core.simulation.SimulationResult;
 import gecko.rest.config.SimulationJobLimits;
@@ -59,6 +59,8 @@ public class SimulationService {
     private final SimulationJobLimits limits;
     private final Executor deliveryExecutor;
     private final Object admissionMonitor = new Object();
+    private final CircuitFileService circuitFiles;
+    private final CircuitPreparation preparation = new CircuitPreparation();
 
     @Autowired(required = false)
     private WebSocketProgressService webSocketProgressService;
@@ -67,14 +69,22 @@ public class SimulationService {
         this(new SimulationJobLimits());
     }
 
+    public SimulationService(SimulationJobLimits limits) { this(limits, new CircuitFileService()); }
+
+    /**
+     * Creates bounded execution and delivery pools with a shared circuit source registry.
+     *
+     * @param limits the execution, delivery, and retained-result capacity limits.
+     * @param circuitFiles the source adapter used to capture input before job publication.
+     */
     @Autowired
-    public SimulationService(SimulationJobLimits limits) {
+    public SimulationService(SimulationJobLimits limits, CircuitFileService circuitFiles) {
         this(new ThreadPoolExecutor(limits.getWorkers(), limits.getWorkers(), 0, TimeUnit.MILLISECONDS,
                         new ArrayBlockingQueue<>(limits.getQueued())), HeadlessSimulationEngine::new,
                 SseEmitter::new, null, limits,
                 new ThreadPoolExecutor(limits.getDeliveryWorkers(), limits.getDeliveryWorkers(), 0, TimeUnit.MILLISECONDS,
                         new ArrayBlockingQueue<>(limits.getRetained()),
-                        Thread.ofPlatform().daemon().name("gecko-progress-", 0).factory()));
+                        Thread.ofPlatform().daemon().name("gecko-progress-", 0).factory()), circuitFiles);
     }
 
     SimulationService(ExecutorService executorService, Supplier<HeadlessSimulationEngine> engineFactory) {
@@ -90,6 +100,14 @@ public class SimulationService {
     SimulationService(ExecutorService executorService, Supplier<HeadlessSimulationEngine> engineFactory,
                       LongFunction<SseEmitter> emitterFactory, WebSocketProgressService webSocketProgressService,
                       SimulationJobLimits limits, Executor deliveryExecutor) {
+        this(executorService, engineFactory, emitterFactory, webSocketProgressService, limits, deliveryExecutor,
+                new CircuitFileService());
+    }
+
+    SimulationService(ExecutorService executorService, Supplier<HeadlessSimulationEngine> engineFactory,
+                      LongFunction<SseEmitter> emitterFactory, WebSocketProgressService webSocketProgressService,
+                      SimulationJobLimits limits, Executor deliveryExecutor, CircuitFileService circuitFiles) {
+        this.circuitFiles = circuitFiles;
         this.executorService = executorService;
         this.engineFactory = engineFactory;
         this.emitterFactory = emitterFactory;
@@ -98,10 +116,20 @@ public class SimulationService {
         this.deliveryExecutor = deliveryExecutor;
     }
 
+    /**
+     * Captures and prepares one circuit before publishing or dispatching its Simulation job.
+     * Stored sources supply omitted settings, and explicit request settings take precedence.
+     *
+     * @param request the source selection, optional settings, and numeric overrides.
+     * @return a detached snapshot of the accepted job.
+     * @throws CircuitPreparationException for invalid source selection, invalid overrides, or failed Headless readiness.
+     * @throws ResponseStatusException when capacity prevents admission.
+     */
     public SimulationResponse submitSimulation(SimulationRequest request) {
+        PreparedCircuit circuit = prepare(request, circuitFiles.resolveSource(request.getCircuitId(), request.getCircuitFile()));
         synchronized (admissionMonitor) {
             requireCapacity(1, false);
-            SimulationJob job = createJob(request, null);
+            SimulationJob job = createJob(circuit, null);
             if (!dispatch(job) && !executorService.isShutdown()) {
                 jobs.remove(job.response.getSimulationId(), job);
                 throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Simulation queue is full");
@@ -118,14 +146,22 @@ public class SimulationService {
         }
     }
 
-    private SimulationJob createJob(SimulationRequest request, BatchJob batch) {
-        SimulationRequest ownedRequest = new SimulationRequest(
-                request.getCircuitFile(), request.getSimulationTime(), request.getTimeStep());
-        ownedRequest.setSolverType(request.getSolverType());
-        if (request.getParameters() != null) {
-            ownedRequest.setParameters(new HashMap<>(request.getParameters()));
+    private PreparedCircuit prepare(SimulationRequest request, CircuitFileService.ResolvedSource source) {
+        if (!source.stored() && (request.getTimeStep() == null || request.getSimulationTime() == null)) {
+            throw CircuitPreparationException.failure(HttpStatus.BAD_REQUEST, "INVALID_SETTING", Diagnostic.Category.CONFIGURATION,
+                    "Path requests require time step and simulation time", request.getTimeStep() == null ? "timeStep" : "simulationTime");
         }
-        SimulationJob job = new SimulationJob(ownedRequest, batch, deliveryExecutor);
+        PreparationResult result = preparation.prepare(source.snapshot(), new PreparationRequest(
+                new SolverOverrides(request.getSolverType() == null ? null : parseSolverType(request.getSolverType()),
+                        request.getTimeStep(), request.getSimulationTime()),
+                request.getParameters() == null ? Map.of() : request.getParameters()));
+        if (result instanceof PreparationResult.Ready ready) return ready.execution();
+        throw new CircuitPreparationException(result instanceof PreparationResult.Rejected ? HttpStatus.BAD_REQUEST
+                : HttpStatus.UNPROCESSABLE_ENTITY, result.report());
+    }
+
+    private SimulationJob createJob(PreparedCircuit circuit, BatchJob batch) {
+        SimulationJob job = new SimulationJob(circuit, batch, deliveryExecutor);
         jobs.put(job.response.getSimulationId(), job);
         return job;
     }
@@ -152,7 +188,6 @@ public class SimulationService {
                     return;
                 }
             }
-            SimulationConfig config = buildSimulationConfig(job.request);
             HeadlessSimulationEngine engine = engineFactory.get();
             engine.setProgressListener((currentTime, endTime, currentStep) -> {
                 double progress = endTime > 0 ? currentTime / endTime : 0;
@@ -166,7 +201,7 @@ public class SimulationService {
                 markRunning(job.response);
             }
             // The durable signal also covers cancellation before the engine starts.
-            SimulationResult result = engine.runSimulation(config, job::isCancelled);
+            SimulationResult result = engine.runSimulation(job.circuit, job.options, job::isCancelled);
             synchronized (job) {
                 boolean committed = result.isSuccess()
                         ? applySuccessfulResult(job.response, result)
@@ -468,29 +503,8 @@ public class SimulationService {
         }
     }
 
-    SimulationConfig buildSimulationConfig(SimulationRequest request) {
-        SimulationConfig.Builder builder = SimulationConfig.builder()
-                .circuitFile(request.getCircuitFile())
-                .stepWidth(request.getTimeStep())
-                .simulationDuration(request.getSimulationTime());
-        if (request.getSolverType() != null) {
-            builder.solverType(parseSolverType(request.getSolverType()));
-        }
-        if (request.getParameters() != null) {
-            builder.withParameters(request.getParameters());
-        }
-        return builder.build();
-    }
-
     SolverType parseSolverType(String value) {
-        if (value == null) {
-            return SolverType.SOLVER_BE;
-        }
-        return switch (value.toLowerCase(Locale.ROOT).trim()) {
-            case "trapezoidal", "trz" -> SolverType.SOLVER_TRZ;
-            case "gear-shichman", "gear", "gs" -> SolverType.SOLVER_GS;
-            default -> SolverType.SOLVER_BE;
-        };
+        return CircuitFileService.parseSolverType(value);
     }
 
     boolean markRunning(SimulationResponse response) {
@@ -555,22 +569,42 @@ public class SimulationService {
         return response.getStatus() == SimulationStatus.COMPLETED || response.getStatus() == SimulationStatus.FAILED;
     }
 
+    /**
+     * Captures one base snapshot and prepares every child before publishing the Batch.
+     * Accepted jobs own their prepared settings and parameters independently of later caller changes.
+     *
+     * @param request the source selection, parameter variations, concurrency limit, and optional settings.
+     * @return a detached Batch summary after atomic capacity admission.
+     * @throws CircuitPreparationException for invalid input or a child that fails preparation.
+     * @throws ResponseStatusException when retained capacity prevents admission.
+     */
     public BatchSimulationResponse submitBatch(BatchSimulationRequest request) {
         int requestedLimit = request.getMaxConcurrent() == null
                 ? DEFAULT_BATCH_CONCURRENCY : request.getMaxConcurrent();
-        BatchJob batch = new BatchJob(requestedLimit);
+        if (requestedLimit < 0 || requestedLimit > 100) throw invalidBatch("Batch concurrency must be between zero and 100");
+        CircuitFileService.ResolvedSource source = circuitFiles.resolveSource(request.getCircuitId(), request.getCircuitFile());
         BatchSimulationRequest.SimulationSettings settings = request.getSimulationSettings();
-        double duration = settings != null && settings.getSimulationTime() != null ? settings.getSimulationTime() : 0.02;
-        double dt = settings != null && settings.getTimeStep() != null ? settings.getTimeStep() : 1e-6;
+        Double duration = settings == null ? null : settings.getSimulationTime();
+        Double dt = settings == null ? null : settings.getTimeStep();
+        if (!source.stored()) {
+            if (duration == null) duration = 0.02;
+            if (dt == null) dt = 1e-6;
+        }
         List<Map<String, Double>> parameterSets = expandParameterSets(request);
+        List<PreparedCircuit> prepared = new ArrayList<>();
+        for (Map<String, Double> parameters : parameterSets) {
+            SimulationRequest child = new SimulationRequest(request.getCircuitFile(), duration, dt);
+            child.setCircuitId(request.getCircuitId());
+            child.setParameters(parameters);
+            child.setSolverType(settings == null ? null : settings.getSolverType());
+            prepared.add(prepare(child, source));
+        }
+        BatchJob batch = new BatchJob(requestedLimit);
         synchronized (admissionMonitor) {
-            requireCapacity(parameterSets.size(), true);
+            requireCapacity(prepared.size(), true);
             List<String> ids = new ArrayList<>();
-            for (Map<String, Double> parameters : parameterSets) {
-                SimulationRequest child = new SimulationRequest(request.getCircuitFile(), duration, dt);
-                child.setParameters(parameters);
-                child.setSolverType(settings == null ? null : settings.getSolverType());
-                SimulationJob job = createJob(child, batch);
+            for (PreparedCircuit circuit : prepared) {
+                SimulationJob job = createJob(circuit, batch);
                 batch.pending.add(job);
                 ids.add(job.response.getSimulationId());
             }
@@ -688,7 +722,8 @@ public class SimulationService {
     }
 
     private static final class SimulationJob {
-        private final SimulationRequest request;
+        private final PreparedCircuit circuit;
+        private final ExecutionOptions options = ExecutionOptions.defaults();
         private final BatchJob batch;
         private final SimulationResponse response;
         private final List<SseEmitter> emitters = new ArrayList<>();
@@ -696,9 +731,9 @@ public class SimulationService {
         private boolean terminalPublished;
         private final ProgressMailbox mailbox;
 
-        private SimulationJob(SimulationRequest request, BatchJob batch, Executor deliveryExecutor) {
+        private SimulationJob(PreparedCircuit circuit, BatchJob batch, Executor deliveryExecutor) {
             mailbox = new ProgressMailbox(deliveryExecutor);
-            this.request = request;
+            this.circuit = circuit;
             this.batch = batch;
             response = new SimulationResponse(UUID.randomUUID().toString());
             response.setStartTime(Instant.now());
@@ -724,13 +759,20 @@ public class SimulationService {
     private List<java.util.Map<String, Double>> expandParameterSets(BatchSimulationRequest req) {
         // Explicit list takes priority
         if (req.getParameterSets() != null && !req.getParameterSets().isEmpty()) {
-            return req.getParameterSets();
+            if (req.getParameterSets().size() > 100) throw invalidBatch("A Batch supports at most 100 explicit parameter sets");
+            List<Map<String, Double>> owned = new ArrayList<>();
+            for (Map<String, Double> row : req.getParameterSets()) {
+                if (row == null) throw invalidBatch("Each Batch parameter set must be a map");
+                owned.add(java.util.Collections.unmodifiableMap(new HashMap<>(row)));
+            }
+            return List.copyOf(owned);
         }
         // Linear sweep
         if (req.getLinearSweep() != null) {
             BatchSimulationRequest.LinearSweep sweep = req.getLinearSweep();
             List<java.util.Map<String, Double>> sets = new ArrayList<>();
             int n = sweep.getPoints();
+            validateSweep(sweep.getParameterPath(), sweep.getStartValue(), sweep.getEndValue(), n, false);
             for (int i = 0; i < n; i++) {
                 double val = sweep.getStartValue() + i * (sweep.getEndValue() - sweep.getStartValue()) / (n - 1);
                 java.util.Map<String, Double> params = new java.util.HashMap<>();
@@ -747,6 +789,7 @@ public class SimulationService {
             BatchSimulationRequest.LogSweep sweep = req.getLogSweep();
             List<java.util.Map<String, Double>> sets = new ArrayList<>();
             int n = sweep.getPoints();
+            validateSweep(sweep.getParameterPath(), sweep.getStartValue(), sweep.getEndValue(), n, true);
             double logStart = Math.log10(sweep.getStartValue());
             double logEnd = Math.log10(sweep.getEndValue());
             for (int i = 0; i < n; i++) {
@@ -761,7 +804,19 @@ public class SimulationService {
             }
             return sets;
         }
-        return java.util.Collections.emptyList();
+        throw invalidBatch("A Batch requires parameter sets or a sweep");
+    }
+
+    private static void validateSweep(String path, double start, double end, int points, boolean logarithmic) {
+        if (path == null || path.isBlank() || points < 2 || points > 1000
+                || !Double.isFinite(start) || !Double.isFinite(end) || (logarithmic && (start <= 0 || end <= 0))) {
+            throw invalidBatch("A sweep requires a parameter path, finite limits, and two to 1000 points");
+        }
+    }
+
+    private static CircuitPreparationException invalidBatch(String message) {
+        return CircuitPreparationException.failure(HttpStatus.BAD_REQUEST, "INVALID_BATCH",
+                Diagnostic.Category.CONFIGURATION, message, null);
     }
 
 }

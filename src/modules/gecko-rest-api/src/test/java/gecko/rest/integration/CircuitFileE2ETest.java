@@ -36,6 +36,26 @@ class CircuitFileE2ETest {
     }
 
     @Test
+    void readyCircuitValidationRetainsTheLegacyResponseFields() throws IOException {
+        String content = Base64.getEncoder().encodeToString(
+                gecko.rest.support.PreparationCircuitFixtures.resistorCircuit(10));
+        var loaded = restTemplate.postForEntity("/api/v1/circuits/parse",
+                new CircuitLoadRequest(content, "ready-upload.ipes"), CircuitLoadResponse.class);
+        assertThat(loaded.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(loaded.getBody()).isNotNull();
+        var validated = restTemplate.getForEntity("/api/v1/circuits/" + loaded.getBody().circuitId() + "/validate",
+                ValidationResponse.class);
+        assertThat(validated.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(validated.getBody()).isNotNull();
+        assertThat(validated.getBody().valid()).isTrue();
+        assertThat(validated.getBody().warnings()).isEmpty();
+        assertThat(validated.getBody().errors()).isEmpty();
+        assertThat(validated.getBody().readyForHeadless()).isTrue();
+        assertThat(validated.getBody().outcome()).isEqualTo(gecko.core.preparation.ReadinessReport.Outcome.READY);
+        assertThat(validated.getBody().diagnostics()).isEmpty();
+    }
+
+    @Test
     void testFullWorkflow_parseValidateRetrieveDelete() {
         // 1. Parse circuit
         CircuitLoadRequest loadRequest = new CircuitLoadRequest(validIpesBase64, "test-circuit.ipes");
@@ -88,9 +108,13 @@ class CircuitFileE2ETest {
 
         assertThat(validationResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(validationResponse.getBody()).isNotNull();
-        assertThat(validationResponse.getBody().valid()).isTrue();
-        assertThat(validationResponse.getBody().warnings()).isEmpty();
-        assertThat(validationResponse.getBody().errors()).isEmpty();
+        assertThat(validationResponse.getBody().valid()).isFalse();
+        assertThat(validationResponse.getBody().readyForHeadless()).isFalse();
+        assertThat(validationResponse.getBody().outcome()).isEqualTo(gecko.core.preparation.ReadinessReport.Outcome.INVALID);
+        assertThat(validationResponse.getBody().warnings()).isNotNull();
+        assertThat(validationResponse.getBody().errors()).isNotEmpty();
+        assertThat(validationResponse.getBody().diagnostics()).anyMatch(item ->
+                item.category() == gecko.core.preparation.Diagnostic.Category.CAPABILITY);
 
         // 5. List all circuits
         ResponseEntity<CircuitListResponse> listResponse = restTemplate.getForEntity(

@@ -18,7 +18,11 @@ import gecko.core.datacontainer.ContainerStatus;
 import gecko.core.datacontainer.DataContainerGlobal;
 import gecko.core.io.CircuitFileParser;
 import gecko.core.io.CircuitModel;
-import gecko.core.io.ParameterOverrideApplicator;
+import gecko.core.preparation.CircuitPreparation;
+import gecko.core.preparation.PreparationRequest;
+import gecko.core.preparation.PreparationResult;
+import gecko.core.preparation.PreparedCircuit;
+import gecko.core.preparation.ExecutionOptions;
 import gecko.core.circuit.netlist.CircuitNetlist;
 import gecko.core.circuit.netlist.NetlistBuilder;
 
@@ -109,10 +113,32 @@ public class HeadlessSimulationEngine {
      * @return the simulation result
      */
     public SimulationResult runSimulation(SimulationConfig config, BooleanSupplier cancellationSignal) {
-        if (config == null) {
-            return SimulationResult.failed("Simulation configuration is required");
-        }
+        if (config == null) return SimulationResult.failed("Simulation configuration is required");
+        return runOwnedSimulation(start -> executeSimulation(config, start, cancellationSignal));
+    }
 
+    /**
+     * Runs an immutable prepared description with independent numerical and CONTROL state.
+     * Logging options and cancellation do not change its circuit configuration.
+     * This method blocks until completion. Numerical failure remains possible after successful preflight.
+     * Use separate engine instances for concurrent runs of the same Prepared circuit.
+     *
+     * @param circuit the immutable execution description from preparation
+     * @param options the data logging choices for this run
+     * @param cancellationSignal true when the owning job requests cancellation
+     * @return the successful, cancelled, or failed run result
+     */
+    public SimulationResult runSimulation(PreparedCircuit circuit, ExecutionOptions options,
+            BooleanSupplier cancellationSignal) {
+        return runOwnedSimulation(start -> {
+            var settings = circuit.solverSettings();
+            var config = SimulationConfig.builder().solverSettings(settings)
+                    .enableDataLogging(options.loggingEnabled()).dataLoggingInterval(options.loggingInterval()).build();
+            return executeSimulation(config, start, cancellationSignal, circuit.newRunModel(), settings);
+        });
+    }
+
+    private SimulationResult runOwnedSimulation(java.util.function.LongFunction<SimulationResult> execution) {
         synchronized (pauseMonitor) {
             if (!state.compareAndSet(EngineState.IDLE, EngineState.RUNNING)) {
                 return SimulationResult.failed("Engine is already running a simulation");
@@ -126,12 +152,11 @@ public class HeadlessSimulationEngine {
         }
         long startTime = System.currentTimeMillis();
         simulationStartTime = startTime;
-
         try {
-            return executeSimulation(config, startTime, cancellationSignal);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return SimulationResult.failed("Simulation error: " + e.getMessage());
+            return execution.apply(startTime);
+        } catch (Exception error) {
+            error.printStackTrace();
+            return SimulationResult.failed("Simulation error: " + error.getMessage());
         } finally {
             synchronized (pauseMonitor) {
                 state.set(EngineState.IDLE);
@@ -163,7 +188,26 @@ public class HeadlessSimulationEngine {
             BooleanSupplier cancellationSignal) {
         CircuitModel circuitModel = parseCircuitModel(config);
         SolverSettingsCore settings = config.resolveSolverSettings(circuitModel);
+        validateSimulationSettings(settings.getStepWidth(), settings.getSimulationDuration());
 
+        if (circuitModel != null) {
+            var preparation = new CircuitPreparation();
+            var prepared = preparation.prepare(preparation.capture(circuitModel),
+                    new PreparationRequest(config.explicitSolverOverrides(), config.getParameterOverrides()));
+            if (!(prepared instanceof PreparationResult.Ready ready)) {
+                String findings = prepared.report().diagnostics().stream()
+                        .map(item -> item.code() + ": " + item.message())
+                        .collect(java.util.stream.Collectors.joining("; "));
+                return SimulationResult.failed(findings);
+            }
+            circuitModel = ready.execution().newRunModel();
+            settings = ready.execution().solverSettings();
+        }
+        return executeSimulation(config, startTime, cancellationSignal, circuitModel, settings);
+    }
+
+    private SimulationResult executeSimulation(SimulationConfig config, long startTime,
+            BooleanSupplier cancellationSignal, CircuitModel circuitModel, SolverSettingsCore settings) {
         double dt = settings.getStepWidth();
         double duration = settings.getSimulationDuration();
         validateSimulationSettings(dt, duration);
@@ -171,11 +215,6 @@ public class HeadlessSimulationEngine {
         endTime = duration;
         currentTime = 0;
         currentStep = 0;
-
-        // Apply parameter overrides before building the netlist
-        if (circuitModel != null && !config.getParameterOverrides().isEmpty()) {
-            ParameterOverrideApplicator.applyOverrides(circuitModel, config.getParameterOverrides());
-        }
 
         // Build circuit netlist
         circuitNetlist = NetlistBuilder.buildFromCircuitModel(circuitModel);

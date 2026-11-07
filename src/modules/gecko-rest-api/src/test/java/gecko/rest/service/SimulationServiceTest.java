@@ -3,7 +3,8 @@ package gecko.rest.service;
 import gecko.core.allg.SolverType;
 import gecko.core.datacontainer.DataContainerGlobal;
 import gecko.core.simulation.HeadlessSimulationEngine;
-import gecko.core.simulation.SimulationConfig;
+import gecko.core.preparation.PreparedCircuit;
+import gecko.core.preparation.ExecutionOptions;
 import gecko.core.simulation.SimulationResult;
 import gecko.rest.model.BatchJobStatus;
 import gecko.rest.model.BatchSimulationRequest;
@@ -37,12 +38,13 @@ import static org.mockito.Mockito.*;
 
 /** Tests lifecycle behavior through the same interface used by controllers. */
 class SimulationServiceTest {
+    private static final String CIRCUIT = "../gecko-simulation-core/src/test/resources/ipes/buck_simple.ipes";
     private ManualExecutor executor;
     private SimulationService service;
     private WebSocketProgressService webSocket;
     private AtomicInteger enginesCreated;
-    private AtomicReference<SimulationConfig> executedConfig;
-    private BiFunction<SimulationConfig, BooleanSupplier, SimulationResult> execution;
+    private AtomicReference<PreparedCircuit> executedConfig;
+    private BiFunction<PreparedCircuit, BooleanSupplier, SimulationResult> execution;
 
     @BeforeEach
     void setUp() {
@@ -55,7 +57,7 @@ class SimulationServiceTest {
             enginesCreated.incrementAndGet();
             return new HeadlessSimulationEngine() {
                 @Override
-                public SimulationResult runSimulation(SimulationConfig config, BooleanSupplier cancelled) {
+                public SimulationResult runSimulation(PreparedCircuit config, ExecutionOptions options, BooleanSupplier cancelled) {
                     executedConfig.set(config);
                     return execution.apply(config, cancelled);
                 }
@@ -117,17 +119,17 @@ class SimulationServiceTest {
     @Test
     void requestParametersAreOwnedWhileQueued() {
         SimulationRequest request = request();
-        Map<String, Double> parameters = new HashMap<>(Map.of("R_load", 12.0));
+        Map<String, Double> parameters = new HashMap<>(Map.of("R.1.resistance", 12.0));
         request.setParameters(parameters);
         request.setSolverType("trz");
         service.submitSimulation(request);
-        parameters.put("R_load", 999.0);
+        parameters.put("R.1.resistance", 999.0);
         request.setCircuitFile("changed.ipes");
         request.setSolverType("gs");
         executor.runNext();
-        assertEquals("test.ipes", executedConfig.get().getCircuitFilePath());
-        assertEquals(12.0, executedConfig.get().getParameterOverrides().get("R_load"));
-        assertEquals(SolverType.SOLVER_TRZ, executedConfig.get().getSolverSettings().getSolverType());
+        assertEquals(CIRCUIT, executedConfig.get().newRunModel().getFilePath());
+        assertEquals(12.0, parameter(executedConfig.get(), "R.1", "resistance"));
+        assertEquals(SolverType.SOLVER_TRZ, executedConfig.get().solverSettings().getSolverType());
     }
 
     @Test
@@ -157,7 +159,7 @@ class SimulationServiceTest {
             await(release);
             return new HeadlessSimulationEngine() {
                 @Override
-                public SimulationResult runSimulation(SimulationConfig config, BooleanSupplier cancelled) {
+                public SimulationResult runSimulation(PreparedCircuit config, ExecutionOptions options, BooleanSupplier cancelled) {
                     runs.incrementAndGet();
                     return successfulResult();
                 }
@@ -187,12 +189,11 @@ class SimulationServiceTest {
         executor = new ManualExecutor();
         service = new SimulationService(executor, () -> new HeadlessSimulationEngine() {
             @Override
-            public SimulationResult runSimulation(SimulationConfig config, BooleanSupplier cancelled) {
+            public SimulationResult runSimulation(PreparedCircuit config, ExecutionOptions options, BooleanSupplier cancelled) {
                 starting.countDown();
                 await(release);
-                // Use the real core loop, without a fixture file, after cancellation arrives.
-                SimulationResult result = super.runSimulation(SimulationConfig.builder()
-                        .stepWidth(1e-6).simulationDuration(0.001).build(), cancelled);
+                // The accepted prepared input still uses the durable cancellation signal.
+                SimulationResult result = super.runSimulation(config, options, cancelled);
                 actual.set(result);
                 return result;
             }
@@ -437,13 +438,13 @@ class SimulationServiceTest {
     @Test
     void explicitAndSweepSettingsReachOwnedChildRequests() {
         BatchSimulationRequest request = new BatchSimulationRequest();
-        request.setCircuitFile("test.ipes");
+        request.setCircuitFile(CIRCUIT);
         BatchSimulationRequest.LinearSweep sweep = new BatchSimulationRequest.LinearSweep();
-        sweep.setParameterPath("R1");
+        sweep.setParameterPath("R.1.resistance");
         sweep.setStartValue(1.0);
         sweep.setEndValue(3.0);
         sweep.setPoints(3);
-        sweep.setFixedParameters(Map.of("C1", 2e-6));
+        sweep.setFixedParameters(Map.of("C.1.capacitance", 2e-6));
         request.setLinearSweep(sweep);
         BatchSimulationRequest.SimulationSettings settings = new BatchSimulationRequest.SimulationSettings();
         settings.setSimulationTime(0.01);
@@ -452,10 +453,10 @@ class SimulationServiceTest {
         request.setSimulationSettings(settings);
         service.submitBatch(request);
         executor.runAll();
-        assertEquals(3.0, executedConfig.get().getParameterOverrides().get("R1"));
-        assertEquals(2e-6, executedConfig.get().getParameterOverrides().get("C1"));
-        assertEquals(1e-5, executedConfig.get().getSolverSettings().getStepWidth());
-        assertEquals(SolverType.SOLVER_GS, executedConfig.get().getSolverSettings().getSolverType());
+        assertEquals(3.0, parameter(executedConfig.get(), "R.1", "resistance"));
+        assertEquals(2e-6, parameter(executedConfig.get(), "C.1", "capacitance"));
+        assertEquals(1e-5, executedConfig.get().solverSettings().getStepWidth());
+        assertEquals(SolverType.SOLVER_GS, executedConfig.get().solverSettings().getSolverType());
     }
 
     @Test
@@ -508,14 +509,13 @@ class SimulationServiceTest {
     @Test
     void configurationPreservesOverridesAndSolverAliases() {
         SimulationRequest request = request();
-        request.setParameters(Map.of("R_load", 12.0, "C_dc", 8.5e-6));
+        request.setParameters(Map.of("R.1.resistance", 12.0, "C.1.capacitance", 8.5e-6));
         request.setSolverType(" GEAR ");
-        SimulationConfig config = service.buildSimulationConfig(request);
-        assertEquals(2, config.getParameterOverrides().size());
-        assertEquals(12.0, config.getParameterOverrides().get("R_load"));
-        assertEquals(SolverType.SOLVER_GS, config.getSolverSettings().getSolverType());
-        assertEquals(SolverType.SOLVER_BE, service.parseSolverType(null));
-        assertEquals(SolverType.SOLVER_BE, service.parseSolverType("unknown"));
+        service.submitSimulation(request);
+        executor.runNext();
+        assertEquals(12.0, parameter(executedConfig.get(), "R.1", "resistance"));
+        assertEquals(8.5e-6, parameter(executedConfig.get(), "C.1", "capacitance"));
+        assertEquals(SolverType.SOLVER_GS, executedConfig.get().solverSettings().getSolverType());
     }
 
     @Test
@@ -554,10 +554,10 @@ class SimulationServiceTest {
                 .when(webSocket).broadcastCompletion(anyString(), anyBoolean(), nullable(String.class));
         executor.shutdown();
         BatchSimulationRequest request = new BatchSimulationRequest();
-        request.setCircuitFile("test.ipes");
+        request.setCircuitFile(CIRCUIT);
         request.setMaxConcurrent(1);
         BatchSimulationRequest.LinearSweep sweep = new BatchSimulationRequest.LinearSweep();
-        sweep.setParameterPath("R1");
+        sweep.setParameterPath("R.1.resistance");
         sweep.setStartValue(1.0);
         sweep.setEndValue(1000.0);
         sweep.setPoints(1000);
@@ -582,8 +582,13 @@ class SimulationServiceTest {
         submit();
         executor.runNext();
     }
+    private static double parameter(PreparedCircuit circuit, String component, String name) {
+        return ((Number) circuit.newRunModel().getCircuitComponents().stream()
+                .filter(item -> item.getName().equals(component)).findFirst().orElseThrow()
+                .getParameters().get(name)).doubleValue();
+    }
     private SimulationResponse submit() { return service.submitSimulation(request()); }
-    private SimulationRequest request() { return new SimulationRequest("test.ipes", 0.02, 1e-6); }
+    private SimulationRequest request() { return new SimulationRequest(CIRCUIT, 0.02, 1e-6); }
     private RecordingEmitter stream(String id) {
         return (RecordingEmitter) service.registerProgressStream(id, 300000L);
     }
@@ -601,10 +606,10 @@ class SimulationServiceTest {
     }
     private static BatchSimulationRequest batchRequest(int count, int limit) {
         BatchSimulationRequest request = new BatchSimulationRequest();
-        request.setCircuitFile("test.ipes");
+        request.setCircuitFile(CIRCUIT);
         request.setMaxConcurrent(limit);
         List<Map<String, Double>> parameters = new ArrayList<>();
-        for (int i = 0; i < count; i++) { parameters.add(Map.of("R1", (double) i + 1)); }
+        for (int i = 0; i < count; i++) { parameters.add(Map.of("R.1.resistance", (double) i + 1)); }
         request.setParameterSets(parameters);
         return request;
     }
