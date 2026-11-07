@@ -1,30 +1,29 @@
 package gecko.rest.model;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.util.Map;
 
 /**
  * Request DTO for circuit simulation submissions.
- * Contains circuit file reference and simulation parameters.
+ * Contains a circuit source and optional simulation settings.
+ * Stored sources supply omitted settings independently.
+ * Path submissions require a simulation time and a time step.
+ * A null optional setting has the same meaning as an omitted setting.
  */
 public class SimulationRequest {
 
-    @NotBlank(message = "Circuit file path cannot be blank")
     private String circuitFile;
+    private String circuitId;
 
-    @NotNull(message = "Simulation time cannot be null")
     @Positive(message = "Simulation time must be positive")
     private Double simulationTime;
 
-    @NotNull(message = "Time step cannot be null")
     @Positive(message = "Time step must be positive")
     private Double timeStep;
 
     private Map<String, Double> parameters;
 
-    private String solverType;  // Optional, defaults to backward-euler
+    private String solverType;  // Optional. Inherits the captured solver.
 
     // Constructors
     public SimulationRequest() {
@@ -37,6 +36,20 @@ public class SimulationRequest {
     }
 
     // Getters and setters
+    /**
+     * Returns the explicit registry source selection.
+     *
+     * @return the exact registry ID, or null when the legacy source field is selected.
+     */
+    public String getCircuitId() { return circuitId; }
+    /**
+     * Selects an explicit registry ID for validation during admission.
+     * Select this field or circuitFile, but not both.
+     *
+     * @param circuitId the exact live registry ID, or null to omit this selection.
+     */
+    public void setCircuitId(String circuitId) { this.circuitId = circuitId; }
+
     public String getCircuitFile() {
         return circuitFile;
     }

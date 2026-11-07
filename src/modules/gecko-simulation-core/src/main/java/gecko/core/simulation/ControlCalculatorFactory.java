@@ -40,6 +40,15 @@ public class ControlCalculatorFactory {
     private static final int SIGNAL_SUBTYPE_TRIANGLE = 401;
     private static final int SIGNAL_SUBTYPE_RECTANGLE = 404;
 
+    /** Reports a wired CONTROL graph that has an instantaneous dependency cycle. */
+    public static final class DependencyCycleException extends IllegalArgumentException {
+        private static final long serialVersionUID = 1L;
+
+        private DependencyCycleException(List<String> blocked) {
+            super("A CONTROL dependency cycle prevents execution of: " + String.join(", ", blocked) + ".");
+        }
+    }
+
     /**
      * Result of building the control calculator chain.
      */
@@ -61,6 +70,7 @@ public class ControlCalculatorFactory {
      *
      * @param controlComponents list of control component data from the parser
      * @return a BuildResult containing the wired ControlNetlist and ControlBlockMapping
+     * @throws DependencyCycleException if the wired blocks contain an instantaneous dependency cycle
      */
     public BuildResult build(List<CircuitModel.ComponentData> controlComponents) {
         if (controlComponents == null || controlComponents.isEmpty()) {
@@ -84,7 +94,7 @@ public class ControlCalculatorFactory {
             String[] yLabels = entry.component.getTerminalYLabels();
             for (int port = 0; port < yLabels.length; port++) {
                 String label = yLabels[port];
-                if (!label.isEmpty()) {
+                if (label != null && !label.isEmpty()) {
                     outputMap.put(label, new SignalPort(entry.calculator, port));
                 }
             }
@@ -95,7 +105,7 @@ public class ControlCalculatorFactory {
             String[] xLabels = entry.component.getTerminalXLabels();
             for (int inputPort = 0; inputPort < xLabels.length; inputPort++) {
                 String label = xLabels[inputPort];
-                if (!label.isEmpty() && outputMap.containsKey(label)) {
+                if (label != null && !label.isEmpty() && outputMap.containsKey(label)) {
                     SignalPort source = outputMap.get(label);
                     try {
                         entry.calculator.setInputSignal(inputPort, source.calculator, source.portIndex);
@@ -151,32 +161,50 @@ public class ControlCalculatorFactory {
             }
         }
 
-        // Step 5: Sort calculators in execution order
-        // VOLT/AMP probes first (externally driven) → SIGNAL → processing → GATE → SCOPE last
-        List<AbstractControlCalculatable> sorted = new ArrayList<>();
-        for (CalculatorEntry e : entries) {
-            if (isProbeType(e.component.getType())) sorted.add(e.calculator);
-        }
-        for (CalculatorEntry e : entries) {
-            if (e.component.getType() == ControlTypCore.SIGNAL.getTypeNumber()) sorted.add(e.calculator);
-        }
-        for (CalculatorEntry e : entries) {
-            int t = e.component.getType();
-            if (!isProbeType(t) && t != ControlTypCore.SIGNAL.getTypeNumber()
-                    && t != ControlTypCore.GATE.getTypeNumber()
-                    && t != ControlTypCore.SCOPE.getTypeNumber()) {
-                sorted.add(e.calculator);
+        // Execute each signal producer before its consumers.
+        ControlNetlist netlist = ControlNetlist.fromOrderedCalculators(dependencyOrder(entries));
+        return new BuildResult(netlist, mapping);
+    }
+
+    private static List<AbstractControlCalculatable> dependencyOrder(List<CalculatorEntry> entries) {
+        Map<double[], Integer> producers = new IdentityHashMap<>();
+        List<Set<Integer>> consumers = new ArrayList<>();
+        int[] dependencies = new int[entries.size()];
+        for (int index = 0; index < entries.size(); index++) {
+            consumers.add(new LinkedHashSet<>());
+            for (double[] output : entries.get(index).calculator._outputSignal) {
+                producers.put(output, index);
             }
         }
-        for (CalculatorEntry e : entries) {
-            if (e.component.getType() == ControlTypCore.GATE.getTypeNumber()) sorted.add(e.calculator);
+        for (int index = 0; index < entries.size(); index++) {
+            for (double[] input : entries.get(index).calculator._inputSignal) {
+                Integer producer = producers.get(input);
+                if (producer != null && consumers.get(producer).add(index)) {
+                    dependencies[index]++;
+                }
+            }
         }
-        for (CalculatorEntry e : entries) {
-            if (e.component.getType() == ControlTypCore.SCOPE.getTypeNumber()) sorted.add(e.calculator);
+        Queue<Integer> ready = new PriorityQueue<>();
+        for (int index = 0; index < dependencies.length; index++) {
+            if (dependencies[index] == 0) ready.add(index);
         }
-
-        ControlNetlist netlist = ControlNetlist.fromOrderedCalculators(sorted);
-        return new BuildResult(netlist, mapping);
+        List<AbstractControlCalculatable> sorted = new ArrayList<>();
+        while (!ready.isEmpty()) {
+            int index = ready.remove();
+            sorted.add(entries.get(index).calculator);
+            for (int consumer : consumers.get(index)) {
+                if (--dependencies[consumer] == 0) ready.add(consumer);
+            }
+        }
+        if (sorted.size() != entries.size()) {
+            List<String> blocked = new ArrayList<>();
+            for (int index = 0; index < dependencies.length; index++) {
+                if (dependencies[index] > 0) blocked.add(entries.get(index).component.getName());
+            }
+            Collections.sort(blocked);
+            throw new DependencyCycleException(blocked);
+        }
+        return sorted;
     }
 
     /**
@@ -253,10 +281,6 @@ public class ControlCalculatorFactory {
         } catch (NumberFormatException e) {
             return 0; // ground for unrecognized labels
         }
-    }
-
-    private static boolean isProbeType(int type) {
-        return type == ControlTypCore.VOLT.getTypeNumber() || type == ControlTypCore.AMP.getTypeNumber();
     }
 
     private static class CalculatorEntry {

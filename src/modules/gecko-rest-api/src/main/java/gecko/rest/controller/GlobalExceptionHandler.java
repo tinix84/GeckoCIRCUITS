@@ -1,5 +1,10 @@
 package gecko.rest.controller;
 
+import gecko.rest.service.CircuitPreparationException;
+import gecko.core.preparation.Diagnostic;
+import gecko.core.preparation.ReadinessReport;
+import java.util.List;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -36,6 +41,11 @@ public class GlobalExceptionHandler {
         response.put("status", ex.getStatusCode().value());
         response.put("error", ex.getStatusCode().toString());
         response.put("message", ex.getReason());
+        if (ex instanceof CircuitPreparationException preparation) {
+            response.put("readyForHeadless", preparation.report().readyForHeadless());
+            response.put("outcome", preparation.report().outcome());
+            response.put("diagnostics", preparation.report().diagnostics());
+        }
 
         return ResponseEntity.status(ex.getStatusCode()).body(response);
     }
@@ -59,8 +69,29 @@ public class GlobalExceptionHandler {
                 fieldErrors.put(error.getField(), error.getDefaultMessage())
         );
         response.put("fieldErrors", fieldErrors);
+        response.put("readyForHeadless", false);
+        response.put("outcome", ReadinessReport.Outcome.INVALID);
+        response.put("diagnostics", fieldErrors.entrySet().stream().map(entry -> new Diagnostic(
+                entry.getKey().equals("simulationTime") || entry.getKey().equals("timeStep") ? "INVALID_SETTING" : "INVALID_REQUEST",
+                Diagnostic.Category.CONFIGURATION, Diagnostic.Severity.ERROR, entry.getValue(),
+                null, null, entry.getKey(), null)).toList());
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
+     * Maps an unreadable JSON body to HTTP 400 with a typed parsing diagnostic.
+     *
+     * @param ex the request decoding failure.
+     * @param request the web request context.
+     * @return the error response with a MALFORMED_REQUEST diagnostic.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleMalformedRequest(HttpMessageNotReadableException ex, WebRequest request) {
+        var report = new ReadinessReport(ReadinessReport.Outcome.INVALID,
+                List.of(new Diagnostic("MALFORMED_REQUEST", Diagnostic.Category.PARSING, Diagnostic.Severity.ERROR,
+                        "The JSON request cannot be read.", null, null, null, null)));
+        return handleResponseStatusException(new CircuitPreparationException(HttpStatus.BAD_REQUEST, report), request);
     }
 
     /**

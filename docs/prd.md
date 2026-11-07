@@ -67,6 +67,7 @@ GeckoCIRCUITS is an open-source, Java 21 circuit simulator for power electronics
 - **Real Solver Backend:** HeadlessSimulationEngine uses full MNA solver (MatrixSolver, CircuitNetlist, DomainCoupler)
 - **Batch Simulations:** Up to 100 concurrent simulations; linearSweep/logSweep/explicit parameter sets
 - **Parameter Overrides:** Dot-notation (`ComponentName.parameterKey`) applied before simulation
+- **Design References:** [Circuit preparation admission](adr/ADR-0001-circuit-preparation-admission.md) and [Circuit preparation interface](adr/ADR-0002-circuit-preparation-interface.md).
 - 224 tests passing
 - Docker packaging available (multi-stage Alpine JRE 21 build, ~180MB image)
 

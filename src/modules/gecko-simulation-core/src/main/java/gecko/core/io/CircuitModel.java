@@ -55,6 +55,8 @@ public class CircuitModel {
     private final List<ComponentData> thermalComponents = new ArrayList<>();
     private final List<ConnectionData> connections = new ArrayList<>();
 
+    private final List<ImportIssue> importIssues = new ArrayList<>();
+
     // Optimizer parameters
     private final Map<String, Double> optimizerParameters = new HashMap<>();
 
@@ -202,6 +204,10 @@ public class CircuitModel {
         return circuitComponents;
     }
 
+    public List<ImportIssue> getImportIssues() {
+        return importIssues;
+    }
+
     public void addCircuitComponent(ComponentData component) {
         circuitComponents.add(component);
     }
@@ -229,6 +235,8 @@ public class CircuitModel {
     public void addConnection(ConnectionData connection) {
         connections.add(connection);
     }
+
+
 
     // Optimizer parameters
 
@@ -322,6 +330,22 @@ public class CircuitModel {
         private String[] terminalYLabels = new String[0];  // labelEndKnoten[]
         private String[] parameterStrings = new String[0]; // parameterString[]
         private double[] numericParameters = new double[0]; // parameter[] raw values
+
+        private boolean parsedInput;
+        private boolean configurationNormalized;
+        private final Map<String, String> importTokens = new HashMap<>();
+        private int importedParameterCount = -1;
+        private String sourceLocation;
+
+        public boolean isParsedInput() { return parsedInput; }
+        public void setParsedInput(boolean parsedInput) { this.parsedInput = parsedInput; }
+        public boolean isConfigurationNormalized() { return configurationNormalized; }
+        public void setConfigurationNormalized(boolean normalized) { this.configurationNormalized = normalized; }
+        public Map<String, String> getImportTokens() { return importTokens; }
+        public int getImportedParameterCount() { return importedParameterCount; }
+        public void setImportedParameterCount(int count) { this.importedParameterCount = count; }
+        public String getSourceLocation() { return sourceLocation; }
+        public void setSourceLocation(String sourceLocation) { this.sourceLocation = sourceLocation; }
 
         public ComponentData(int type, String name) {
             this.type = type;

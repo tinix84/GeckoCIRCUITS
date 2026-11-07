@@ -15,6 +15,7 @@ package gecko.core.simulation;
 
 import gecko.core.control.NotCalculateableMarker;
 import gecko.core.control.calculators.AbstractControlCalculatable;
+import gecko.core.control.calculators.DelayCalculator;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -68,7 +69,8 @@ public class ControlNetlist {
 
     /**
      * Execute all control calculators for one simulation time step.
-     * Calculators are executed in the order they were added via setSortedCalculators().
+     * Combinational calculators execute in the supplied order.
+     * Buffered delays publish history first and capture settled inputs last.
      *
      * @param dt the time step size in seconds
      * @param time the current simulation time in seconds
@@ -77,8 +79,21 @@ public class ControlNetlist {
         this.simulationTime = time;
         AbstractControlCalculatable.setTime(time);
         for (AbstractControlCalculatable calc : sortedCalculators) {
+            if (calc instanceof DelayCalculator delay && dt <= delay.getDelayTime()) {
+                delay.publishDelayedOutput();
+            }
+        }
+        for (AbstractControlCalculatable calc : sortedCalculators) {
+            if (calc instanceof DelayCalculator delay && dt <= delay.getDelayTime()) {
+                continue;
+            }
             if (calc != null && !(calc instanceof NotCalculateableMarker)) {
                 calc.berechneYOUT(dt);
+            }
+        }
+        for (AbstractControlCalculatable calc : sortedCalculators) {
+            if (calc instanceof DelayCalculator delay && dt <= delay.getDelayTime()) {
+                delay.captureCurrentInput();
             }
         }
     }

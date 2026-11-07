@@ -3,6 +3,10 @@ package gecko.rest.controller;
 import gecko.rest.model.SimulationRequest;
 import gecko.rest.model.SimulationResponse;
 import gecko.rest.service.SimulationService;
+import gecko.rest.service.CircuitPreparationException;
+import gecko.core.preparation.Diagnostic;
+import gecko.core.preparation.ReadinessReport;
+import org.springframework.http.HttpStatus;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +21,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.List;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
@@ -70,15 +75,19 @@ class SimulationControllerTest {
     }
 
     @Test
-    void submitSimulation_missingCircuitFile_returnsBadRequest() throws Exception {
+    void submitSimulation_serviceRejectsMissingCircuitSource_returnsBadRequest() throws Exception {
         SimulationRequest request = new SimulationRequest();
         request.setSimulationTime(0.02);
         request.setTimeStep(1e-6);
+        // The service resolves stored IDs and paths through one source boundary.
+        when(simulationService.submitSimulation(any(SimulationRequest.class)))
+                .thenThrow(invalidSource());
 
         mockMvc.perform(post("/api/v1/simulations")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.diagnostics[0].code").value("INVALID_SOURCE"));
     }
 
     @Test
@@ -351,4 +360,11 @@ class SimulationControllerTest {
                 .andExpect(jsonPath("$.message").value("An unexpected error occurred"))
                 .andExpect(content().string(not(containsString(internalMessage))));
     }
+    private static CircuitPreparationException invalidSource() {
+        return new CircuitPreparationException(HttpStatus.BAD_REQUEST,
+                new ReadinessReport(ReadinessReport.Outcome.INVALID, List.of(new Diagnostic(
+                        "INVALID_SOURCE", Diagnostic.Category.CONFIGURATION, Diagnostic.Severity.ERROR,
+                        "Select exactly one circuit source.", null, null, null, null))));
+    }
+
 }
