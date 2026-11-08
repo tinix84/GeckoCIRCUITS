@@ -1,6 +1,6 @@
 package gecko.rest.service;
 
-import gecko.core.datacontainer.DataContainerSimple;
+import gecko.core.signal.TimedSignal;
 import gecko.core.signal.CharacteristicsCalculator;
 import gecko.core.signal.FourierGUIless;
 import gecko.core.GeckoInvalidArgumentException;
@@ -32,71 +32,24 @@ public class AnalysisService {
         this.simulationService = simulationService;
     }
 
-    /**
-     * Resolve signal data from either raw input or server-side simulation storage.
-     *
-     * @param request The analysis request containing data or simulation reference
-     * @return double[] signal data
-     * @throws ResponseStatusException if data cannot be resolved
-     */
-    private double[] resolveData(SignalAnalysisRequest request) {
-        // Priority: raw data
-        if (request.getData() != null && request.getData().length > 0) {
-            return validateData(request.getData());
-        }
-
-        // Fallback: server-side simulation lookup
-        if (request.getSimulationId() != null && request.getSignalName() != null) {
-            double[] data = simulationService.getSignalData(request.getSimulationId(), request.getSignalName());
-            if (data == null || data.length == 0) {
-                throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "Signal '" + request.getSignalName() + "' not found in simulation " + request.getSimulationId()
-                );
+    private TimedSignal resolveInput(SignalAnalysisRequest request) {
+        try {
+            if (request.getData() != null && request.getData().length > 0) {
+                return TimedSignal.evenlySampled(request.getData(), request.getSampleRate());
             }
-            return validateData(data);
-        }
-
-        // No data source
-        throw new ResponseStatusException(
-            HttpStatus.BAD_REQUEST,
-            "Either supply 'data' with 'sampleRate', or provide 'simulationId' + 'signalName'"
-        );
-    }
-
-    private double[] validateData(double[] data) {
-        for (double value : data) {
-            if (!Float.isFinite((float) value)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Signal values must be finite and within the float storage range");
+            if (request.getSimulationId() != null && request.getSignalName() != null) {
+                TimedSignal signal = simulationService.getTimedSignalData(request.getSimulationId(), request.getSignalName());
+                if (signal == null) {
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "Signal '" + request.getSignalName() + "' not found in simulation " + request.getSimulationId());
+                }
+                return signal.window(request.getStartTime(), request.getEndTime());
             }
-        }
-        return data;
-    }
-
-    private double validateSampleRate(Double sampleRate, int samples) {
-        if (sampleRate == null || !Double.isFinite(sampleRate) || sampleRate <= 0
-                || !Double.isFinite((samples - 1) / sampleRate)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "A finite sampleRate > 0 and finite signal duration are required");
+                    "Either supply 'data' with 'sampleRate', or provide 'simulationId' + 'signalName'");
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
         }
-        return sampleRate;
-    }
-
-    /**
-     * Build a DataContainerSimple from raw signal data with constant sample rate.
-     *
-     * @param data signal values
-     * @param sampleRate samples per second
-     * @return DataContainerSimple initialized with time series
-     */
-    private DataContainerSimple buildContainer(double[] data, double sampleRate) {
-        DataContainerSimple container = DataContainerSimple.fabricConstantDtTimeSeries(1, data.length);
-        double dt = 1.0 / sampleRate;
-        for (int i = 0; i < data.length; i++) {
-            container.insertValuesAtEnd(new float[]{(float) data[i]}, i * dt);
-        }
-        return container;
     }
 
     /**
@@ -108,24 +61,9 @@ public class AnalysisService {
      */
     public CharacteristicsResponse computeCharacteristics(SignalAnalysisRequest request) {
         try {
-            // Resolve data source
-            double[] data = resolveData(request);
-
-            if (data == null || data.length < 2) {
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Insufficient data points for analysis (minimum 2 required)"
-                );
-            }
-
-            // Determine sample rate
-            double sampleRate = validateSampleRate(request.getSampleRate(), data.length);
-
-            // Build data container
-            DataContainerSimple container = buildContainer(data, sampleRate);
-
-            // Calculate time range
-            double duration = (data.length - 1) / sampleRate;
+            TimedSignal signal = resolveInput(request);
+            var container = signal.toContainer();
+            double duration = signal.duration();
 
             // Calculate characteristics using gecko-core
             try {
@@ -141,7 +79,7 @@ public class AnalysisService {
                 // Build response
                 CharacteristicsResponse response = CharacteristicsResponse.of(
                     metrics,
-                    data.length,
+                    signal.sampleCount(),
                     request.getSignalName()
                 );
 
@@ -184,24 +122,9 @@ public class AnalysisService {
                 );
             }
 
-            // Resolve data source
-            double[] data = resolveData(request);
-
-            if (data == null || data.length < 2) {
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Insufficient data points for Fourier analysis (minimum 2 required)"
-                );
-            }
-
-            // Determine sample rate
-            double sampleRate = validateSampleRate(request.getSampleRate(), data.length);
-
-            // Build data container
-            DataContainerSimple container = buildContainer(data, sampleRate);
-
-            // Calculate time range
-            double duration = (data.length - 1) / sampleRate;
+            TimedSignal signal = resolveInput(request);
+            var container = signal.toContainer();
+            double duration = signal.duration();
 
             // Calculate base frequency
             double baseFreq = 1.0 / duration;

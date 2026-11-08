@@ -665,6 +665,14 @@ Response:
 }
 ```
 
+Stored signals use their recorded timestamps. They do not require `sampleRate`, and a supplied rate does not replace the recorded clock.
+Each omitted time bound defaults to the corresponding recorded endpoint.
+Bounds must be finite, increasing, and within the recorded clock.
+Between timestamps, analysis holds the preceding sample value. Exact window boundaries preserve the requested duration.
+`sampleCount` includes inserted boundary samples. Raw arrays retain their explicit sample-rate contract.
+These window rules apply to characteristics, RMS, and Fourier analysis.
+Fourier uses the selected duration for its base frequency and rejects harmonic counts beyond the selected signal resolution.
+
 **Fourier Harmonic Analysis**
 
 Decompose signal into harmonic components with amplitude and phase.

@@ -125,3 +125,4 @@ Never run `python -m venv`, `uv venv`, or `virtualenv`.
 | 2026-11-04 | [ADR-0001: Circuit preparation admission contract](docs/adr/ADR-0001-circuit-preparation-admission.md) |
 | 2026-11-04 | [ADR-0002: Circuit preparation interface](docs/adr/ADR-0002-circuit-preparation-interface.md) |
 | 2026-11-07 | [ADR-0003: CONTROL dependency ordering](docs/adr/ADR-0003-control-dependency-ordering.md) |
+| 2026-11-07 | [ADR-0004: Recorded signal analysis](docs/adr/ADR-0004-recorded-signal-analysis.md) |
