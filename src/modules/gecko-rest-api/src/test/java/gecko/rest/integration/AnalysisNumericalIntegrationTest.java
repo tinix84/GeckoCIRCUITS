@@ -60,8 +60,10 @@ class AnalysisNumericalIntegrationTest {
         String id = simulations.submitSimulation(new SimulationRequest(circuit, 0.002, 0.00025)).getSimulationId();
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> assertEquals(
                 SimulationResponse.SimulationStatus.COMPLETED, simulations.getSimulation(id).getStatus()));
-        simulations.addResults(id, "known", new double[]{4, 4, 4, 4, 4});
-        JsonNode result = analyze("characteristics", Map.of("simulationId", id, "signalName", "known", "sampleRate", 100));
+        double[] known = new double[simulations.getSignalData(id, "time").length];
+        java.util.Arrays.fill(known, 4);
+        simulations.addResults(id, "known", known);
+        JsonNode result = analyze("characteristics", Map.of("simulationId", id, "signalName", "known"));
         assertEquals(4, result.get("average").asDouble(), 1e-6);
         assertEquals("known", result.get("signalName").asText());
     }

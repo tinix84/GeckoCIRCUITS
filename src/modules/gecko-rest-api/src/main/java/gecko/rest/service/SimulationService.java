@@ -5,6 +5,7 @@ import gecko.core.preparation.*;
 import gecko.core.simulation.HeadlessSimulationEngine;
 import gecko.core.simulation.SimulationProgress;
 import gecko.core.simulation.SimulationResult;
+import gecko.core.signal.TimedSignal;
 import gecko.rest.config.SimulationJobLimits;
 import gecko.rest.model.BatchJobStatus;
 import gecko.rest.model.BatchSimulationRequest;
@@ -302,6 +303,24 @@ public class SimulationService {
         }
         synchronized (job) {
             return job.response.getResult(signalName);
+        }
+    }
+
+    /**
+     * Captures one retained signal and its recorded clock under the same job monitor.
+     *
+     * @param simulationId the retained job identifier.
+     * @param signalName the requested signal name.
+     * @return independent timed samples, or null when the job or signal is absent.
+     * @throws IllegalArgumentException if the retained signal has no valid matching clock.
+     */
+    public TimedSignal getTimedSignalData(String simulationId, String signalName) {
+        SimulationJob job = jobs.get(simulationId);
+        if (job == null) return null;
+        synchronized (job) {
+            double[] values = job.response.getResult(signalName);
+            if (values == null || values.length == 0) return null;
+            return new TimedSignal(job.response.getResult("time"), values);
         }
     }
 
