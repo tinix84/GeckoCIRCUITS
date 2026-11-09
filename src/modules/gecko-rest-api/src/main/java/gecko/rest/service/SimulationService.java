@@ -428,7 +428,15 @@ public class SimulationService {
         }
     }
 
-    public void broadcastProgress(String simulationId, double progress, double currentTime, double endTime) {
+    /**
+     * Sends a progress ratio to SSE subscribers and its percentage to STOMP subscribers.
+     *
+     * @param simulationId the retained job identifier.
+     * @param progressRatio the completion ratio from zero to one.
+     * @param currentTime the current simulation time in seconds.
+     * @param endTime the requested end time in seconds.
+     */
+    public void broadcastProgress(String simulationId, double progressRatio, double currentTime, double endTime) {
         SimulationJob job = jobs.get(simulationId);
         if (job == null) {
             return;
@@ -440,7 +448,7 @@ public class SimulationService {
             refreshProgress(job);
             String data = String.format(Locale.ROOT,
                     "{\"progress\":%.3f,\"currentTime\":%.6f,\"endTime\":%.6f,\"simulationId\":\"%s\"}",
-                    progress, currentTime, endTime, simulationId);
+                    progressRatio, currentTime, endTime, simulationId);
             List<SseEmitter> emitters = new ArrayList<>(job.emitters);
             SimulationResponse.ProgressDetails details = job.response.getProgressDetails();
             job.mailbox.progress(() -> {
@@ -453,7 +461,7 @@ public class SimulationService {
                 }
                 if (webSocketProgressService != null) {
                     try {
-                        webSocketProgressService.broadcastProgress(simulationId, progress, currentTime, endTime,
+                        webSocketProgressService.broadcastProgress(simulationId, progressRatio * 100.0, currentTime, endTime,
                                 details == null ? 0 : details.currentStep(), details == null ? 0 : details.totalSteps(),
                                 "RUNNING");
                     } catch (Exception e) {
