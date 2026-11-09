@@ -292,6 +292,13 @@
             </goals>
             <configuration>
               <rules>
+                <rule>
+                  <element>CLASS</element>
+                  <includes><include>gecko.geckocircuits.control.calculators.DelayCalculator</include></includes>
+                  <limits>
+                    <limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>1.00</minimum></limit>
+                  </limits>
+                </rule>
                 <!-- Core packages must maintain 60%+ instruction coverage -->
                 <rule>
                   <element>PACKAGE</element>
