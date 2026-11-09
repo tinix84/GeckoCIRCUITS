@@ -136,7 +136,7 @@ public class SimulationController {
             @Parameter(description = "Simulation ID") @PathVariable String simulationId,
             @Parameter(description = "Signal name") @PathVariable String signalName) {
 
-        SimulationResponse response = simulationService.getSimulation(simulationId);
+        SimulationResponse response = simulationService.getSimulationStatus(simulationId);
         if (response == null) {
             return ResponseEntity.notFound().build();
         }
@@ -172,7 +172,7 @@ public class SimulationController {
     public ResponseEntity<Map<String, Object>> getSimulationProgress(
             @Parameter(description = "Simulation ID") @PathVariable String simulationId) {
 
-        SimulationResponse response = simulationService.getSimulation(simulationId);
+        SimulationResponse response = simulationService.getSimulationStatus(simulationId);
         if (response == null) {
             return ResponseEntity.notFound().build();
         }

@@ -231,7 +231,22 @@ public class SimulationService {
         return job == null ? null : snapshot(job);
     }
 
+    /**
+     * Captures detached status metadata without reading retained waveform arrays.
+     *
+     * @param simulationId the retained job identifier.
+     * @return metadata with empty results, or null when the job is absent.
+     */
+    public SimulationResponse getSimulationStatus(String simulationId) {
+        SimulationJob job = jobs.get(simulationId);
+        return job == null ? null : snapshot(job, false);
+    }
+
     private SimulationResponse snapshot(SimulationJob job) {
+        return snapshot(job, true);
+    }
+
+    private SimulationResponse snapshot(SimulationJob job, boolean includeResults) {
         synchronized (job) {
             refreshProgress(job);
             SimulationResponse source = job.response;
@@ -241,7 +256,7 @@ public class SimulationService {
             result.setEndTime(source.getEndTime());
             result.setErrorMessage(source.getErrorMessage());
             result.setProgressDetails(source.getProgressDetails());
-            result.setResults(source.getResults());
+            if (includeResults) result.setResults(source.getResults());
             return result;
         }
     }

@@ -127,3 +127,4 @@ Never run `python -m venv`, `uv venv`, or `virtualenv`.
 | 2026-11-07 | [ADR-0003: CONTROL dependency ordering](docs/adr/ADR-0003-control-dependency-ordering.md) |
 | 2026-11-07 | [ADR-0004: Recorded signal analysis](docs/adr/ADR-0004-recorded-signal-analysis.md) |
 | 2026-11-08 | [ADR-0005: Shared CONTROL delay history](docs/adr/ADR-0005-shared-control-delay-history.md) |
+| 2026-11-09 | [ADR-0006: Scoped simulation retrieval](docs/adr/ADR-0006-scoped-simulation-retrieval.md) |

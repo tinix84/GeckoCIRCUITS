@@ -6,23 +6,30 @@ import gecko.core.simulation.HeadlessSimulationEngine;
 import gecko.core.preparation.PreparedCircuit;
 import gecko.core.preparation.ExecutionOptions;
 import gecko.core.simulation.SimulationResult;
+import gecko.core.simulation.SimulationProgress;
 import gecko.rest.model.BatchJobStatus;
 import gecko.rest.model.BatchSimulationRequest;
 import gecko.rest.model.BatchSimulationResponse;
 import gecko.rest.model.SimulationRequest;
 import gecko.rest.model.SimulationResponse;
 import gecko.rest.model.SimulationResponse.SimulationStatus;
+import gecko.rest.controller.SimulationController;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.ArrayDeque;
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.Queue;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.CountDownLatch;
@@ -45,6 +52,7 @@ class SimulationServiceTest {
     private AtomicInteger enginesCreated;
     private AtomicReference<PreparedCircuit> executedConfig;
     private BiFunction<PreparedCircuit, BooleanSupplier, SimulationResult> execution;
+    private SimulationProgress engineProgress;
 
     @BeforeEach
     void setUp() {
@@ -56,6 +64,10 @@ class SimulationServiceTest {
         service = new SimulationService(executor, () -> {
             enginesCreated.incrementAndGet();
             return new HeadlessSimulationEngine() {
+                @Override
+                public SimulationProgress getDetailedProgress() { return engineProgress; }
+                @Override
+                public double getProgress() { return engineProgress == null ? 0 : engineProgress.getOverallProgress(); }
                 @Override
                 public SimulationResult runSimulation(PreparedCircuit config, ExecutionOptions options, BooleanSupplier cancelled) {
                     executedConfig.set(config);
@@ -97,6 +109,140 @@ class SimulationServiceTest {
         assertFalse(service.isRunning(submitted.getSimulationId()));
         assertEquals(SimulationStatus.PENDING, submitted.getStatus());
         verify(webSocket).broadcastCompletion(submitted.getSimulationId(), true, null);
+    }
+
+    @Test
+    void progressRetrievalDoesNotCopyRetainedWaveforms() {
+        String id = submit().getSimulationId();
+        executor.runNext();
+        retainLargeSignals(id);
+        SimulationController controller = new SimulationController(service);
+        var response = new AtomicReference<ResponseEntity<Map<String, Object>>>();
+
+        long allocated = allocatedBytes(() -> response.set(controller.getSimulationProgress(id)));
+
+        assertEquals(200, response.get().getStatusCode().value());
+        assertEquals(Map.of("simulationId", id, "status", "COMPLETED", "progress", 100.0, "isRunning", false),
+                response.get().getBody());
+        assertTrue(allocated < 65536, "Progress retrieval allocated " + allocated + " bytes");
+    }
+
+    @Test
+    void singleSignalRetrievalCopiesOnlyTheSelectedWaveform() {
+        String id = submit().getSimulationId();
+        executor.runNext();
+        retainLargeSignals(id);
+        SimulationController controller = new SimulationController(service);
+        var response = new AtomicReference<ResponseEntity<Map<String, Object>>>();
+
+        long allocated = allocatedBytes(() -> response.set(controller.getSignalData(id, "large-0")));
+
+        assertEquals(200, response.get().getStatusCode().value());
+        Map<String, Object> body = response.get().getBody();
+        assertEquals(Set.of("signalName", "dataPoints", "data"), body.keySet());
+        assertEquals("large-0", body.get("signalName"));
+        assertEquals(65536, body.get("dataPoints"));
+        double[] data = (double[]) body.get("data");
+        assertEquals(12.0, data[0]);
+        assertEquals(18.0, data[data.length - 1]);
+        assertTrue(allocated < 65536L * Double.BYTES + 65536,
+                "Single-signal retrieval allocated " + allocated + " bytes");
+        data[0] = 999.0;
+        assertEquals(12.0, service.getSignalData(id, "large-0")[0]);
+    }
+
+    @ParameterizedTest
+    @EnumSource(SimulationStatus.class)
+    void statusSnapshotIsDetachedMetadataInEveryJobState(SimulationStatus state) {
+        String id = submit().getSimulationId();
+        service.addResults(id, "manual", new double[]{1.0, 2.0});
+        if (state == SimulationStatus.FAILED) service.cancelSimulation(id);
+        else service.updateStatus(id, state);
+        SimulationResponse full = service.getSimulation(id);
+
+        SimulationResponse status = service.getSimulationStatus(id);
+
+        assertEquals(id, status.getSimulationId());
+        assertEquals(state, status.getStatus());
+        assertEquals(full.getStartTime(), status.getStartTime());
+        assertEquals(full.getEndTime(), status.getEndTime());
+        assertEquals(full.getExecutionTimeMs(), status.getExecutionTimeMs());
+        assertEquals(full.getErrorMessage(), status.getErrorMessage());
+        assertEquals(full.getProgressDetails(), status.getProgressDetails());
+        assertTrue(status.getResults().isEmpty());
+        status.setStatus(SimulationStatus.RUNNING);
+        status.setErrorMessage("caller mutation");
+        status.setStartTime(null);
+        status.setEndTime(null);
+        status.addResult("manual", new double[]{999.0});
+        SimulationResponse next = service.getSimulationStatus(id);
+        assertEquals(state, next.getStatus());
+        assertEquals(full.getErrorMessage(), next.getErrorMessage());
+        assertEquals(full.getStartTime(), next.getStartTime());
+        assertEquals(full.getEndTime(), next.getEndTime());
+        assertTrue(next.getResults().isEmpty());
+        assertArrayEquals(new double[]{1.0, 2.0}, service.getSignalData(id, "manual"));
+    }
+
+    @Test
+    void statusSnapshotRefreshesLiveEngineProgress() {
+        String id = submit().getSimulationId();
+        engineProgress = new SimulationProgress(0.25, 1.0, 0.2, 2, 10, 0.2, 1.0, 600L,
+                HeadlessSimulationEngine.EngineState.RUNNING);
+        execution = (config, cancelled) -> {
+            SimulationResponse status = service.getSimulationStatus(id);
+            assertEquals(SimulationStatus.RUNNING, status.getStatus());
+            assertEquals(new SimulationResponse.ProgressDetails(1.0, 0.2, 0.2, 1.0, 2, 10, 600L),
+                    status.getProgressDetails());
+            assertTrue(status.getResults().isEmpty());
+            assertEquals(Map.of("simulationId", id, "status", "RUNNING", "progress", 25.0, "isRunning", true),
+                    new SimulationController(service).getSimulationProgress(id).getBody());
+            return successfulResult();
+        };
+        executor.runNext();
+        assertEquals(SimulationStatus.COMPLETED, service.getSimulationStatus(id).getStatus());
+        assertEquals(2, service.getSimulationStatus(id).getProgressDetails().currentStep());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = SimulationStatus.class, names = {"PENDING", "RUNNING", "FAILED"})
+    void singleSignalRetrievalRequiresSuccessfulCompletion(SimulationStatus state) {
+        String id = submit().getSimulationId();
+        service.addResults(id, "manual", new double[]{1.0});
+        service.updateStatus(id, state);
+        var response = new SimulationController(service).getSignalData(id, "manual");
+        assertEquals(425, response.getStatusCode().value());
+        assertNull(response.getBody());
+    }
+
+    @Test
+    void unknownStatusAndSignalRequestsReturnNotFound() {
+        SimulationController controller = new SimulationController(service);
+        assertNull(service.getSimulationStatus("missing"));
+        assertEquals(404, controller.getSimulationProgress("missing").getStatusCode().value());
+        assertEquals(404, controller.getSignalData("missing", "manual").getStatusCode().value());
+        String id = submit().getSimulationId();
+        executor.runNext();
+        assertEquals(404, controller.getSignalData(id, "missing").getStatusCode().value());
+    }
+
+    private void retainLargeSignals(String id) {
+        double[] samples = new double[65536];
+        samples[0] = 12.0;
+        samples[samples.length - 1] = 18.0;
+        for (int i = 0; i < 16; i++) service.addResults(id, "large-" + i, samples);
+    }
+
+    private static long allocatedBytes(Runnable read) {
+        var bean = ManagementFactory.getPlatformMXBean(com.sun.management.ThreadMXBean.class);
+        org.junit.jupiter.api.Assumptions.assumeTrue(bean != null && bean.isThreadAllocatedMemorySupported(),
+                "Thread allocation accounting is required for this regression");
+        if (!bean.isThreadAllocatedMemoryEnabled()) bean.setThreadAllocatedMemoryEnabled(true);
+        read.run(); // Initialize the retrieval path before measuring its allocations.
+        long threadId = Thread.currentThread().threadId();
+        long before = bean.getThreadAllocatedBytes(threadId);
+        read.run();
+        return bean.getThreadAllocatedBytes(threadId) - before;
     }
 
     @Test
