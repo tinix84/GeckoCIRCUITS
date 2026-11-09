@@ -1,5 +1,6 @@
 package gecko.rest.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import gecko.core.allg.SolverType;
 import gecko.core.datacontainer.DataContainerGlobal;
 import gecko.core.simulation.HeadlessSimulationEngine;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -53,6 +55,7 @@ class SimulationServiceTest {
     private AtomicReference<PreparedCircuit> executedConfig;
     private BiFunction<PreparedCircuit, BooleanSupplier, SimulationResult> execution;
     private SimulationProgress engineProgress;
+    private HeadlessSimulationEngine.SimulationProgressListener engineProgressListener;
 
     @BeforeEach
     void setUp() {
@@ -64,6 +67,8 @@ class SimulationServiceTest {
         service = new SimulationService(executor, () -> {
             enginesCreated.incrementAndGet();
             return new HeadlessSimulationEngine() {
+                @Override
+                public void setProgressListener(SimulationProgressListener listener) { engineProgressListener = listener; }
                 @Override
                 public SimulationProgress getDetailedProgress() { return engineProgress; }
                 @Override
@@ -461,9 +466,34 @@ class SimulationServiceTest {
         service.completeProgressStreams(id, true);
         service.broadcastProgress(id, 1.0, 10.0, 10.0);
         assertEquals(2, stream.events.size());
-        verify(webSocket).broadcastProgress(id, 0.5, 5.0, 10.0, 0, 0, "RUNNING");
+        verify(webSocket).broadcastProgress(id, 50.0, 5.0, 10.0, 0, 0, "RUNNING");
         verify(webSocket).broadcastCompletion(id, true, null);
         verifyNoMoreInteractions(webSocket);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"0.0, 10.0, 0.0, 0.0", "5.0, 10.0, 0.5, 50.0",
+            "10.0, 10.0, 1.0, 100.0", "0.0, 0.0, 0.0, 0.0"})
+    void engineCallbacksKeepSseRatiosAndStompAndPollingPercentages(
+            double currentTime, double endTime, double ratio, double percentage) throws Exception {
+        String id = submit().getSimulationId();
+        RecordingEmitter stream = stream(id);
+        engineProgress = new SimulationProgress(ratio, 0.0, ratio, 37, 100, currentTime, endTime, null,
+                HeadlessSimulationEngine.EngineState.RUNNING);
+        execution = (config, cancelled) -> {
+            engineProgressListener.onProgress(currentTime, endTime, 37);
+            assertEquals(percentage, service.getSimulationProgress(id));
+            return successfulResult();
+        };
+
+        executor.runNext();
+
+        verify(webSocket).broadcastProgress(id, percentage, currentTime, endTime, 37, 100, "RUNNING");
+        String event = stream.events.get(0);
+        var payload = new ObjectMapper().readTree(event.substring(event.indexOf('{'), event.lastIndexOf('}') + 1));
+        assertEquals(ratio, payload.get("progress").asDouble());
+        assertEquals(currentTime, payload.get("currentTime").asDouble());
+        assertEquals(endTime, payload.get("endTime").asDouble());
     }
 
     @Test
