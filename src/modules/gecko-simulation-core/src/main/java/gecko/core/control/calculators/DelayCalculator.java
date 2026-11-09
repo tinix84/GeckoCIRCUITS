@@ -14,155 +14,49 @@
 package gecko.core.control.calculators;
 
 import gecko.core.control.IsDtChangeSensitive;
+import gecko.core.control.DelayHistory;
 
-/**
- * Calculator that delays an input signal by a specified time.
- *
- * This block implements a pure delay (transport delay) using a circular buffer.
- * The output at time t equals the input at time (t - delayTime).
- *
- * Features:
- * - Configurable delay time
- * - Handles time step changes via IsDtChangeSensitive
- * - Uses circular buffer for efficient memory usage
- * - Zero output during initial buffer filling period
- *
- * @author GeckoCIRCUITS Team
- */
+/** Adapts shared delay history to this runtime's signal arrays and lifecycle interfaces. */
 public final class DelayCalculator extends AbstractSingleInputSingleOutputCalculator
         implements InitializableAtSimulationStart, IsDtChangeSensitive {
-
-    /** Original time step used when delay buffer was created */
-    private double _originalDt;
-
-    /** Circular buffer storing delayed values */
-    private double[] _delayBuffer = null;
-
-    /** Current write position in circular buffer */
-    private int _bufferIndex = -1;
-
-    /** Flag indicating buffer is still being filled */
-    private boolean _bufferEmpty;
-
-    /** Delay time to use at next initialization */
-    private double _initDelayTime;
-
-    /** Current active delay time */
-    private double _delayTime;
+    private final DelayHistory history;
 
     /**
-     * Creates a delay calculator with the specified delay time.
+     * Creates a calculator with a deferred initial delay.
      *
-     * @param delayTime delay time in seconds (must be non-negative)
-     * @throws IllegalArgumentException if delayTime is negative
+     * @param delayTime the finite, nonnegative delay in seconds.
+     * @throws IllegalArgumentException if the delay is invalid.
      */
-    public DelayCalculator(final double delayTime) {
-        super();
-        setDelayTime(delayTime);
-    }
+    public DelayCalculator(final double delayTime) { history = new DelayHistory(delayTime); }
 
     @Override
-    public void initWithNewDt(final double deltaT) {
-        _delayTime = _initDelayTime;
-
-        // Calculate new buffer size
-        int newBufferSize = Math.max(1, (int) (_delayTime / deltaT));
-        double[] newBuffer = new double[newBufferSize];
-
-        // Sample the old chronological history at the new output timestamps.
-        if (_delayBuffer != null && _delayBuffer.length > 0) {
-            final double ratio = deltaT / _originalDt;
-            for (int i = 0; i < newBuffer.length; i++) {
-                double position = _delayBuffer.length - 1 - (newBuffer.length - 1 - i) * ratio;
-                int lower = (int) Math.floor(position);
-                double fraction = position - lower;
-                newBuffer[i] = historyValue(lower) * (1 - fraction) + historyValue(lower + 1) * fraction;
-            }
-        }
-
-        _delayBuffer = newBuffer;
-        _bufferIndex = 0;
-        _bufferEmpty = false;
-        _originalDt = deltaT;
-    }
-
-    private double historyValue(int position) {
-        if (position == -1) {
-            // The last output retains the sample immediately before the oldest buffered sample.
-            return _outputSignal[0][0];
-        }
-        if (position < 0 || position >= _delayBuffer.length) {
-            return 0;
-        }
-        return _delayBuffer[(_bufferIndex + position) % _delayBuffer.length];
-    }
+    public void initWithNewDt(final double deltaT) { history.changeTimeStep(deltaT); }
 
     @Override
     public void initializeAtSimulationStart(final double deltaT) {
-        _delayTime = _initDelayTime;
-        _originalDt = deltaT;
-        _bufferEmpty = true;
+        history.restart(deltaT);
         _outputSignal[0][0] = 0;
-
-        // Create buffer sized for delay time
-        int bufferSize = Math.max(1, (int) (_delayTime / deltaT));
-        _delayBuffer = new double[bufferSize];
-        _bufferIndex = 0;
     }
 
     @Override
     public void berechneYOUT(final double deltaT) {
-        if (deltaT > _delayTime) {
-            _outputSignal[0][0] = _inputSignal[0][0];
-            return;
-        }
-        publishDelayedOutput();
-        captureCurrentInput();
+        _outputSignal[0][0] = history.step(_inputSignal[0][0], deltaT);
     }
 
     /**
-     * Publishes the historical sample without reading the current input.
-     * Use after initialization. The time step must not exceed the active delay.
-     */
-    public void publishDelayedOutput() {
-        _outputSignal[0][0] = _bufferEmpty ? 0 : _delayBuffer[_bufferIndex];
-    }
-
-    /**
-     * Stores the settled current input and advances history by one sample.
-     * Call after all combinational calculators execute, following {@link #publishDelayedOutput()}.
-     */
-    public void captureCurrentInput() {
-        _delayBuffer[_bufferIndex] = _inputSignal[0][0];
-        _bufferIndex++;
-        if (_bufferIndex >= _delayBuffer.length) {
-            _bufferEmpty = false;
-            _bufferIndex = 0;
-        }
-    }
-
-    /**
-     * Sets the delay time.
+     * Defers a delay change until the next restart or time-step callback.
      *
-     * The new delay time will take effect at the next simulation start
-     * or when initWithNewDt() is called.
-     *
-     * @param delayTime delay time in seconds (must be non-negative)
-     * @throws IllegalArgumentException if delayTime is negative
+     * @param delayTime the finite, nonnegative delay in seconds.
+     * @throws IllegalArgumentException if the delay is invalid.
      */
-    public void setDelayTime(final double delayTime) {
-        if (delayTime < 0) {
-            throw new IllegalArgumentException("Error: Delay time must be positive!");
-        }
-        _initDelayTime = delayTime;
-    }
+    public void setDelayTime(final double delayTime) { history.setDelayTime(delayTime); }
 
-    /**
-     * Gets the current delay time.
-     *
-     * @return the active delay time in seconds
-     */
-    public double getDelayTime() {
-        return _delayTime;
-    }
+    /** Publishes the current historical sample without capturing an input. Use after initialization. */
+    public void publishDelayedOutput() { _outputSignal[0][0] = history.publish(); }
+
+    /** Captures the settled input after combinational execution. Use after publishing the delayed output. */
+    public void captureCurrentInput() { history.capture(_inputSignal[0][0]); }
+
+    /** @return the delay activated by the most recent lifecycle callback. */
+    public double getDelayTime() { return history.getDelayTime(); }
 }
