@@ -161,6 +161,7 @@ For batch simulations and external tool integration:
 ## Related Resources
 
 - [**Examples**](../examples/) - Complete application examples
+- [**Examples — Basso Book**](../examples/basso_switching_converters/) - Circuits from *"Simulating Switching Converters with LTspice"* by Christoph Basso
 - [**Articles**](../articles/) - Technical papers and notes
 
 ---

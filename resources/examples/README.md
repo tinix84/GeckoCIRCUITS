@@ -21,6 +21,7 @@ A comprehensive collection of power electronics circuit examples demonstrating r
 | [**Thermal**](thermal/) | Thermal analysis and design | Loss Calculation, Heatsink |
 | [**Automotive**](automotive/) | EV and charging applications | OBC, DC Fast Charger, Traction |
 | [**Renewable Energy**](renewable_energy/) | Solar and wind applications | PV Inverter, Wind Converter |
+| [**Basso — Switching Converters**](basso_switching_converters/) | Circuits from C. Basso *"Simulating Switching Converters with LTspice"* | Buck/Boost VMC+CMC, Flyback, Forward, PFC, Compensators |
 
 ## Examples by Difficulty
 
@@ -40,6 +41,12 @@ A comprehensive collection of power electronics circuit examples demonstrating r
 | [Three-Phase VSI](inverters/three_phase_vsi/) | Inverters | Grid-tied inverter |
 | [Loss Calculation](thermal/loss_calculation/) | Thermal | Semiconductor losses |
 | [EV Charger](automotive/ev_charger/) | Automotive | Level 2 AC charging |
+| [Buck VMC](basso_switching_converters/01_buck_vmc/) | Basso | VMC buck with Type 3 compensator |
+| [Buck CMC](basso_switching_converters/02_buck_cmc/) | Basso | Peak current mode buck |
+| [Boost VMC](basso_switching_converters/03_boost_vmc/) | Basso | VMC boost (RHPZ analysis) |
+| [Boost CMC](basso_switching_converters/04_boost_cmc/) | Basso | CMC boost |
+| [Flyback DCM](basso_switching_converters/05_flyback_dcm/) | Basso | Offline flyback in DCM |
+| [Compensators](basso_switching_converters/09_compensators/) | Basso | Type 1/2/3 op-amp design |
 
 ### Advanced
 | Example | Category | Description |
@@ -52,6 +59,9 @@ A comprehensive collection of power electronics circuit examples demonstrating r
 | [Thermal Networks](thermal/thermal_networks/) | Thermal | Transient thermal |
 | [Onboard Charger](automotive/onboard_charger/) | Automotive | Bidirectional OBC |
 | [Traction Inverter](automotive/traction_inverter/) | Automotive | EV motor drive |
+| [Forward Converter](basso_switching_converters/07_forward_converter/) | Basso | Isolated step-down with core reset |
+| [PFC Boost](basso_switching_converters/08_pfc_boost/) | Basso | Average CMC PFC, 300 W universal input |
+| [Flyback CCM](basso_switching_converters/06_flyback_ccm/) | Basso | CCM flyback with RHPZ and snubber |
 
 ## Example Structure
 
@@ -74,6 +84,7 @@ example_name/
 | Thermal | [thermal/](thermal/) |
 | Automotive | [automotive/](automotive/) |
 | Renewable Energy | [renewable_energy/](renewable_energy/) |
+| SMPS Control Design | [basso_switching_converters/](basso_switching_converters/) |
 
 ## Running Examples
 
