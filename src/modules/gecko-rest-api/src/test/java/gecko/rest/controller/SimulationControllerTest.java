@@ -154,7 +154,7 @@ class SimulationControllerTest {
         testResponse.setStatus(SimulationResponse.SimulationStatus.COMPLETED);
         double[] signalData = new double[]{1.0, 2.0, 3.0, 4.0, 5.0};
 
-        when(simulationService.getSimulation(testSimulationId))
+        when(simulationService.getSimulationStatus(testSimulationId))
                 .thenReturn(testResponse);
         when(simulationService.getSignalData(testSimulationId, "V_out"))
                 .thenReturn(signalData);
@@ -171,7 +171,7 @@ class SimulationControllerTest {
     void getSignalData_nonExistingSignal_returnsNotFound() throws Exception {
         testResponse.setStatus(SimulationResponse.SimulationStatus.COMPLETED);
 
-        when(simulationService.getSimulation(testSimulationId))
+        when(simulationService.getSimulationStatus(testSimulationId))
                 .thenReturn(testResponse);
         when(simulationService.getSignalData(testSimulationId, "nonexistent"))
                 .thenReturn(null);
@@ -185,7 +185,7 @@ class SimulationControllerTest {
     void getSignalData_nonCompletedSimulation_returnsTooEarly() throws Exception {
         testResponse.setStatus(SimulationResponse.SimulationStatus.RUNNING);
 
-        when(simulationService.getSimulation(testSimulationId))
+        when(simulationService.getSimulationStatus(testSimulationId))
                 .thenReturn(testResponse);
 
         mockMvc.perform(get("/api/v1/simulations/{id}/results/{signal}", testSimulationId, "V_out")
@@ -197,7 +197,7 @@ class SimulationControllerTest {
     void getSimulationProgress_runningSimulation_returnsProgress() throws Exception {
         testResponse.setStatus(SimulationResponse.SimulationStatus.RUNNING);
 
-        when(simulationService.getSimulation(testSimulationId))
+        when(simulationService.getSimulationStatus(testSimulationId))
                 .thenReturn(testResponse);
         when(simulationService.getSimulationProgress(testSimulationId))
                 .thenReturn(50.0);
