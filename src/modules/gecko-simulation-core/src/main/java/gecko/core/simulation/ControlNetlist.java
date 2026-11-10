@@ -16,6 +16,9 @@ package gecko.core.simulation;
 import gecko.core.control.NotCalculateableMarker;
 import gecko.core.control.calculators.AbstractControlCalculatable;
 import gecko.core.control.calculators.DelayCalculator;
+import gecko.core.control.calculators.PT2Calculator;
+import gecko.core.control.calculators.InitializableAtSimulationStart;
+import gecko.core.control.IsDtChangeSensitive;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -44,6 +47,62 @@ public class ControlNetlist {
 
     private AbstractControlCalculatable[] sortedCalculators = new AbstractControlCalculatable[0];
     private double simulationTime;
+    private double lastStep = Double.NaN;
+    private long stateVersion;
+    private java.util.function.BiFunction<Double, Boolean, List<AbstractControlCalculatable>> dependencyOrder;
+
+    void setDependencyOrder(java.util.function.BiFunction<Double, Boolean, List<AbstractControlCalculatable>> order) {
+        dependencyOrder = order;
+        stateVersion++;
+    }
+
+    /**
+     * Starts calculator histories and clocks for a new run.
+     * All delay sizes and staged buffers are ready before lifecycle callbacks change state.
+     *
+     * @param dt the finite, positive step in seconds
+     * @throws IllegalArgumentException if the step or a configured delay size is invalid
+     * @throws ControlCalculatorFactory.DependencyCycleException if the selected step creates an instantaneous cycle
+     */
+    public void initializeAtSimulationStart(double dt) {
+        prepareInitialization(dt).run();
+    }
+
+    /**
+     * Stages dependency checks and delay buffers before a simulation start.
+     * Preparation does not invoke initialization callbacks or change clocks.
+     * The caller must serialize calculator access until commit.
+     * Commit invokes initialization callbacks and starts a new history.
+     * This interface does not roll back arbitrary extension callback failures.
+     *
+     * @param dt the finite, positive step in seconds
+     * @return a single-use start action
+     * @throws IllegalArgumentException if the step, input widths, or a delay size is invalid
+     * @throws IllegalStateException if the action is stale or has already committed
+     * @throws ControlCalculatorFactory.DependencyCycleException if the selected step creates an instantaneous cycle
+     */
+    public Runnable prepareInitialization(double dt) {
+        validateStep(dt);
+        var planned = dependencyOrder == null ? sortedCalculators
+                : dependencyOrder.apply(dt, true).toArray(AbstractControlCalculatable[]::new);
+        for (var calculator : sortedCalculators) {
+            if (calculator != null) calculator.validateInputSignalWidths();
+        }
+        var delayUpdates = prepareDelayUpdates(dt, true);
+        return stagedTransition(() -> {
+            for (var calculator : sortedCalculators) {
+                if (calculator == null) continue;
+                calculator.setSimulationTime(0);
+                if (!(calculator instanceof DelayCalculator) && calculator instanceof InitializableAtSimulationStart initializable) {
+                    initializable.initializeAtSimulationStart(dt);
+                }
+            }
+            for (int index = 0; index < delayUpdates.size(); index++) delayUpdates.get(index).run();
+            simulationTime = 0;
+            lastStep = dt;
+            sortedCalculators = planned;
+        });
+    }
 
     /**
      * Creates an empty ControlNetlist with no calculators.
@@ -56,6 +115,7 @@ public class ControlNetlist {
     /**
      * Sets the ordered list of calculators to execute.
      * Must be called before executeTimeStep() to execute any calculations.
+     * Replaces factory dependency planning. The caller supplies the execution order.
      *
      * @param calculators the list of control calculators in execution order
      * @throws NullPointerException if calculators is null
@@ -65,6 +125,8 @@ public class ControlNetlist {
             throw new NullPointerException("Calculators list cannot be null");
         }
         this.sortedCalculators = calculators.toArray(new AbstractControlCalculatable[0]);
+        dependencyOrder = null;
+        stateVersion++;
     }
 
     /**
@@ -74,16 +136,38 @@ public class ControlNetlist {
      *
      * @param dt the time step size in seconds
      * @param time the current simulation time in seconds
+     * @throws IllegalArgumentException if the step or a configured delay size is invalid
+     * @throws ControlCalculatorFactory.DependencyCycleException if a step change creates an instantaneous cycle
      */
     public void executeTimeStep(double dt, double time) {
+        validateStep(dt);
+        boolean stepChanges = !Double.isNaN(lastStep) && lastStep != dt;
+        var planned = dependencyOrder != null && (Double.isNaN(lastStep) || stepChanges)
+                ? dependencyOrder.apply(dt, stepChanges).toArray(AbstractControlCalculatable[]::new) : sortedCalculators;
+        var delayUpdates = stepChanges ? prepareDelayUpdates(dt, false) : List.<Runnable>of();
+        stateVersion++;
+        if (stepChanges) {
+            for (var calculator : sortedCalculators) {
+                if (!(calculator instanceof DelayCalculator) && calculator instanceof IsDtChangeSensitive sensitive) sensitive.initWithNewDt(dt);
+            }
+        }
+        delayUpdates.forEach(Runnable::run);
+        sortedCalculators = planned;
+        lastStep = dt;
         this.simulationTime = time;
-        AbstractControlCalculatable.setTime(time);
         for (AbstractControlCalculatable calc : sortedCalculators) {
+            if (calc != null) calc.setSimulationTime(time);
+        }
+        for (AbstractControlCalculatable calc : sortedCalculators) {
+            if (calc instanceof PT2Calculator pt2) {
+                pt2.publishPreviousInputOutput(dt);
+            }
             if (calc instanceof DelayCalculator delay && dt <= delay.getDelayTime()) {
                 delay.publishDelayedOutput();
             }
         }
         for (AbstractControlCalculatable calc : sortedCalculators) {
+            if (calc instanceof PT2Calculator) continue;
             if (calc instanceof DelayCalculator delay && dt <= delay.getDelayTime()) {
                 continue;
             }
@@ -92,10 +176,85 @@ public class ControlNetlist {
             }
         }
         for (AbstractControlCalculatable calc : sortedCalculators) {
+            if (calc instanceof PT2Calculator pt2) {
+                pt2.captureCurrentInput();
+            }
             if (calc instanceof DelayCalculator delay && dt <= delay.getDelayTime()) {
                 delay.captureCurrentInput();
             }
         }
+    }
+
+    /**
+     * Stages dependency planning and calculator updates without changing active state.
+     * The caller must serialize preparation, commit, and calculator access.
+     * A netlist mutation invalidates every pending transition.
+     * Staged callbacks must commit without allocation or failure.
+     * This interface does not roll back arbitrary extension callback failures.
+     *
+     * @param dt the finite, positive step in seconds
+     * @return a single-use commit action that leaves the simulation clock unchanged
+     * @throws IllegalArgumentException if the step or a configured history size is invalid
+     * @throws IllegalStateException if initialization is missing, or the commit is stale or repeated
+     * @throws UnsupportedOperationException if a calculator cannot stage its time-step callback
+     * @throws ControlCalculatorFactory.DependencyCycleException if the selected step creates an instantaneous cycle
+     */
+    public Runnable prepareTimeStepChange(double dt) {
+        validateStep(dt);
+        if (Double.isNaN(lastStep)) {
+            throw new IllegalStateException("The CONTROL netlist requires initialization before a staged step change.");
+        }
+        var planned = dependencyOrder == null ? sortedCalculators
+                : dependencyOrder.apply(dt, true).toArray(AbstractControlCalculatable[]::new);
+        for (var calculator : sortedCalculators) {
+            if (calculator instanceof DelayCalculator delay) delay.validateTimeStep(dt);
+        }
+        var updates = new ArrayList<Runnable>();
+        for (var calculator : sortedCalculators) {
+            if (calculator instanceof IsDtChangeSensitive sensitive) {
+                updates.add(java.util.Objects.requireNonNull(sensitive.prepareTimeStepChange(dt),
+                        "A staged CONTROL callback must supply a commit action."));
+            }
+        }
+        return stagedTransition(() -> {
+            for (int index = 0; index < updates.size(); index++) updates.get(index).run();
+            sortedCalculators = planned;
+            lastStep = dt;
+        });
+    }
+
+    private Runnable stagedTransition(Runnable commit) {
+        long expectedVersion = stateVersion;
+        return new Runnable() {
+            private boolean used;
+
+            @Override
+            public void run() {
+                if (used || expectedVersion != stateVersion) {
+                    throw new IllegalStateException("The CONTROL transition is stale or has already committed.");
+                }
+                used = true;
+                stateVersion++;
+                commit.run();
+            }
+        };
+    }
+
+    private List<Runnable> prepareDelayUpdates(double dt, boolean restart) {
+        var updates = new ArrayList<Runnable>();
+        for (var calculator : sortedCalculators) {
+            if (calculator instanceof DelayCalculator delay) delay.validateTimeStep(dt);
+        }
+        for (var calculator : sortedCalculators) {
+            if (calculator instanceof DelayCalculator delay) {
+                updates.add(restart ? delay.prepareInitialization(dt) : delay.prepareStepChange(dt));
+            }
+        }
+        return updates;
+    }
+
+    private static void validateStep(double dt) {
+        if (!Double.isFinite(dt) || dt <= 0) throw new IllegalArgumentException("Time step must be finite and positive.");
     }
 
     /**

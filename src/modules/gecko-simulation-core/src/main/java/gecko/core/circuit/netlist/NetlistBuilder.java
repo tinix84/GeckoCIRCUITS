@@ -16,6 +16,7 @@ package gecko.core.circuit.netlist;
 import gecko.core.circuit.circuitcomponents.CircuitTypCore;
 import gecko.core.circuit.matrix.StamperRegistry;
 import gecko.core.io.CircuitModel;
+import gecko.core.io.CircuitTopology;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -145,11 +146,15 @@ public class NetlistBuilder {
 
         List<CircuitModel.ComponentData> allComponents = new ArrayList<>();
         List<CircuitModel.ComponentData> couplingComponents = new ArrayList<>();
+        CircuitTopology topology = CircuitTopology.resolve(model);
+        topology.validatePhysicalConnections();
+        Set<CircuitTopology.ComponentIdentity> active = new HashSet<>(topology.activeComponents());
         Set<String> names = new HashSet<>();
         for (CircuitModel.ComponentData component : model.getCircuitComponents()) {
             if (component == null) {
                 throw new IllegalArgumentException("Circuit component cannot be null");
             }
+            if (!active.contains(topology.identity(component))) continue;
             if (component.getName() != null && !component.getName().isEmpty()
                     && !names.add(component.getName())) {
                 throw new IllegalArgumentException("Duplicate component name '" + component.getName() + "'");
@@ -183,17 +188,20 @@ public class NetlistBuilder {
             }
         }
 
-        String[][] terminalLabels = new String[allComponents.size()][2];
-        boolean missingLabel = false;
+        CircuitTopology.Group[][] terminalGroups = new CircuitTopology.Group[allComponents.size()][2];
+        boolean[][] referenceNodes = new boolean[allComponents.size()][2];
+        boolean hasElectricalWires = topology.hasConnections("LK") || topology.hasConnections("RELUCTANCE")
+                || topology.hasConnections("THERMAL");
         for (int i = 0; i < allComponents.size(); i++) {
-            terminalLabels[i][0] = terminalLabel(allComponents.get(i), true);
-            terminalLabels[i][1] = terminalLabel(allComponents.get(i), false);
-            missingLabel |= terminalLabels[i][0].isEmpty() || terminalLabels[i][1].isEmpty();
-        }
-        boolean hasElectricalWires = model.getConnections().stream()
-                .anyMatch(connection -> "LK".equals(connection.getType()));
-        if (hasElectricalWires && missingLabel) {
-            terminalLabels = CoordinateTopologyResolver.resolve(allComponents, model.getConnections(), terminalLabels);
+            var component = allComponents.get(i);
+            for (int side = 0; side < 2; side++) {
+                terminalLabel(component, side == 0);
+                var group = topology.group(component, side == 0 ? CircuitTopology.Side.INPUT : CircuitTopology.Side.OUTPUT, 0);
+                if (group == null) throw new IllegalArgumentException("Component '" + component.getName() + "' has no terminal topology");
+                terminalGroups[i][side] = group;
+                referenceNodes[i][side] = group.canonicalLabel().equals("0") || group.canonicalLabel().equalsIgnoreCase("gnd")
+                        || group.canonicalLabel().isEmpty() && !topology.hasConnections(group.domain()) && component.getTerminalData().isEmpty();
+            }
         }
 
         // Keep legacy label-only models working without inferring geometry at default positions.
@@ -202,7 +210,11 @@ public class NetlistBuilder {
 
         if (hasLabels || hasElectricalWires) {
             // Use label-based topology extraction
-            CircuitNetlist netlist = buildFromComponentsWithLabels(allComponents, terminalLabels);
+            boolean legacyLabelOnly = !hasElectricalWires
+                    && allComponents.stream().allMatch(component -> component.getTerminalData().isEmpty())
+                    && allComponents.stream().map(component -> component.getSavedBlock() == null
+                            ? 0L : component.getSavedBlock().parentSheetIdentifier()).distinct().count() == 1;
+            CircuitNetlist netlist = buildFromComponentsWithGroups(allComponents, terminalGroups, referenceNodes, legacyLabelOnly);
             registerMagneticCouplings(netlist, allComponents, couplingComponents);
             return netlist;
         } else {
@@ -221,19 +233,22 @@ public class NetlistBuilder {
      *   <li>Assigns voltage source numbers</li>
      * </ul>
      */
-    private static CircuitNetlist buildFromComponentsWithLabels(List<CircuitModel.ComponentData> components,
-                                                               String[][] terminalLabels) {
+    private static CircuitNetlist buildFromComponentsWithGroups(List<CircuitModel.ComponentData> components,
+            CircuitTopology.Group[][] terminalGroups, boolean[][] referenceNodes, boolean legacyLabelOnly) {
         // Step 1: Build node label → index map
         // Ground reference: label "0" or "" → node 0
-        Map<String, Integer> labelToNode = new LinkedHashMap<>();
-        labelToNode.put("0", 0);
-        labelToNode.put("", 0);  // Empty label also maps to ground
+        // Legacy label-only models share named numerical nodes across physical component types.
+        // Explicit terminal domains and geometric topology retain their typed groups.
+        Map<Object, Integer> groupToNode = new LinkedHashMap<>();
         int nextNode = 1;
 
-        for (String[] labels : terminalLabels) {
-            for (String label : labels) {
-                if (!labelToNode.containsKey(label)) {
-                    labelToNode.put(label, nextNode++);
+        for (int component = 0; component < terminalGroups.length; component++) {
+            for (int side = 0; side < 2; side++) {
+                var group = terminalGroups[component][side];
+                Object key = nodeKey(group, legacyLabelOnly);
+                if (referenceNodes[component][side]) groupToNode.put(key, 0);
+                else if (!groupToNode.containsKey(key)) {
+                    groupToNode.put(key, nextNode++);
                 }
             }
         }
@@ -267,8 +282,8 @@ public class NetlistBuilder {
         for (int i = 0; i < elementCount; i++) {
             CircuitModel.ComponentData comp = components.get(i);
 
-            nodeX[i] = labelToNode.get(terminalLabels[i][0]);
-            nodeY[i] = labelToNode.get(terminalLabels[i][1]);
+            nodeX[i] = groupToNode.get(nodeKey(terminalGroups[i][0], legacyLabelOnly));
+            nodeY[i] = groupToNode.get(nodeKey(terminalGroups[i][1], legacyLabelOnly));
             if (nodeX[i] == nodeY[i] && (types[i] == CircuitTypCore.LK_U
                     || types[i] == CircuitTypCore.TH_TEMP || types[i] == CircuitTypCore.REL_MMF)) {
                 throw new IllegalArgumentException("Voltage source '" + comp.getName()
@@ -328,6 +343,10 @@ public class NetlistBuilder {
                 nodeCount - 1, voltageSourceCount, elementCount);
         netlist.setComponentNameToIndex(nameToIndex);
         return netlist;
+    }
+
+    private static Object nodeKey(CircuitTopology.Group group, boolean legacyLabelOnly) {
+        return legacyLabelOnly ? group.canonicalLabel() : group;
     }
 
     private static void registerMagneticCouplings(CircuitNetlist netlist,

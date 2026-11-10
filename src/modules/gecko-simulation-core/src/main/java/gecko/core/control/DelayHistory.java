@@ -32,6 +32,9 @@ public final class DelayHistory {
     /** @return the delay activated by the most recent lifecycle callback. */
     public double getDelayTime() { return activeDelay; }
 
+    /** @return the configured delay for the next restart or time-step change. */
+    public double getConfiguredDelayTime() { return pendingDelay; }
+
     /**
      * Starts a new run with zero history and the pending delay.
      *
@@ -39,13 +42,7 @@ public final class DelayHistory {
      * @throws IllegalArgumentException if the step or required history size is invalid.
      */
     public void restart(double dt) {
-        double[] replacement = new double[bufferSize(dt)];
-        samples = replacement;
-        next = 0;
-        beforeOldest = 0;
-        available = 0;
-        sampleStep = dt;
-        activeDelay = pendingDelay;
+        prepareRestart(dt).commit();
     }
 
     /**
@@ -56,7 +53,31 @@ public final class DelayHistory {
      * @throws IllegalArgumentException if the step or required history size is invalid.
      */
     public void changeTimeStep(double dt) {
-        double[] replacement = new double[bufferSize(dt)];
+        prepareTimeStepChange(dt).commit();
+    }
+
+    /**
+     * Allocates a new zero history without changing the active history.
+     *
+     * @param dt the finite, positive step in seconds
+     * @return an update that can be committed once
+     * @throws IllegalArgumentException if the step or history size is invalid
+     */
+    public PreparedUpdate prepareRestart(double dt) {
+        double delay = pendingDelay;
+        return new PreparedUpdate(new double[requiredCapacity(delay, dt)], dt, delay, 0, 0);
+    }
+
+    /**
+     * Resamples known history into a staged buffer without changing the active history.
+     *
+     * @param dt the finite, positive step in seconds
+     * @return an update that can be committed once
+     * @throws IllegalArgumentException if the step or history size is invalid
+     */
+    public PreparedUpdate prepareTimeStepChange(double dt) {
+        double delay = pendingDelay;
+        double[] replacement = new double[requiredCapacity(delay, dt)];
         double preceding = 0;
         int known = 0;
         if (samples != null) {
@@ -70,21 +91,60 @@ public final class DelayHistory {
             preceding = interpolate(position);
             if (isKnown(position)) known++;
         }
-        samples = replacement;
-        next = 0;
-        beforeOldest = preceding;
-        available = known;
-        sampleStep = dt;
-        activeDelay = pendingDelay;
+        return new PreparedUpdate(replacement, dt, delay, preceding, known);
     }
 
-    private int bufferSize(double dt) {
+    /**
+     * Checks array capacity without allocating or changing a history.
+     *
+     * @param delay the finite, nonnegative delay in seconds
+     * @param dt the finite, positive step in seconds
+     * @throws IllegalArgumentException if the delay, step, or array size is invalid
+     */
+    public static void validateHistorySize(double delay, double dt) { requiredCapacity(delay, dt); }
+
+    private static int requiredCapacity(double delay, double dt) {
+        if (!Double.isFinite(delay) || delay < 0) throw new IllegalArgumentException("Delay time must be finite and nonnegative");
         validateStep(dt);
-        double size = pendingDelay / dt;
+        double size = delay / dt;
         if (!Double.isFinite(size) || size >= Integer.MAX_VALUE - 8) {
             throw new IllegalArgumentException("Delay history must fit a Java array");
         }
         return Math.max(1, (int) size);
+    }
+
+    /** Holds a fully allocated history update until the runtime commits all staged updates. */
+    public final class PreparedUpdate {
+        private final double[] replacement;
+        private final double step;
+        private final double delay;
+        private final double preceding;
+        private final int known;
+        private boolean committed;
+
+        private PreparedUpdate(double[] replacement, double step, double delay, double preceding, int known) {
+            this.replacement = replacement;
+            this.step = step;
+            this.delay = delay;
+            this.preceding = preceding;
+            this.known = known;
+        }
+
+        /**
+         * Publishes the staged history without allocating a buffer.
+         *
+         * @throws IllegalStateException if this update has already been committed
+         */
+        public void commit() {
+            if (committed) throw new IllegalStateException("The delay history update has already been committed.");
+            samples = replacement;
+            next = 0;
+            beforeOldest = preceding;
+            available = known;
+            sampleStep = step;
+            activeDelay = delay;
+            committed = true;
+        }
     }
 
     private static void validateStep(double dt) {

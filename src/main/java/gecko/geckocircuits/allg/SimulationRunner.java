@@ -13,267 +13,401 @@
  */
 package gecko.geckocircuits.allg;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import javax.swing.SwingUtilities;
-
-import gecko.geckocircuits.circuit.AbstractBlockInterface;
 import gecko.geckocircuits.circuit.NetListContainer;
 import gecko.geckocircuits.circuit.SchematicEditor2;
 import gecko.geckocircuits.circuit.SimulationsKern;
-import gecko.geckocircuits.circuit.SimulationsKern.SimulationStatus;
-import gecko.geckocircuits.circuit.SolverSettings;
 import gecko.geckocircuits.circuit.SimulationTraceLogger;
+import gecko.geckocircuits.circuit.SolverSettings;
 import gecko.geckocircuits.control.DataSaver;
 import gecko.geckocircuits.control.NetzlisteCONTROL;
+import gecko.geckocircuits.control.RegelBlock;
 import gecko.geckocircuits.control.ReglerOSZI;
 import gecko.geckocircuits.datacontainer.ContainerStatus;
-import gecko.geckoscript.SimulationAccess;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @SuppressFBWarnings(value = {"PA_PUBLIC_PRIMITIVE_ATTRIBUTE", "EI_EXPOSE_REP2"},
-        justification = "Public field for simulation kernel access; stores references to GUI components for simulation coordination")
+        justification = "Public kernel alias and frontend references preserve the legacy desktop interface")
 public final class SimulationRunner {
+    private static final Logger LOGGER = Logger.getLogger(SimulationRunner.class.getName());
+    final MainWindow _mainwindow;
+    final SchematicEditor2 _se;
+    public SimulationsKern simKern;
+    private final Object lifecycleMonitor = new Object();
+    // Serialize numerical preparation and publication. Swing delivery always follows this monitor's release.
+    private final Object preparationMonitor = new Object();
+    private final LatestOwnedPresentation presentationUpdates = new LatestOwnedPresentation();
+    private volatile Object preparationToken = new Object();
+    private volatile Execution execution;
+    private SimulationTraceLogger pendingTraceLogger;
 
-	final MainWindow _mainwindow;
-	final SchematicEditor2 _se;
-	public SimulationsKern simKern;
-	private NetListContainer nlContainer;
-	private SimulationTraceLogger _pendingTraceLogger;
+    private record Preparation(Object token, Execution previous, SimulationTraceLogger logger) { }
+    private record Execution(Object token, SimulationsKern kernel, NetListContainer netlist,
+            LegacySimulationFrontend presentation, SolverSettings settings,
+            Consumer<ContainerStatus> originStatus, SimulationsKern.ExecutionTicket ticket,
+            boolean preCalculation, Runnable activation) { }
 
-	/** Sets a trace logger for the next calculation before its thread starts. */
-	public void setPendingTraceLogger(SimulationTraceLogger logger) {
-		_pendingTraceLogger = logger;
-	}
+    /** Sets a trace logger for the next calculation before its thread starts. */
+    public void setPendingTraceLogger(SimulationTraceLogger logger) {
+        synchronized (lifecycleMonitor) {
+            pendingTraceLogger = logger;
+        }
+    }
 
-	public SimulationRunner(final MainWindow mainwindow, final SchematicEditor2 schematicEntry) {
-		_mainwindow = mainwindow;
-		_se = schematicEntry;
-	}
+    public SimulationRunner(final MainWindow mainwindow, final SchematicEditor2 schematicEntry) {
+        _mainwindow = mainwindow;
+        _se = schematicEntry;
+    }
 
-	public void startCalculation(boolean createNewSimThread, SolverSettings solverSettings) throws Exception {
-		boolean getAnfangsbedVomDialogfenster = true;
-		_mainwindow.setMenuDuringSimulation(true, false);
+    private Preparation beginPreparation(Execution expected, boolean requireCurrent, boolean takeLogger) {
+        Preparation preparation;
+        synchronized (lifecycleMonitor) {
+            if (requireCurrent && !isCurrent(expected)) {
+                return null;
+            }
+            Object token = new Object();
+            preparationToken = token;
+            preparation = new Preparation(token, execution, takeLogger ? pendingTraceLogger : null);
+            if (takeLogger) {
+                pendingTraceLogger = null;
+            }
+        }
+        if (preparation.previous() != null) {
+            preparation.previous().ticket().supersede();
+        }
+        return preparation;
+    }
 
-		simKern = new SimulationsKern();
-		double tSTART = 0, tAktuell = tSTART;
-		double tEND = solverSettings._tDURATION.getValue();
-		double dtLoc = solverSettings.dt.getValue();
+    private boolean isPreparing(Object token) {
+        return preparationToken == token;
+    }
 
-		if (solverSettings._T_pre.getValue() > 0) {
-			solverSettings.inPreCalculationMode = true;
-		}
+    private boolean isCurrent(Execution candidate) {
+        return candidate != null && execution == candidate && isPreparing(candidate.token());
+    }
 
-		if (solverSettings.inPreCalculationMode) {
-			tEND = solverSettings._T_pre.getValue();
-			dtLoc = solverSettings._dt_pre.getValue();
-		}
+    private Execution prepareExecution(Execution expected, boolean requireCurrent, boolean takeLogger,
+            Function<Preparation, Execution> initialize) {
+        Preparation preparation = null;
+        try {
+            synchronized (preparationMonitor) {
+                preparation = beginPreparation(expected, requireCurrent, takeLogger);
+                return preparation == null ? null : initialize.apply(preparation);
+            }
+        } catch (RuntimeException | Error error) {
+            if (preparation != null) {
+                Object token = preparation.token();
+                try {
+                    LegacySimulationFrontend.onEventThread(() -> presentationUpdates.update(() -> isPreparing(token),
+                            () -> _mainwindow.setMenuDuringSimulation(false, true, () -> isPreparing(token)),
+                            () -> _mainwindow.jtfStatus.setText("Simulation aborted.")));
+                } catch (RuntimeException presentationError) {
+                    LOGGER.log(Level.WARNING, "Could not report simulation initialization failure", presentationError);
+                }
+            }
+            throw error;
+        }
+    }
 
-		nlContainer = NetListContainer.fabricStartSimulation(_se, simKern);
+    private Execution publish(Preparation preparation, SimulationsKern kernel, NetListContainer netlist,
+            LegacySimulationFrontend presentation, SolverSettings settings,
+            Consumer<ContainerStatus> originStatus, SimulationsKern.ExecutionTicket ticket, boolean activate) {
+        Object token = preparation.token();
+        if (!isPreparing(token)) {
+            ticket.supersede();
+            return null;
+        }
+        Runnable activation = presentation.prepare(netlist, () -> isPreparing(token), activate);
+        ticket.bindCompletion();
+        Execution prepared = new Execution(token, kernel, netlist, presentation, settings,
+                originStatus, ticket, settings.inPreCalculationMode, activation);
+        boolean published;
+        synchronized (lifecycleMonitor) {
+            published = isPreparing(token);
+            if (published) {
+                execution = prepared;
+                simKern = kernel;
+            }
+        }
+        if (!published) {
+            ticket.supersede();
+            return null;
+        }
+        return prepared;
+    }
 
-		simKern.initSimulation(
-				dtLoc, tSTART, tAktuell, tEND, solverSettings._tPAUSE.getValue(),
-				getAnfangsbedVomDialogfenster, nlContainer, false);
-		simKern.setScopeMenuesStartStop();
-		solverSettings._dt_ALT = dtLoc;
-		simKern.initialisiereCONTROLatSimulationStart(dtLoc);  // wird nicht gemacht, wenn 'Continue' aktiviert wird
+    public void startCalculation(boolean createNewSimThread, SolverSettings settings) throws Exception {
+        Execution prepared = prepareExecution(null, false, true, preparation -> prepareStart(preparation, settings));
+        if (prepared != null) {
+            updatePresentation(prepared, () -> setMenus(prepared, true), prepared.activation());
+            startWorker(prepared, createNewSimThread, !createNewSimThread);
+        }
+    }
 
-		if (_pendingTraceLogger != null) {
-			simKern.setTraceLogger(_pendingTraceLogger);
-			_pendingTraceLogger = null;
-		}
+    private Execution prepareStart(Preparation preparation, SolverSettings settings) {
+        Object token = preparation.token();
+        LegacySimulationFrontend presentation = new LegacySimulationFrontend(() -> isPreparing(token));
+        SimulationsKern kernel = new SimulationsKern(settings.SOLVER_TYPE.getValue(), presentation);
+        SimulationsKern.ExecutionTicket ticket = kernel.reserveExecution(() -> isPreparing(token));
+        double end = settings._tDURATION.getValue();
+        double dt = settings.dt.getValue();
+        if (settings._T_pre.getValue() > 0) {
+            settings.inPreCalculationMode = true;
+        }
+        if (settings.inPreCalculationMode) {
+            end = settings._T_pre.getValue();
+            dt = settings._dt_pre.getValue();
+        }
+        settings._dt_ALT = dt;
+        NetListContainer netlist = NetListContainer.fabricStartSimulation(_se, kernel);
+        Consumer<ContainerStatus> originStatus = NetzlisteCONTROL.globalData.captureStatusUpdater();
+        if (!isPreparing(token)) {
+            ticket.supersede();
+            return null;
+        }
+        kernel.initSimulation(dt, 0, 0, end, settings._tPAUSE.getValue(), true, netlist, false);
+        kernel.initialisiereCONTROLatSimulationStart(dt);
+        if (preparation.logger() != null) {
+            kernel.setTraceLogger(preparation.logger());
+        }
+        return publish(preparation, kernel, netlist, presentation, settings, originStatus, ticket, true);
+    }
 
-		RunThreadRun _runThread = new RunThreadRun();
+    public void continueCalculation(boolean createNewSimThread, SolverSettings settings) throws Exception {
+        Execution prepared = prepareExecution(null, false, false, preparation -> prepareContinuation(preparation, settings));
+        activateContinuation(prepared, createNewSimThread);
+    }
 
-		if (createNewSimThread) {
-			final Thread calc = new Thread(_runThread);
-			calc.setName("simulationThread");
-			calc.start();
-		} else {
-			_runThread.setRunWithoutThread();
-			_runThread.run();
-		}
-	}
+    private Execution prepareContinuation(Preparation preparation, SolverSettings settings) {
+        Object token = preparation.token();
+        Execution previous = preparation.previous();
+        if (previous == null) {
+            throw new IllegalStateException("Initialize simulation before continuation");
+        }
+        SimulationsKern kernel = previous.kernel();
+        SimulationsKern.ExecutionTicket ticket = kernel.reserveExecution(() -> isPreparing(token));
+        if (!isPreparing(token)) {
+            return null;
+        }
+        NetListContainer netlist = previous.netlist();
+        Consumer<ContainerStatus> originStatus = previous.originStatus();
+        double current = kernel.getZeitAktuell();
+        double start = kernel.getTSTART();
+        double end = kernel.getTEND();
+        if (current >= end) {
+            start = end;
+            end += settings._tDURATION.getValue();
+            kernel.setZeiten(start, end, settings.dt.getValue());
+            boolean recalculate = settings.dt.getValue() != settings._dt_ALT;
+            settings._dt_ALT = settings.dt.getValue();
+            netlist = NetListContainer.fabricContinueSimulation(_se, kernel, netlist);
+            originStatus = NetzlisteCONTROL.globalData.captureStatusUpdater();
+            if (!isPreparing(token)) {
+                ticket.supersede();
+                return null;
+            }
+            kernel.initSimulation(settings.dt.getValue(), start, current, end,
+                    settings._tPAUSE.getValue(), false, netlist, recalculate);
+            kernel.setInitialConditionsFromContinue();
+        } else {
+            kernel._simulationStatus = SimulationsKern.SimulationStatus.RUNNING;
+        }
+        return publish(preparation, kernel, netlist, previous.presentation(), settings,
+                originStatus, ticket, true);
+    }
 
-	public void continueCalculation(final boolean createNewSimThread, final SolverSettings solverSettings) throws Exception {
-		boolean getAnfangsbedVomDialogfenster = false;
-		_mainwindow.setMenuDuringSimulation(true, false);
+    private void activateContinuation(Execution prepared, boolean createNewSimThread) {
+        if (prepared != null) {
+            commitStatus(prepared, ContainerStatus.RUNNING);
+            updatePresentation(prepared, () -> setMenus(prepared, true), prepared.activation());
+            startWorker(prepared, createNewSimThread, false);
+        }
+    }
 
-		double tAktuell = simKern.getZeitAktuell();
-		double tSTART = simKern.getTSTART();
-		double tEND = simKern.getTEND();
+    public void pauseSimulation() {
+        Execution current = execution;
+        if (current != null && current.ticket().pause()) {
+            commitStatus(current, ContainerStatus.PAUSED);
+            updatePresentation(current, () -> setMenus(current, false));
+        }
+    }
 
-		if (tAktuell >= tEND) {
-			tSTART = tEND;
-			tEND += solverSettings._tDURATION.getValue();
-			simKern.setZeiten(tSTART, tEND, solverSettings.dt.getValue());
-			boolean recalculateMatrix = false;
-			if (solverSettings.dt.getValue() != solverSettings._dt_ALT) {
-				recalculateMatrix = true;
-			}
-			solverSettings._dt_ALT = solverSettings.dt.getValue();
+    public void initSim(double dt, double end) {
+        SolverSettings settings = MainWindow._solverSettings;
+        settings._tDURATION.setValueWithoutUndo(end);
+        settings.dt.setValueWithoutUndo(dt);
+        initializeScript(settings, end, dt, true);
+    }
 
-			nlContainer = NetListContainer.fabricContinueSimulation(_se, simKern, nlContainer);
+    public void initSim() {
+        initSim(0, 0);
+    }
 
-			simKern.initSimulation(solverSettings.dt.getValue(), tSTART, tAktuell, tEND,
-					solverSettings._tPAUSE.getValue(),
-					getAnfangsbedVomDialogfenster, nlContainer, recalculateMatrix);
-			simKern.setScopeMenuesStartStop();
-			simKern.setInitialConditionsFromContinue();
+    public void external_init(double end) {
+        SolverSettings settings = MainWindow._solverSettings;
+        initializeScript(settings, end, settings.dt.getValue(), false);
+    }
 
-		} else {
-			simKern._simulationStatus = SimulationStatus.RUNNING;
-			simKern.setScopeMenuesStartStop();
-			NetzlisteCONTROL.globalData.setContainerStatus(ContainerStatus.RUNNING);
-		}
+    private void initializeScript(SolverSettings settings, double end, double dt, boolean usePreCalculation) {
+        Execution prepared = prepareExecution(null, false, false,
+                preparation -> prepareScript(preparation, settings, end, dt, usePreCalculation));
+        if (prepared != null) {
+            List<Runnable> changes = new ArrayList<>();
+            if (usePreCalculation) {
+                changes.add(() -> setMenus(prepared, true));
+            }
+            changes.add(prepared.activation());
+            changes.add(() -> _mainwindow.jtfStatus.setText("Starting Simulation ... "));
+            addScopeBoundaries(prepared, changes);
+            updatePresentation(prepared, changes.toArray(Runnable[]::new));
+        }
+    }
 
-		Thread calc = new Thread(new RunThreadRun());
-		if (createNewSimThread) {
-			calc.start();
-		} else {
-			calc.run();
-		}
-	}
+    private Execution prepareScript(Preparation preparation, SolverSettings settings, double end, double dt,
+            boolean usePreCalculation) {
+        Object token = preparation.token();
+        LegacySimulationFrontend presentation = new LegacySimulationFrontend(() -> isPreparing(token));
+        SimulationsKern kernel = new SimulationsKern(settings.SOLVER_TYPE.getValue(), presentation);
+        SimulationsKern.ExecutionTicket ticket = kernel.reserveExecution(() -> isPreparing(token));
+        if (usePreCalculation && settings.inPreCalculationMode) {
+            end = settings._T_pre.getValue();
+            dt = settings._dt_pre.getValue();
+        }
+        if (usePreCalculation) {
+            settings._dt_ALT = dt;
+        }
+        NetListContainer netlist = NetListContainer.fabricStartSimulation(_se, kernel);
+        Consumer<ContainerStatus> originStatus = NetzlisteCONTROL.globalData.captureStatusUpdater();
+        if (!isPreparing(token)) {
+            ticket.supersede();
+            return null;
+        }
+        kernel.initSimulation(dt, 0, 0, end, settings._tPAUSE.getValue(), true, netlist, false);
+        kernel.initialisiereCONTROLatSimulationStart(dt);
+        return publish(preparation, kernel, netlist, presentation, settings, originStatus, ticket, false);
+    }
 
-	private void waitForDataSavers() {
-		int counter = 0;
-		while (DataSaver.WAIT_COUNTER.get() != 0 && counter < 100) {
-			try {
-				Thread.sleep(100);
-			} catch (InterruptedException ex) {
-				Logger.getLogger(SimulationAccess.class.getName()).log(Level.SEVERE, null, ex);
-			}
-			counter++;
-		}
-	}
+    private void setMenus(Execution owner, boolean running) {
+        _mainwindow.setMenuDuringSimulation(running, !running, () -> isCurrent(owner));
+    }
 
-	public void pauseSimulation() {
-		try {
-			if (simKern != null) {
-				simKern._simulationStatus = SimulationStatus.PAUSED;
-			} else {
-				return;
-			}
+    private void addScopeBoundaries(Execution owner, List<Runnable> changes) {
+        for (RegelBlock block : owner.netlist()._nlControl._orderedControlBlocks) {
+            if (block instanceof ReglerOSZI scope) {
+                changes.add(() -> scope.setSimulationTimeBoundaries(owner.kernel().getTSTART(), owner.kernel().getTEND()));
+            }
+        }
+    }
 
-			SwingUtilities.invokeLater(() -> _mainwindow.setMenuDuringSimulation(false, true));
-			NetzlisteCONTROL.globalData.setContainerStatus(ContainerStatus.PAUSED);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
+    private void startWorker(Execution owner, boolean asynchronous, boolean propagateErrors) {
+        RunThreadRun worker = new RunThreadRun(owner, propagateErrors);
+        if (asynchronous) {
+            Thread thread = new Thread(worker);
+            thread.setName("simulationThread");
+            thread.start();
+        } else {
+            worker.run();
+        }
+    }
 
-	public void initSim(double dtLoc, double tEND) {
-		// Ganz am Anfang: t0=0
-		_mainwindow.setMenuDuringSimulation(true, false);
-		boolean getAnfangsbedVomDialogfenster = true;
+    private void commitStatus(Execution owner, ContainerStatus status) {
+        try {
+            LegacySimulationFrontend.onEventThread(() -> {
+                if (isCurrent(owner)) {
+                    owner.originStatus().accept(status);
+                }
+            });
+        } catch (RuntimeException error) {
+            LOGGER.log(Level.WARNING, "Could not update simulation recording", error);
+        }
+    }
 
-		simKern = new SimulationsKern();
-		double tSTART = 0, tAktuell = tSTART;
-		MainWindow._solverSettings._tDURATION.setValueWithoutUndo(tEND);
-		MainWindow._solverSettings.dt.setValueWithoutUndo(dtLoc);
+    private void updatePresentation(Execution owner, Runnable... changes) {
+        try {
+            LegacySimulationFrontend.onEventThread(() -> presentationUpdates.update(() -> isCurrent(owner), changes));
+        } catch (RuntimeException error) {
+            LOGGER.log(Level.WARNING, "Could not update simulation presentation", error);
+        }
+    }
 
-		if (MainWindow._solverSettings.inPreCalculationMode) {
-			tEND = MainWindow._solverSettings._T_pre.getValue();
-			dtLoc = MainWindow._solverSettings._dt_pre.getValue();
-		}
+    private void waitForDataSavers() {
+        int counter = 0;
+        while (DataSaver.WAIT_COUNTER.get() != 0 && counter++ < 100) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException error) {
+                LOGGER.log(Level.SEVERE, "Could not wait for simulation data", error);
+            }
+        }
+    }
 
-		nlContainer = NetListContainer.fabricStartSimulation(_se, simKern);
+    private final class RunThreadRun implements Runnable {
+        private final Execution owner;
+        private final boolean propagateErrors;
+        private long started;
 
-		simKern.initSimulation(
-				dtLoc, tSTART, tAktuell, tEND, MainWindow._solverSettings._tPAUSE.getValue(),
-				getAnfangsbedVomDialogfenster, nlContainer, false);
-		MainWindow._solverSettings._dt_ALT = dtLoc;
-		simKern.initialisiereCONTROLatSimulationStart(dtLoc);
-		_mainwindow.jtfStatus.setText("Starting Simulation ... ");
+        private RunThreadRun(Execution owner, boolean propagateErrors) {
+            this.owner = owner;
+            this.propagateErrors = propagateErrors;
+        }
 
-		for (AbstractBlockInterface block : _se.getElementCONTROL()) {
-			if (block instanceof ReglerOSZI) {
-				((ReglerOSZI) block).setSimulationTimeBoundaries(simKern.getTSTART(), simKern.getTEND());
-			}
-		}
-	}
-
-	public void initSim() {
-		this.initSim(0, 0); // dt and tEND should be set appropriately
-	}
-
-	private final class RunThreadRun implements Runnable {
-
-		long q1;
-		long q2;
-		private boolean _runWithoutThread = false;
-
-		public void setRunWithoutThread() {
-			_runWithoutThread = true;
-		}
-
-		@Override
-		public void run() {
-			try {
-				for (AbstractBlockInterface block : _se.getElementCONTROL()) {
-					if (block instanceof ReglerOSZI) {
-						((ReglerOSZI) block).setSimulationTimeBoundaries(simKern.getTSTART(), simKern.getTEND());
-					}
-				}
-
-				q1 = System.currentTimeMillis();
-				q2 = 0;
-				_mainwindow.jtfStatus.setText("Starting Simulation ... ");
-
-				try {
-					simKern.runSimulation();
-					// GUI: update menu items
-				} catch (OutOfMemoryError err) {
-					OutOfMemoryError error = new OutOfMemoryError("Could not allocate enough java RAM memory for the simulation!");
-					error.initCause(err);
-					throw error;
-				} finally {
-					if (!MainWindow._solverSettings.inPreCalculationMode) {
-						endRun();
-					} else {
-						MainWindow._solverSettings.inPreCalculationMode = false;
-						try {
-							_mainwindow.continueCalculation(false);
-						} catch (Throwable error) {
-							error.printStackTrace();
-							throw new RuntimeException(error);
-						}
-					}
-				}
-			} catch (Throwable error) {
-				_mainwindow.pauseSimulation();
-				simKern._simulationStatus = SimulationStatus.FINISHED;
-				_mainwindow.jtfStatus.setText("Simulation aborted.");
-				if (!_runWithoutThread) {
-					error.printStackTrace();
-				} else {
-					throw new RuntimeException(error);
-				}
-			}
-		}
-
-		public void endRun() {
-			q2 = System.currentTimeMillis();
-			_mainwindow.pauseSimulation();
-			simKern._simulationStatus = SimulationStatus.FINISHED;
-			simKern.tearDownOnPause();
-			_mainwindow.jtfStatus.setzeStatusRechenzeit(q2 - q1);
-			waitForDataSavers();
-			SwingUtilities.invokeLater(() -> _mainwindow.setMenuDuringSimulation(false, true));
-		}
-	}
-
-	public void external_init(double tEnd) {
-		_mainwindow.jtfStatus.setText("Starting Simulation ... ");
-		boolean getAnfangsbedVomDialogfenster = true;
-		simKern = new SimulationsKern();
-		double tSTART = 0, tAktuell = tSTART;
-		nlContainer = NetListContainer.fabricStartSimulation(_se, simKern);
-		simKern.initSimulation(
-				MainWindow._solverSettings.dt.getValue(), tSTART, tAktuell, tEnd, MainWindow._solverSettings._tPAUSE.getValue(),
-				getAnfangsbedVomDialogfenster, nlContainer, false);
-		simKern.initialisiereCONTROLatSimulationStart(MainWindow._solverSettings.dt.getValue());
-	}
+        @Override
+        public void run() {
+            Throwable failure = null;
+            try {
+                List<Runnable> changes = new ArrayList<>();
+                addScopeBoundaries(owner, changes);
+                changes.add(() -> _mainwindow.jtfStatus.setText("Starting Simulation ... "));
+                updatePresentation(owner, changes.toArray(Runnable[]::new));
+                started = System.currentTimeMillis();
+                try {
+                    owner.ticket().run();
+                } catch (OutOfMemoryError cause) {
+                    OutOfMemoryError error = new OutOfMemoryError("Could not allocate enough java RAM memory for the simulation!");
+                    error.initCause(cause);
+                    throw error;
+                }
+                if (owner.preCalculation() && isCurrent(owner)) {
+                    Execution next = prepareExecution(owner, true, false, preparation -> {
+                            owner.settings().inPreCalculationMode = false;
+                            return prepareContinuation(preparation, owner.settings());
+                    });
+                    activateContinuation(next, false);
+                    return;
+                }
+            } catch (Throwable error) {
+                failure = error;
+            }
+            try {
+                if (owner.ticket().finish()) {
+                    commitStatus(owner, ContainerStatus.PAUSED);
+                }
+            } catch (Throwable teardownError) {
+                if (failure == null) {
+                    failure = teardownError;
+                } else if (failure != teardownError) {
+                    failure.addSuppressed(teardownError);
+                }
+            }
+            if (failure != null) {
+                commitStatus(owner, ContainerStatus.PAUSED);
+                updatePresentation(owner, () -> setMenus(owner, false),
+                        () -> _mainwindow.jtfStatus.setText("Simulation aborted."));
+                if (propagateErrors) {
+                    throw new RuntimeException(failure);
+                }
+                failure.printStackTrace();
+            } else {
+                long elapsed = System.currentTimeMillis() - started;
+                updatePresentation(owner, () -> _mainwindow.jtfStatus.setzeStatusRechenzeit(elapsed),
+                        () -> setMenus(owner, false));
+            }
+            waitForDataSavers();
+        }
+    }
 }
-
-

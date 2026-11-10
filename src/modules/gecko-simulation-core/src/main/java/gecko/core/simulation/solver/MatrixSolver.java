@@ -252,6 +252,42 @@ public class MatrixSolver {
             if (stamper != null) {
                 stamper.stampMatrixA(a, nodeX, nodeY, nodeZ, parameters, dt, solverType);
             }
+            if (componentType == CircuitTypCore.LK_I && SourceControl.mode(parameters) == 5) {
+                int target = SourceControl.target(netlist, elementIndex);
+                int controlX = netlist.getNodeX(target);
+                int controlY = netlist.getNodeY(target);
+                double gain = parameters[11];
+                a[nodeX][controlX] += gain;
+                a[nodeY][controlY] += gain;
+                a[nodeX][controlY] -= gain;
+                a[nodeY][controlX] -= gain;
+            }
+            if ((componentType == CircuitTypCore.LK_U || componentType == CircuitTypCore.REL_MMF
+                    || componentType == CircuitTypCore.TH_TEMP)
+                    && SourceControl.mode(parameters) == 5 && parameters[14] == 0) {
+                int target = SourceControl.target(netlist, elementIndex);
+                double gain = parameters[11];
+                a[nodeZ][netlist.getNodeX(target)] -= gain;
+                a[nodeZ][netlist.getNodeY(target)] += gain;
+            }
+            if ((componentType == CircuitTypCore.LK_U || componentType == CircuitTypCore.REL_MMF
+                    || componentType == CircuitTypCore.TH_TEMP) && SourceControl.mode(parameters) == 3) {
+                int target = SourceControl.target(netlist, elementIndex);
+                a[nodeZ][SourceControl.branch(netlist, target)] -= parameters[11];
+            }
+            if ((componentType == CircuitTypCore.LK_U || componentType == CircuitTypCore.REL_MMF
+                    || componentType == CircuitTypCore.TH_TEMP) && SourceControl.mode(parameters) == 4) {
+                int target = SourceControl.target(netlist, elementIndex);
+                a[nodeZ][SourceControl.branch(netlist, target)] += parameters[11] / dt;
+            }
+            if ((componentType == CircuitTypCore.LK_U || componentType == CircuitTypCore.REL_MMF
+                    || componentType == CircuitTypCore.TH_TEMP) && SourceControl.mode(parameters) == 6) {
+                int target = SourceControl.target(netlist, elementIndex);
+                a[nodeZ][nodeX] -= 1.0;
+                a[nodeZ][nodeY] += 1.0;
+                a[nodeZ][nodeZ] += 1.0 / parameters[11];
+                a[nodeZ][SourceControl.branch(netlist, target)] += 1.0;
+            }
             // If no stamper is registered, component is skipped (e.g., terminals, unimplemented types)
         }
 
@@ -273,6 +309,64 @@ public class MatrixSolver {
 
         // Mark matrix as changed so LU decomposition will be recalculated
         matrixChanged = true;
+    }
+
+    /**
+     * Updates controlled voltage-source limits from the current solution and invalidates the cached factorization when needed.
+     *
+     * @param netlist the circuit with its configured source limits and current limit states
+     * @param time the current simulation time
+     * @return true when a source changes its limit state
+     */
+    public boolean updateControlledSourceLimits(INetList netlist, double time) {
+        boolean changed = false;
+        for (int element = 0; element < netlist.getElementCount(); element++) {
+            if (netlist.getType(element) != CircuitTypCore.LK_U) {
+                continue;
+            }
+            double[] parameters = netlist.getParameter(element);
+            if (SourceControl.mode(parameters) != 5
+                    || ((int) parameters[0] == SourceType.QUELLE_VOLTAGECONTROLLED_DIRECTLY && time <= 0)) {
+                continue;
+            }
+            int target = SourceControl.target(netlist, element);
+            int controlX = netlist.getNodeX(target);
+            int controlY = netlist.getNodeY(target);
+            int branch = netlist.getNodeMax() + netlist.getVoltageSourceNumber(element);
+            double gain = parameters[11];
+            double voltage = gain * (p[controlX] - p[controlY]);
+            double oldState = parameters[14];
+            double newState = oldState;
+            if (oldState == 0) {
+                newState = voltage < parameters[12] ? -1 : voltage > parameters[13] ? 1 : 0;
+            } else if ((oldState == -1 && voltage >= parameters[12])
+                    || (oldState == 1 && voltage <= parameters[13])) {
+                // Return to the linear equation before a source can reach the opposite limit.
+                newState = 0;
+            }
+            if (oldState == newState) {
+                continue;
+            }
+
+            if (oldState == 0) {
+                a[branch][controlX] += gain;
+                a[branch][controlY] -= gain;
+            } else {
+                bVector[branch] -= oldState < 0 ? parameters[12] : parameters[13];
+            }
+            if (newState == 0) {
+                a[branch][controlX] -= gain;
+                a[branch][controlY] += gain;
+            } else {
+                bVector[branch] += newState < 0 ? parameters[12] : parameters[13];
+            }
+            parameters[14] = newState;
+            changed = true;
+        }
+        if (changed) {
+            matrixChanged = true;
+        }
+        return changed;
     }
 
     /**
@@ -496,7 +590,8 @@ public class MatrixSolver {
                             if (time <= 0) {
                                 bVector[voltageSourceIdx] += 2 * gain * params[15] / dt;
                             } else {
-                                bVector[voltageSourceIdx] += gain * pALT[voltageSourceIdx + 1] / dt;
+                                int target = SourceControl.target(netlist, elementIdx);
+                                bVector[voltageSourceIdx] += gain * pALT[SourceControl.branch(netlist, target)] / dt;
                             }
                             break;
                         }

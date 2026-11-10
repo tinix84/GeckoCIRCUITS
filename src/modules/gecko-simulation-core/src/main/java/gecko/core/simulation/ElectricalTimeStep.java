@@ -67,11 +67,12 @@ final class ElectricalTimeStep {
     }
 
     /**
-     * Performs diode iteration loop matching proven LKMatrices.berechneBauteilStroeme().
+     * Resolves diode states and controlled source voltage limits before one history commit.
      *
      * <p>After the initial solve, checks each diode/thyristor/IGBT for voltage-based
      * state transitions. If any diode toggles, incrementally patches the A and b
      * matrices and re-solves until convergence (or max 10000 iterations).
+     * Controlled voltage sources update their limits in this same retry loop.
      *
      * <p>Voltage-based criteria (matching proven code):
      * <ul>
@@ -84,7 +85,7 @@ final class ElectricalTimeStep {
      * @param netlist the circuit netlist
      * @param dt time step
      * @param time current simulation time
-     * @return true if any diode state changed during this step
+     * @return true if a diode or source limit changes during this step
      */
     private boolean doDiodeIteration(CircuitNetlist netlist, double dt, double time) {
         double stoergroesse = 1.0;
@@ -163,6 +164,7 @@ final class ElectricalTimeStep {
                 }
             }
 
+            changed |= matrixSolver.updateControlledSourceLimits(netlist, time);
             if (changed) {
                 anyChangedOverall = true;
                 matrixSolver.setMatrixChanged();

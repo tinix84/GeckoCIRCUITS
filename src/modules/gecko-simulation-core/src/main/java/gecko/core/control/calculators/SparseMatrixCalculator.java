@@ -1027,7 +1027,7 @@ public final class SparseMatrixCalculator extends AbstractControlCalculatable im
     }
 
     private double outputPhase(double frequency, double angle) {
-        double phase = frequency <= 0 ? angle : 2 * Math.PI * frequency * _time;
+        double phase = frequency <= 0 ? angle : 2 * Math.PI * frequency * getTime();
         phase %= 2 * Math.PI;
         return phase < 0 ? phase + 2 * Math.PI : phase;
     }

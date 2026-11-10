@@ -54,12 +54,12 @@ public final class SignalCalculatorImport extends AbstractSignalCalculator imple
 
     @Override
     public void berechneYOUT(final double deltaT) {
-        if (!Double.isFinite(_time)) {
+        if (!Double.isFinite(getTime())) {
             throw new IllegalArgumentException("Signal lookup time must be finite.");
         }
         double firstTime = _xy[0][0];
         double lastTime = _xy[0][_xy[0].length - 1];
-        double time = _time;
+        double time = getTime();
         if (time <= firstTime) {
             _outputSignal[0][0] = _xy[1][0];
             return;

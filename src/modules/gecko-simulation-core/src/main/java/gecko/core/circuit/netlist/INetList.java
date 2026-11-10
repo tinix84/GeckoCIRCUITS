@@ -111,6 +111,12 @@ public interface INetList {
      * @return simulation time in seconds
      */
     double getSimulationTime();
+
+    /** Returns the controlling element index, or -1 when no target is configured. */
+    default int getControlElementIndex(int sourceIndex) {
+        return -1;
+    }
+
     /** Magnetic metadata is optional for netlist implementations without coupled windings. */
     default java.util.List<MutualCouplingRegistry.Coupling> getAllCouplings() {
         return java.util.List.of();

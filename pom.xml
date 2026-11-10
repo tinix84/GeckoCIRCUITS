@@ -362,6 +362,24 @@
 
   <!-- Distribution profiles -->
   <profiles>
+    <profile>
+      <id>desktop-jacoco-audit</id>
+      <activation>
+        <property><name>gecko.desktop.jacocoFile</name></property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <configuration>
+              <destFile>${gecko.desktop.jacocoFile}</destFile>
+              <dataFile>${gecko.desktop.jacocoFile}</dataFile>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <!-- Regression test profile: runs ONLY regression-tagged tests -->
     <!-- Usage: mvn test -Pregression -->
     <profile>

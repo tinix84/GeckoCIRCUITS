@@ -19,8 +19,15 @@ package gecko.core.control.calculators;
  * sobald der RESET-Eingang auf Eins gesetzt wird, beginnt der interne Zaehler zu laufen und wird direkt am Ausgang ausgegeben
  * @author andreas
  */
-public final class CounterCalculatable extends AbstractTwoInputsOneOutputCalculator {
+public final class CounterCalculatable extends AbstractTwoInputsOneOutputCalculator implements InitializableAtSimulationStart {
     private double _lastValue = 0;            
+
+    /** Clears the edge detector and counter for a new run. */
+    @Override
+    public void initializeAtSimulationStart(double deltaT) {
+        _lastValue = 0;
+        _outputSignal[0][0] = 0;
+    }
 
     @Override
     public void berechneYOUT(final double deltaT) {

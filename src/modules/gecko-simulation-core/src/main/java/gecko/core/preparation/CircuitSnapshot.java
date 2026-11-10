@@ -1,6 +1,8 @@
 package gecko.core.preparation;
 
 import gecko.core.io.CircuitModel;
+import gecko.core.io.CircuitTopology;
+import gecko.core.io.SimulationBlockClassification;
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -15,7 +17,10 @@ import java.util.Objects;
 /** Owns a circuit. Every inspection returns a detached model. */
 public final class CircuitSnapshot {
     private final CircuitModel model;
-    CircuitSnapshot(CircuitModel source) { model = copy(Objects.requireNonNull(source, "Circuit is required")); }
+    CircuitSnapshot(CircuitModel source) {
+        model = copy(Objects.requireNonNull(source, "Circuit is required"));
+        SimulationBlockClassification.retainSpecialComponentIssues(model);
+    }
     /**
      * Returns a detached inspection model, including detached arrays, maps, and connections.
      * Changes to this model cannot change the snapshot or another inspection view.
@@ -23,6 +28,54 @@ public final class CircuitSnapshot {
      * @return a writable copy of the captured circuit
      */
     public CircuitModel toModel() { return copy(model); }
+
+    private record Owner(String domain, String name) { }
+
+    /** Creates the common active view for readiness and one numerical run. */
+    CircuitModel executionModel() {
+        var execution = toModel();
+        var topology = CircuitTopology.resolve(execution);
+        execution.getConnections().removeIf(connection -> !topology.isActiveConnection(connection));
+        var active = new LinkedHashSet<>(topology.activeComponents());
+        var structural = new LinkedHashSet<>(topology.structuralComponents());
+        var removedOwners = new LinkedHashSet<Owner>();
+        var activeOwners = new LinkedHashSet<Owner>();
+        retainActive("LK", execution.getCircuitComponents(), topology, active, structural, execution, removedOwners, activeOwners);
+        retainActive("CONTROL", execution.getControlComponents(), topology, active, structural, execution, removedOwners, activeOwners);
+        retainActive("THERMAL", execution.getThermalComponents(), topology, active, structural, execution, removedOwners, activeOwners);
+        retainActive("SPECIAL", execution.getSpecialComponents(), topology, active, structural, execution, removedOwners, activeOwners);
+        var subcircuitLocations = new LinkedHashSet<String>();
+        execution.getSpecialComponents().stream().filter(component -> component.getType() == 27)
+                .map(CircuitModel.ComponentData::getSourceLocation).filter(Objects::nonNull)
+                .forEach(subcircuitLocations::add);
+        execution.getImportIssues().removeIf(issue -> {
+            var owner = new Owner(issue.domain(), issue.component());
+            return removedOwners.contains(owner) && !activeOwners.contains(owner)
+                    || issue.code().equals("UNSUPPORTED_SIMULATION_BLOCK") && "SPECIAL".equals(issue.domain())
+                        && subcircuitLocations.contains(issue.sourceLocation());
+        });
+        return execution;
+    }
+
+    private static void retainActive(String domain, List<CircuitModel.ComponentData> components,
+            CircuitTopology topology, Set<CircuitTopology.ComponentIdentity> active,
+            Set<CircuitTopology.ComponentIdentity> structural, CircuitModel execution,
+            Set<Owner> removedOwners, Set<Owner> activeOwners) {
+        components.removeIf(component -> {
+            var owner = new Owner(domain, component.getName());
+            if (active.contains(topology.identity(component))) {
+                activeOwners.add(owner);
+                return false;
+            }
+            if (structural.contains(topology.identity(component))) {
+                execution.getStructuralComponents().add(new CircuitModel.StructuralComponent(domain, component));
+                activeOwners.add(owner);
+                return true;
+            }
+            removedOwners.add(owner);
+            return true;
+        });
+    }
 
     private static CircuitModel copy(CircuitModel source) {
         var target = new CircuitModel();
@@ -46,13 +99,26 @@ public final class CircuitSnapshot {
         target.setScripterDeclarations(source.getScripterDeclarations());
         target.getOptimizerParameters().putAll(source.getOptimizerParameters());
         target.getImportIssues().addAll(source.getImportIssues());
+        target.getSavedBlocks().addAll(source.getSavedBlocks());
+        target.getSavedSettings().putAll(source.getSavedSettings());
+        target.getSavedSections().addAll(source.getSavedSections());
+        target.getResources().putAll(source.getResources());
+        target.getResourceFailures().putAll(source.getResourceFailures());
         if (source.getDataContainerSignals() != null) target.setDataContainerSignals(source.getDataContainerSignals().clone());
         copyComponents(source.getCircuitComponents(), target.getCircuitComponents());
         copyComponents(source.getControlComponents(), target.getControlComponents());
         copyComponents(source.getThermalComponents(), target.getThermalComponents());
+        copyComponents(source.getSpecialComponents(), target.getSpecialComponents());
+        for (var structural : source.getStructuralComponents()) {
+            var components = new ArrayList<CircuitModel.ComponentData>();
+            copyComponents(List.of(structural.component()), components);
+            target.getStructuralComponents().add(new CircuitModel.StructuralComponent(structural.domain(), components.getFirst()));
+        }
         for (var connection : source.getConnections()) {
-            target.addConnection(new CircuitModel.ConnectionData(connection.getType(),
-                    (int[][]) copyValue(connection.getPoints()), connection.getLabel()));
+            var copy = new CircuitModel.ConnectionData(connection.getType(),
+                    (int[][]) copyValue(connection.getPoints()), connection.getLabel());
+            copy.setSavedBlock(connection.getSavedBlock());
+            target.addConnection(copy);
         }
         return target;
     }
@@ -71,6 +137,9 @@ public final class CircuitSnapshot {
             copy.setConfigurationNormalized(component.isConfigurationNormalized());
             copy.setImportedParameterCount(component.getImportedParameterCount());
             copy.setSourceLocation(component.getSourceLocation());
+            copy.setSavedBlock(component.getSavedBlock());
+            copy.setSourceOrdinal(component.getSourceOrdinal() < 0 ? target.size() : component.getSourceOrdinal());
+            copy.getTerminalData().addAll(component.getTerminalData());
             target.add(copy);
         }
     }

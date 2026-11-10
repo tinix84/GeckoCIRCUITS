@@ -115,9 +115,9 @@ public class SmallSignalCalculator extends AbstractControlCalculatable
      * @param time the simulation time
      */
     public void externalSetTime(double time) {
-        _time = time;
+        setSimulationTime(time);
         if (_signalTypeCalculator != null) {
-            _signalTypeCalculator._time = time;
+            _signalTypeCalculator.setSimulationTime(time);
         }
     }
 
@@ -199,7 +199,7 @@ public class SmallSignalCalculator extends AbstractControlCalculatable
         switch (_signalType) {
             case SINE:
                 for (double frequency : simulationFrequencies) {
-                    returnValue += _amplitude * Math.sin(TWO_PI * frequency * _time);
+                    returnValue += _amplitude * Math.sin(TWO_PI * frequency * getTime());
                 }
                 break;
             case RECTANGLE:

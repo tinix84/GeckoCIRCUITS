@@ -42,6 +42,7 @@ public abstract class AbstractSignalCalculatorPeriodic extends AbstractSignalCal
 
     @Override
     public final void initializeAtSimulationStart(final double deltaT) {
+        _outputSignal[0][0] = 0;
         final double txEnd = 1.0 / _frequency;
         final double dtx = txEnd / THOUSAND;
         double phaseX = calculatePhaseX();

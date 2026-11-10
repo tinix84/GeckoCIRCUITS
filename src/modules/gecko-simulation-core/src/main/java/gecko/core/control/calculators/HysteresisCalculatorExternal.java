@@ -13,11 +13,15 @@
  */
 package gecko.core.control.calculators;
 
-public final class HysteresisCalculatorExternal extends AbstractControlCalculatable {
+public final class HysteresisCalculatorExternal extends AbstractControlCalculatable implements InitializableAtSimulationStart {
 
     public HysteresisCalculatorExternal() {
         super(2, 1);        
     }
+
+    /** Clears the held output for a new run. */
+    @Override
+    public void initializeAtSimulationStart(double deltaT) { _outputSignal[0][0] = 0; }
 
     @Override
     public void berechneYOUT(final double deltaT) {

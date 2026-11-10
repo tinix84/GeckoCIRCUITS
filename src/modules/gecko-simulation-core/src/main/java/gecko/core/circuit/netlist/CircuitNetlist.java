@@ -55,6 +55,7 @@ public class CircuitNetlist implements INetList {
     private int[] nodeY;          // Y terminal node indices
     private int[] voltageSourceNumbers;  // Voltage source numbering for extended MNA
     private double[][] parameters;       // Component parameters
+    private int[] controlElementIndices = new int[0];
 
     // Netlist metrics
     private int nodeCount;              // Maximum node index (nodes 0 to nodeCount)
@@ -81,6 +82,31 @@ public class CircuitNetlist implements INetList {
     public CircuitNetlist() {
         this.couplingRegistry = new MutualCouplingRegistry();
         this.simulationTime = 0.0;
+    }
+
+    /**
+     * Returns an independent copy of topology, parameters, source controls, couplings, names, results, and time.
+     * The caller can mutate the copy without changing this netlist.
+     * Capture this copy while the simulation owns the electrical step.
+     *
+     * @return the detached numerical state
+     */
+    public CircuitNetlist detachedSnapshot() {
+        CircuitNetlist copy = new CircuitNetlist();
+        if (componentTypes != null) {
+            copy.initNetlist(componentTypes, nodeX, nodeY, voltageSourceNumbers, parameters,
+                    nodeCount, voltageSourceCount, elementCount);
+        }
+        copy.controlElementIndices = controlElementIndices.clone();
+        copy.componentNameToIndex = Collections.unmodifiableMap(new LinkedHashMap<>(componentNameToIndex));
+        copy.simulationTime = simulationTime;
+        copy.lastNodeVoltages = lastNodeVoltages.clone();
+        copy.lastComponentCurrents = lastComponentCurrents.clone();
+        for (MutualCouplingRegistry.Coupling coupling : couplingRegistry.getAllCouplings()) {
+            copy.couplingRegistry.registerCoupling(coupling.getInductor1Index(), coupling.getInductor2Index(),
+                    coupling.getCouplingCoefficient(), coupling.getInductance1(), coupling.getInductance2());
+        }
+        return copy;
     }
 
     /**
@@ -153,6 +179,8 @@ public class CircuitNetlist implements INetList {
         this.nodeCount = maxNodeIndex;
         this.voltageSourceCount = maxVoltageSourceIndex;
         this.elementCount = elementCount;
+        controlElementIndices = new int[elementCount];
+        Arrays.fill(controlElementIndices, -1);
 
         // A new circuit must not inherit results, probe mappings or simulation history.
         couplingRegistry.clear();
@@ -160,6 +188,28 @@ public class CircuitNetlist implements INetList {
         componentNameToIndex = Collections.emptyMap();
         lastNodeVoltages = new double[0];
         lastComponentCurrents = new double[0];
+    }
+
+    /** Assigns a controlling element in this run's netlist. */
+    public void setControlElementIndex(int sourceIndex, int targetIndex) {
+        Objects.checkIndex(sourceIndex, elementCount);
+        Objects.checkIndex(targetIndex, elementCount);
+        CircuitTypCore source = componentTypes[sourceIndex];
+        if (!source.isSource() && source != CircuitTypCore.REL_MMF && source != CircuitTypCore.TH_TEMP) {
+            throw new IllegalArgumentException("The controlled element must be a source");
+        }
+        int mode = (int) parameters[sourceIndex][0];
+        boolean branchRequired = mode == 3 || mode == 396 || mode == 4 || mode == 397
+                || mode == 6 || mode == 398;
+        if (branchRequired && voltageSourceNumbers[targetIndex] <= 0) {
+            throw new IllegalArgumentException("The controlling element must have a branch-current equation");
+        }
+        controlElementIndices[sourceIndex] = targetIndex;
+    }
+
+    @Override
+    public int getControlElementIndex(int sourceIndex) {
+        return controlElementIndices[Objects.checkIndex(sourceIndex, elementCount)];
     }
 
     /**

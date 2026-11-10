@@ -35,7 +35,7 @@ class ControlReadinessTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"405", "406", "999"})
+    @CsvSource({"999"})
     void unsupportedSignalSubtypeCannotFallBackToRectangle(int subtype) {
         var model = resistorCircuit();
         model.addControlComponent(control(4, "signal", new double[]{subtype, 1, 10, 0, 0, 0.5},
@@ -57,7 +57,9 @@ class ControlReadinessTest {
     void missingAndAmbiguousInputSignalsHaveStructuredReferenceDiagnostics() {
         var missing = resistorCircuit();
         missing.addControlComponent(control(7, "gain", new double[]{2}, new String[]{"missing"}, new String[]{"out"}));
-        diagnostic(missing, "MISSING_CONTROL_INPUT", "gain");
+        var missingReady = assertInstanceOf(PreparationResult.Ready.class, prepare(missing));
+        assertTrue(missingReady.report().diagnostics().stream().anyMatch(d -> d.code().equals("MISSING_CONTROL_INPUT")
+                && d.severity() == Diagnostic.Severity.WARNING && "gain".equals(d.component())));
         var ambiguous = resistorCircuit();
         ambiguous.addControlComponent(control(3, "one", new double[]{1}, new String[0], new String[]{"shared"}));
         ambiguous.addControlComponent(control(3, "two", new double[]{2}, new String[0], new String[]{"shared"}));
@@ -109,8 +111,45 @@ class ControlReadinessTest {
         model.addControlComponent(control(3, "constant", new double[]{1}, new String[0], new String[]{"drive"}));
         model.addControlComponent(control(5, "first", new double[0], new String[]{"drive"}, new String[0]));
         model.addControlComponent(control(5, "second", new double[0], new String[]{"drive"}, new String[0]));
-        diagnostic(model, "UNSUPPORTED_CONTROL_LAYOUT", "second");
-        assertEquals(ReadinessReport.Outcome.UNSUPPORTED, prepare(model).report().outcome());
+        var ready = assertInstanceOf(PreparationResult.Ready.class, prepare(model));
+        var result = new gecko.core.simulation.HeadlessSimulationEngine()
+                .runSimulation(ready.execution(), ExecutionOptions.defaults(), () -> false);
+        assertTrue(result.isSuccess(), result.getErrorMessage());
+        assertEquals(1, result.getDataContainer().getRowLength());
+        assertEquals(1, result.getDataContainer().getValue(0, 0));
+        @SuppressWarnings("unchecked")
+        var channels = (java.util.List<gecko.core.simulation.ScopeDataExtractor.ScopeChannel>) result.getMetadata().get("scopeChannels");
+        assertEquals(java.util.List.of("first", "second"), channels.stream()
+                .map(gecko.core.simulation.ScopeDataExtractor.ScopeChannel::scopeName).toList());
+        assertEquals(java.util.List.of(0, 0), channels.stream()
+                .map(gecko.core.simulation.ScopeDataExtractor.ScopeChannel::row).toList());
+    }
+
+    @Test
+    void importedSignalRequiresItsCapturedResource() {
+        var model = resistorCircuit();
+        model.addControlComponent(control(4, "signal", new double[]{406, 1, 10, 0, 0, 0.5},
+                new String[0], new String[]{"out"}));
+        diagnostic(model, "INVALID_PARAMETER", "signal");
+    }
+
+    @Test
+    void randomWalkIsAnExecutableSignalWithBoundedIndependentIncrements() {
+        var model = resistorCircuit();
+        model.setTimeStep(0.01);
+        model.setSimulationDuration(1);
+        model.addControlComponent(control(4, "signal", new double[]{405, 1, 10, 0, 0, 0.5},
+                new String[0], new String[]{"out"}));
+        model.addControlComponent(control(5, "scope", new double[0], new String[]{"out"}, new String[0]));
+        var ready = assertInstanceOf(PreparationResult.Ready.class, prepare(model));
+        var result = new gecko.core.simulation.HeadlessSimulationEngine()
+                .runSimulation(ready.execution(), ExecutionOptions.defaults(), () -> false);
+        assertTrue(result.isSuccess(), result.getErrorMessage());
+        double previous = 0;
+        for (float sample : result.getSignalData(0)) {
+            assertTrue(Math.abs(sample - previous) <= 1.000001);
+            previous = sample;
+        }
     }
 
     @Test

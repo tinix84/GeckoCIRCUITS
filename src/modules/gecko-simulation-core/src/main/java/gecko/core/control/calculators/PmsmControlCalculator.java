@@ -14,7 +14,7 @@
 package gecko.core.control.calculators;
 
 
-public class PmsmControlCalculator extends AbstractControlCalculatable {
+public class PmsmControlCalculator extends AbstractControlCalculatable implements InitializableAtSimulationStart {
 
     // State variables for PI controllers and last values
     double valpha_last = 0;
@@ -28,6 +28,20 @@ public class PmsmControlCalculator extends AbstractControlCalculatable {
 
     public PmsmControlCalculator() {
         super(12, 8);
+    }
+
+    /** Clears controller histories and published outputs for a fresh simulation start. */
+    @Override
+    public void initializeAtSimulationStart(double dt) {
+        valpha_last = 0;
+        vbeta_last = 0;
+        int_n_last = 0;
+        int_iq_last = 0;
+        int_id_last = 0;
+        x_n_last = 0;
+        x_iq_last = 0;
+        x_id_last = 0;
+        for (double[] output : _outputSignal) output[0] = 0;
     }
 
     @Override
