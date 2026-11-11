@@ -229,6 +229,18 @@ public final class SimulationRunner {
         }
     }
 
+    /** Stops the captured execution without pausing a replacement started by its completion callbacks. */
+    public void endSimulation() {
+        Execution owner = execution;
+        if (owner == null || !owner.ticket().endSimulation()) return;
+        if (owner.ticket().pause()) {
+            commitStatus(owner, ContainerStatus.PAUSED);
+            updatePresentation(owner,
+                    () -> _mainwindow.setzeSTATUS("Stopped after  "),
+                    () -> setMenus(owner, false));
+        }
+    }
+
     public void pauseSimulation() {
         Execution current = execution;
         if (current != null && current.ticket().pause()) {

@@ -496,6 +496,26 @@ public class SimulationsKern implements ISimulationEngine {
         }
 
         /**
+         * Stops only this execution and completes its current frontend activation.
+         * The method releases the execution monitor before it calls the completion listeners.
+         *
+         * @return true if this ticket owned and stopped the kernel
+         */
+        public boolean endSimulation() {
+            Runnable captured;
+            synchronized (executionMonitor) {
+                if (executionTicket != this || !stillCurrent.getAsBoolean()) {
+                    return false;
+                }
+                captured = captureScopeCompletion();
+                _simulationStatus = SimulationStatus.FINISHED;
+                saveContinuationState();
+            }
+            notifyPresentation(captured);
+            return true;
+        }
+
+        /**
          * Pauses this execution at a committed boundary without notifying Swing.
          *
          * @return true if this ticket still owns the kernel

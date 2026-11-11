@@ -63,6 +63,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
@@ -605,6 +606,53 @@ class SimulationRunnerPresentationContractTest {
     }
 
     @Test
+    void publicScriptStopCannotPauseTheRunStartedByItsCompletionListener() throws Exception {
+        window._simRunner.initSim(1, 1);
+        var origin = window._simRunner.simKern;
+        origin.setScopeMenuesStartStop();
+        origin.simulateOneStep();
+        var oldData = receiver.getZVDatenImRAM();
+        var replacement = new AtomicReference<SimulationsKern>();
+        var replaced = new AtomicBoolean();
+        var fixtureError = new AtomicReference<Throwable>();
+        findCalculateButton(receiverWindow).addPropertyChangeListener("enabled", event -> {
+            if (Boolean.TRUE.equals(event.getNewValue()) && replaced.compareAndSet(false, true)) {
+                try {
+                    window._simRunner.initSim(0.125, 2);
+                    replacement.set(window._simRunner.simKern);
+                    replacement.get().setScopeMenuesStartStop();
+                    replacement.get().simulateOneStep();
+                } catch (Throwable error) {
+                    fixtureError.set(error);
+                }
+            }
+        });
+        try {
+            MainWindow._scripter.endSimulation();
+
+            assertNull(fixtureError.get());
+            assertTrue(replaced.get());
+            assertNotSame(origin, replacement.get());
+            assertSame(replacement.get(), window._simRunner.simKern);
+            assertNotSame(oldData, receiver.getZVDatenImRAM());
+            assertEquals(ContainerStatus.FINISHED, oldData.getContainerStatus());
+            assertEquals(ContainerStatus.RUNNING, receiver.getZVDatenImRAM().getContainerStatus());
+            assertEquals(SimulationsKern.SimulationStatus.RUNNING, replacement.get()._simulationStatus);
+            assertEquals(2.0, replacement.get().getTEND());
+            assertEquals(0.125, replacement.get().getdt());
+            assertTrue(window.isSimulationRunning());
+            assertFalse(findMainMenuItem(window.getJMenuBar(), "Save").isEnabled());
+            assertTrue(findMainMenuItem(window.getJMenuBar(), "Pause").isEnabled());
+            assertFalse(findMainMenuItem(window.getJMenuBar(), "Continue").isEnabled());
+            assertFalse(findCalculateButton(receiverWindow).isEnabled());
+            assertEquals("Simulation running. Waiting for data...", findSimulationStatus(receiverWindow));
+            assertEquals("Starting Simulation ... ", statusLabel().getText());
+        } finally {
+            if (replacement.get() != null) replacement.get().endSim();
+        }
+    }
+
+    @Test
     void timedPauseKeepsLegacyRunnerStatusAndContinuesTheSameRecording() throws Exception {
         var settings = new SolverSettings();
         settings.dt.setValueWithoutUndo(0.25);
@@ -785,6 +833,129 @@ class SimulationRunnerPresentationContractTest {
             }
         }
         return null;
+    }
+
+    @Test
+    void publicScriptStopCannotFinishAConcurrentContinuationOfTheSameKernel() throws Exception {
+        window._simRunner.initSim(0.25, 1);
+        var kernel = window._simRunner.simKern;
+        kernel.setScopeMenuesStartStop();
+        kernel.simulateOneStep();
+        window._simRunner.pauseSimulation();
+        var data = receiver.getZVDatenImRAM();
+        var reached = new CountDownLatch(1);
+        var continueNow = new CountDownLatch(1);
+        var continued = new CountDownLatch(1);
+        var releaseStep = new CountDownLatch(1);
+        var eventThreadHeld = new CountDownLatch(1);
+        var releaseEventThread = new CountDownLatch(1);
+        var armEventGate = new AtomicBoolean();
+        var held = new AtomicBoolean();
+        var callbackFailure = new AtomicReference<Throwable>();
+        var originalWorker = new AtomicReference<Thread>();
+        var resumedWorker = new AtomicReference<Thread>();
+        var resumedEntered = new CountDownLatch(1);
+        var continuationStarted = new AtomicBoolean();
+        Throwable primaryFailure = null;
+        var stopper = new AtomicReference<Thread>();
+        var stop = new AtomicReference<CompletableFuture<Void>>();
+        findCalculateButton(receiverWindow).addPropertyChangeListener("enabled", event -> {
+            if (Boolean.FALSE.equals(event.getNewValue()) && armEventGate.compareAndSet(true, false)) {
+                SwingUtilities.invokeLater(() -> {
+                    eventThreadHeld.countDown();
+                    try {
+                        if (!releaseEventThread.await(10, TimeUnit.SECONDS)) {
+                            throw new IllegalStateException("Timed out releasing the continuation presentation gate");
+                        }
+                    } catch (InterruptedException error) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(error);
+                    }
+                });
+            }
+        });
+        try (var logger = new SimulationTraceLogger(newTrace().toFile()) {
+            @Override
+            public void logStep(double time, LKMatrices matrices, NetListLK netlist) {
+                if (!held.compareAndSet(false, true)) {
+                    resumedWorker.compareAndSet(null, Thread.currentThread());
+                    resumedEntered.countDown();
+                    return;
+                }
+                originalWorker.set(Thread.currentThread());
+                reached.countDown();
+                try {
+                    if (!continueNow.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Continuation was not requested");
+                    SwingUtilities.invokeAndWait(() -> findCalculateButton(receiverWindow).setEnabled(true));
+                    armEventGate.set(true);
+                    window._simRunner.continueCalculation(true, MainWindow._solverSettings);
+                    continuationStarted.set(true);
+                    continued.countDown();
+                    if (!releaseStep.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Original step was not released");
+                } catch (Throwable error) {
+                    callbackFailure.set(error);
+                    continued.countDown();
+                    throw new IllegalStateException(error);
+                }
+            }
+        }) {
+            kernel.setTraceLogger(logger);
+            try {
+                window._simRunner.continueCalculation(true, MainWindow._solverSettings);
+                assertTrue(reached.await(5, TimeUnit.SECONDS));
+                stop.set(CompletableFuture.runAsync(() -> {
+                    stopper.set(Thread.currentThread());
+                    MainWindow._scripter.endSimulation();
+                }));
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                while ((stopper.get() == null || stopper.get().getState() != Thread.State.BLOCKED)
+                        && System.nanoTime() < deadline) Thread.onSpinWait();
+                assertEquals(Thread.State.BLOCKED, stopper.get().getState());
+                continueNow.countDown();
+                assertTrue(continued.await(5, TimeUnit.SECONDS));
+                assertNull(callbackFailure.get());
+                assertTrue(eventThreadHeld.await(5, TimeUnit.SECONDS));
+                releaseStep.countDown();
+                deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                while (!stop.get().isDone() && stopper.get().getState() != Thread.State.WAITING
+                        && System.nanoTime() < deadline) Thread.onSpinWait();
+                assertTrue(stop.get().isDone() || stopper.get().getState() == Thread.State.WAITING);
+                assertSame(kernel, window._simRunner.simKern);
+                assertSame(data, receiver.getZVDatenImRAM());
+                assertEquals(SimulationsKern.SimulationStatus.RUNNING, kernel._simulationStatus);
+                assertEquals(ContainerStatus.RUNNING, data.getContainerStatus());
+                assertTrue(window.isSimulationRunning());
+                assertEquals("Simulation running. Waiting for data...", findSimulationStatus(receiverWindow));
+                assertEquals("Starting Simulation ... ", statusLabel().getText());
+            } catch (Exception | Error failure) {
+                primaryFailure = failure;
+                throw failure;
+            } finally {
+                continueNow.countDown();
+                releaseStep.countDown();
+                releaseEventThread.countDown();
+                try {
+                    assertAll(
+                            () -> { if (stop.get() != null) stop.get().get(10, TimeUnit.SECONDS); },
+                            () -> {
+                                if (originalWorker.get() != null) {
+                                    originalWorker.get().join(10000);
+                                    assertFalse(originalWorker.get().isAlive());
+                                }
+                            },
+                            () -> {
+                                if (continuationStarted.get()) assertTrue(resumedEntered.await(10, TimeUnit.SECONDS));
+                                if (resumedWorker.get() != null) {
+                                    resumedWorker.get().join(10000);
+                                    assertFalse(resumedWorker.get().isAlive());
+                                }
+                            });
+                } catch (Exception | Error cleanupFailure) {
+                    if (primaryFailure != null) primaryFailure.addSuppressed(cleanupFailure);
+                    else throw cleanupFailure;
+                }
+            }
+        }
     }
 
     @Test

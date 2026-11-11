@@ -1537,27 +1537,9 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
         mItemConnectorTest.setState(cb);
     }
 
-    //end simulation - control from GeckoSCRIPT
+    /** Stops the simulation requested by GeckoSCRIPT. */
     public void endSim() {
-        _simRunner.simKern.endSim();
-        jtfStatus.setText("Stopped after  ");
-        //
-
-        if (IS_BRANDED) {
-            mItemNew.setEnabled(false);
-            mItemOpen.setEnabled(false);
-        } else {
-            mItemNew.setEnabled(true);
-            mItemOpen.setEnabled(true);
-        }
-        mItemExit.setEnabled(true);
-        mItemSave.setEnabled(true);
-        mItemSaveAs.setEnabled(true);
-        mItemSaveView.setEnabled(true);
-        setzeSTATUS("Stopped after  ");
-        pauseSimulation();
-        setMenuDuringSimulation(false, true);
-
+        _simRunner.endSimulation();
     }
 
     public void continueCalculation(final boolean createNewSimThread) throws Exception {
