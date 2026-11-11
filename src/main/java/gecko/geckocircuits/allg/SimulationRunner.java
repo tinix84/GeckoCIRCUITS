@@ -42,10 +42,11 @@ public final class SimulationRunner {
     // Serialize numerical preparation and publication. Swing delivery always follows this monitor's release.
     private final Object preparationMonitor = new Object();
     private final LatestOwnedPresentation presentationUpdates = new LatestOwnedPresentation();
-    private volatile Object preparationToken = new Object();
+    private volatile PreparationOwner preparationOwner = new PreparationOwner(new Object(), null);
     private volatile Execution execution;
     private SimulationTraceLogger pendingTraceLogger;
 
+    private record PreparationOwner(Object token, SolverSettings settings) { }
     private record Preparation(Object token, Execution previous, SimulationTraceLogger logger) { }
     private record Execution(Object token, SimulationsKern kernel, NetListContainer netlist,
             LegacySimulationFrontend presentation, SolverSettings settings,
@@ -64,27 +65,34 @@ public final class SimulationRunner {
         _se = schematicEntry;
     }
 
-    private Preparation beginPreparation(Execution expected, boolean requireCurrent, boolean takeLogger) {
+    private Preparation beginPreparation(Execution expected, boolean requireCurrent, boolean takeLogger,
+            SolverSettings settings) {
         Preparation preparation;
         synchronized (lifecycleMonitor) {
             if (requireCurrent && !isCurrent(expected)) {
                 return null;
             }
             Object token = new Object();
-            preparationToken = token;
+            preparationOwner = new PreparationOwner(token, settings);
             preparation = new Preparation(token, execution, takeLogger ? pendingTraceLogger : null);
             if (takeLogger) {
                 pendingTraceLogger = null;
             }
         }
-        if (preparation.previous() != null) {
-            preparation.previous().ticket().supersede();
-        }
         return preparation;
     }
 
     private boolean isPreparing(Object token) {
-        return preparationToken == token;
+        return preparationOwner.token() == token;
+    }
+
+    private void clearPreCalculationMode(Object failedToken, SolverSettings failedSettings) {
+        synchronized (lifecycleMonitor) {
+            PreparationOwner current = preparationOwner;
+            if (current.token() == failedToken || current.settings() != failedSettings) {
+                failedSettings.inPreCalculationMode = false;
+            }
+        }
     }
 
     private boolean isCurrent(Execution candidate) {
@@ -92,16 +100,21 @@ public final class SimulationRunner {
     }
 
     private Execution prepareExecution(Execution expected, boolean requireCurrent, boolean takeLogger,
-            Function<Preparation, Execution> initialize) {
+            SolverSettings settings, Function<Preparation, Execution> initialize) {
         Preparation preparation = null;
         try {
             synchronized (preparationMonitor) {
-                preparation = beginPreparation(expected, requireCurrent, takeLogger);
-                return preparation == null ? null : initialize.apply(preparation);
+                preparation = beginPreparation(expected, requireCurrent, takeLogger, settings);
+                if (preparation == null) return null;
+                if (preparation.previous() != null) preparation.previous().ticket().supersede();
+                Execution initialized = initialize.apply(preparation);
+                if (initialized == null) clearPreCalculationMode(preparation.token(), settings);
+                return initialized;
             }
         } catch (RuntimeException | Error error) {
             if (preparation != null) {
                 Object token = preparation.token();
+                clearPreCalculationMode(token, settings);
                 try {
                     LegacySimulationFrontend.onEventThread(() -> presentationUpdates.update(() -> isPreparing(token),
                             () -> _mainwindow.setMenuDuringSimulation(false, true, () -> isPreparing(token)),
@@ -142,7 +155,7 @@ public final class SimulationRunner {
     }
 
     public void startCalculation(boolean createNewSimThread, SolverSettings settings) throws Exception {
-        Execution prepared = prepareExecution(null, false, true, preparation -> prepareStart(preparation, settings));
+        Execution prepared = prepareExecution(null, false, true, settings, preparation -> prepareStart(preparation, settings));
         if (prepared != null) {
             updatePresentation(prepared, () -> setMenus(prepared, true), prepared.activation());
             startWorker(prepared, createNewSimThread, !createNewSimThread);
@@ -156,9 +169,7 @@ public final class SimulationRunner {
         SimulationsKern.ExecutionTicket ticket = kernel.reserveExecution(() -> isPreparing(token));
         double end = settings._tDURATION.getValue();
         double dt = settings.dt.getValue();
-        if (settings._T_pre.getValue() > 0) {
-            settings.inPreCalculationMode = true;
-        }
+        settings.inPreCalculationMode = settings._T_pre.getValue() > 0;
         if (settings.inPreCalculationMode) {
             end = settings._T_pre.getValue();
             dt = settings._dt_pre.getValue();
@@ -176,10 +187,11 @@ public final class SimulationRunner {
             kernel.setTraceLogger(preparation.logger());
         }
         return publish(preparation, kernel, netlist, presentation, settings, originStatus, ticket, true);
+
     }
 
     public void continueCalculation(boolean createNewSimThread, SolverSettings settings) throws Exception {
-        Execution prepared = prepareExecution(null, false, false, preparation -> prepareContinuation(preparation, settings));
+        Execution prepared = prepareExecution(null, false, false, settings, preparation -> prepareContinuation(preparation, settings));
         activateContinuation(prepared, createNewSimThread);
     }
 
@@ -266,7 +278,7 @@ public final class SimulationRunner {
     }
 
     private void initializeScript(SolverSettings settings, double end, double dt, boolean usePreCalculation) {
-        Execution prepared = prepareExecution(null, false, false,
+        Execution prepared = prepareExecution(null, false, false, settings,
                 preparation -> prepareScript(preparation, settings, end, dt, usePreCalculation));
         if (prepared != null) {
             List<Runnable> changes = new ArrayList<>();
@@ -385,7 +397,7 @@ public final class SimulationRunner {
                     throw error;
                 }
                 if (owner.preCalculation() && isCurrent(owner)) {
-                    Execution next = prepareExecution(owner, true, false, preparation -> {
+                    Execution next = prepareExecution(owner, true, false, owner.settings(), preparation -> {
                             owner.settings().inPreCalculationMode = false;
                             return prepareContinuation(preparation, owner.settings());
                     });
@@ -394,6 +406,10 @@ public final class SimulationRunner {
                 }
             } catch (Throwable error) {
                 failure = error;
+            } finally {
+                if (owner.preCalculation()) {
+                    clearPreCalculationMode(owner.token(), owner.settings());
+                }
             }
             try {
                 if (owner.ticket().finish()) {

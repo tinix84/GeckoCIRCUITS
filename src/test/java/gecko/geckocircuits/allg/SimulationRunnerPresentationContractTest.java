@@ -61,6 +61,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -736,6 +737,307 @@ class SimulationRunnerPresentationContractTest {
         }
         assertEquals(List.of(0.0, 0.25, 0.5, 0.75, 1.0), samples);
         assertEquals(1.25, window._simRunner.simKern.getZeitAktuell());
+    }
+
+    @Test
+    void aFailedPreCalculationCannotPoisonTheNextOrdinaryRun() throws Exception {
+        var primary = new ArithmeticException("Test pre-calculation failure");
+        TestControl extension = replaceConstant();
+        installPreCalculationFailure(extension, false, primary, () -> { });
+        var settings = new SolverSettings();
+        configurePreCalculation(settings, 0.02);
+        RuntimeException reported = assertThrows(RuntimeException.class,
+                () -> window._simRunner.startCalculation(false, settings));
+        assertSame(primary, reported.getCause());
+        assertOrdinaryRetry(extension, settings, settings.inPreCalculationMode);
+    }
+
+    @Test
+    void aFailedPreCalculationInitializationClearsItsModeBeforeRetry() throws Exception {
+        var primary = new ArithmeticException("Test pre-calculation initialization failure");
+        TestControl extension = replaceConstant();
+        installPreCalculationFailure(extension, true, primary, () -> { });
+        var settings = new SolverSettings();
+        configurePreCalculation(settings, 0.02);
+        assertSame(primary, assertThrows(ArithmeticException.class,
+                () -> window._simRunner.startCalculation(false, settings)));
+        assertOrdinaryRetry(extension, settings, settings.inPreCalculationMode);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false,false", "true,false", "false,true", "true,true"})
+    void failedPreCalculationCannotClearItsReplacementMode(boolean failDuringInitialization,
+            boolean separateSettings) throws Exception {
+        var primary = new ArithmeticException("Test replaced pre-calculation failure");
+        TestControl extension = replaceConstant();
+        var original = MainWindow._solverSettings;
+        configurePreCalculation(original, 0.2);
+        var incoming = separateSettings ? new SolverSettings() : original;
+        configurePreCalculation(incoming, 0.2);
+        boolean originalModeAfterFailure;
+        try (var replacement = new PreCalculationReplacement(extension, incoming)) {
+            installPreCalculationFailure(extension, failDuringInitialization, primary, replacement::start);
+            if (!failDuringInitialization) {
+                findCalculateButton(receiverWindow).addPropertyChangeListener("enabled", event -> {
+                    if (Boolean.TRUE.equals(event.getNewValue())) replacement.start();
+                });
+            }
+            RuntimeException reported = assertThrows(RuntimeException.class,
+                    () -> window._simRunner.startCalculation(false, original));
+            assertSame(primary, failDuringInitialization ? reported : reported.getCause());
+            replacement.assertRunning();
+            originalModeAfterFailure = original.inPreCalculationMode;
+            if (!separateSettings) assertTrue(originalModeAfterFailure);
+        }
+        if (separateSettings) {
+            assertAll(() -> assertFalse(originalModeAfterFailure), () -> assertScriptRetry(extension, original));
+        }
+        assertFalse(incoming.inPreCalculationMode);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void failedWarmupRespectsSettingsOwnedByAPendingReplacement(boolean separateSettings) throws Exception {
+        var primary = new ArithmeticException("Test pending replacement failure");
+        TestControl extension = replaceConstant();
+        var original = MainWindow._solverSettings;
+        configurePreCalculation(original, 0.2);
+        var incoming = separateSettings ? new SolverSettings() : original;
+        configurePreCalculation(incoming, 0.2);
+        try (var replacement = new PreCalculationReplacement(extension, incoming)) {
+            installPreCalculationFailure(extension, false, primary, () -> { });
+            findCalculateButton(receiverWindow).addPropertyChangeListener("enabled", event -> {
+                if (Boolean.TRUE.equals(event.getNewValue())) replacement.startPending();
+            });
+            RuntimeException reported = assertThrows(RuntimeException.class,
+                    () -> window._simRunner.startCalculation(false, original));
+            assertSame(primary, reported.getCause());
+            replacement.assertPending();
+            assertEquals(!separateSettings, original.inPreCalculationMode);
+            replacement.continuePreparation();
+            replacement.assertRunning();
+        }
+        if (separateSettings) assertScriptRetry(extension, original);
+        assertFalse(incoming.inPreCalculationMode);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void supersededWarmupInitializationReleasesOnlyItsOwnSettings(boolean separateSettings) throws Exception {
+        TestControl extension = replaceConstant();
+        var original = MainWindow._solverSettings;
+        configurePreCalculation(original, 0.2);
+        var incoming = separateSettings ? new SolverSettings() : original;
+        configurePreCalculation(incoming, 0.2);
+        var cancelledSteps = new AtomicInteger();
+        boolean originalModeAfterCancellation;
+        try (var replacement = new PreCalculationReplacement(extension, incoming)) {
+            installPreCalculationCancellation(extension, replacement::start, cancelledSteps);
+            window._simRunner.startCalculation(false, original);
+            replacement.assertRunning();
+            assertEquals(0, cancelledSteps.get());
+            originalModeAfterCancellation = original.inPreCalculationMode;
+            if (!separateSettings) assertTrue(originalModeAfterCancellation);
+        }
+        if (separateSettings) {
+            assertAll(() -> assertFalse(originalModeAfterCancellation), () -> assertScriptRetry(extension, original));
+        }
+        assertFalse(incoming.inPreCalculationMode);
+    }
+
+    private static void installPreCalculationCancellation(TestControl extension, Runnable replacement,
+            AtomicInteger cancelledSteps) {
+        class CancelledPreCalculation extends AbstractControlCalculatable
+                implements gecko.geckocircuits.control.calculators.InitializableAtSimulationStart {
+            CancelledPreCalculation() { super(0, 1); }
+            @Override
+            public void initializeAtSimulationStart(double dt) { replacement.run(); }
+            @Override
+            public void berechneYOUT(double dt) { cancelledSteps.incrementAndGet(); }
+        }
+        extension.calculator = CancelledPreCalculation::new;
+    }
+
+    private static void configurePreCalculation(SolverSettings settings, double duration) {
+        settings._T_pre.setValueWithoutUndo(0.05);
+        settings._dt_pre.setValueWithoutUndo(0.025);
+        settings.dt.setValueWithoutUndo(0.01);
+        settings._tDURATION.setValueWithoutUndo(duration);
+    }
+
+    private static void installPreCalculationFailure(TestControl extension, boolean initialize,
+            ArithmeticException primary, Runnable replacement) {
+        class FailingPreCalculation extends AbstractControlCalculatable
+                implements gecko.geckocircuits.control.calculators.InitializableAtSimulationStart {
+            FailingPreCalculation() { super(0, 1); }
+            @Override
+            public void initializeAtSimulationStart(double dt) {
+                if (initialize) {
+                    replacement.run();
+                    throw primary;
+                }
+            }
+            @Override
+            public void berechneYOUT(double dt) { throw primary; }
+        }
+        extension.calculator = FailingPreCalculation::new;
+    }
+
+    private void assertOrdinaryRetry(TestControl extension, SolverSettings settings, boolean modeAfterFailure)
+            throws Exception {
+        extension.calculator = () -> new ConstantCalculator(1);
+        settings._T_pre.setValueWithoutUndo(-0.1);
+        Path trace = newTrace();
+        try (var logger = new SimulationTraceLogger(trace.toFile())) {
+            window._simRunner.setPendingTraceLogger(logger);
+            window._simRunner.startCalculation(false, settings);
+        }
+        var times = Files.readAllLines(trace).stream().skip(1)
+                .map(row -> Double.parseDouble(row.split(",")[0])).toList();
+        assertAll(() -> assertFalse(modeAfterFailure),
+                () -> assertEquals(List.of(0.0, 0.01, 0.02), times),
+                () -> assertEquals(0.02, window._simRunner.simKern.getTEND()),
+                () -> assertEquals(0.01, window._simRunner.simKern.getdt()),
+                () -> assertEquals(0.01, settings._dt_ALT),
+                () -> assertFalse(settings.inPreCalculationMode));
+    }
+
+    private void assertScriptRetry(TestControl extension, SolverSettings original) throws Exception {
+        extension.calculator = () -> new ConstantCalculator(1);
+        original._T_pre.setValueWithoutUndo(-0.1);
+        MainWindow._scripter.initializeSimulation(0.01, 0.02);
+        try {
+            assertEquals(0.01, window._simRunner.simKern.getdt());
+            assertEquals(0.02, window._simRunner.simKern.getTEND());
+            MainWindow._scripter.simulateOneStep();
+            assertEquals(0.01, window._simRunner.simKern.getZeitAktuell());
+        } finally {
+            MainWindow._scripter.endSimulation();
+        }
+    }
+
+    private final class PreCalculationReplacement implements AutoCloseable {
+        private final TestControl extension;
+        private final SolverSettings settings;
+        private final AtomicReference<SimulationsKern> kernel = new AtomicReference<>();
+        private final AtomicReference<Thread> worker = new AtomicReference<>();
+        private final CountDownLatch reached = new CountDownLatch(1);
+        private final CountDownLatch release = new CountDownLatch(1);
+        private final AtomicInteger steps = new AtomicInteger();
+        private final AtomicBoolean started = new AtomicBoolean();
+        private final AtomicBoolean requested = new AtomicBoolean();
+        private final AtomicReference<Throwable> failure = new AtomicReference<>();
+        private final CountDownLatch preparing = new CountDownLatch(1);
+        private final CountDownLatch releasePreparation = new CountDownLatch(1);
+        private final AtomicReference<CompletableFuture<Void>> pending = new AtomicReference<>();
+
+        private PreCalculationReplacement(TestControl extension, SolverSettings settings) {
+            this.extension = extension;
+            this.settings = settings;
+        }
+
+        private void start() {
+            if (!requested.compareAndSet(false, true)) return;
+            installGate();
+            startWorker();
+        }
+
+        private void startPending() {
+            if (!requested.compareAndSet(false, true)) return;
+            installGate();
+            extension.validate = () -> {
+                preparing.countDown();
+                try {
+                    if (!releasePreparation.await(10, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("Timed out releasing replacement preparation");
+                    }
+                } catch (InterruptedException error) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(error);
+                }
+            };
+            pending.set(CompletableFuture.runAsync(this::startWorker));
+            try {
+                if (!preparing.await(5, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("Replacement preparation did not begin");
+                }
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                failure.set(error);
+            }
+        }
+
+        private void assertPending() {
+            assertNull(failure.get());
+            assertEquals(0, preparing.getCount());
+            assertFalse(started.get());
+            assertTrue(settings.inPreCalculationMode);
+        }
+
+        private void continuePreparation() throws Exception {
+            releasePreparation.countDown();
+            pending.get().get(10, TimeUnit.SECONDS);
+            assertNull(failure.get());
+        }
+
+        private void startWorker() {
+            try {
+                window._simRunner.startCalculation(true, settings);
+                kernel.set(window._simRunner.simKern);
+                started.set(true);
+            } catch (Throwable error) {
+                failure.set(error);
+            }
+        }
+
+        private void installGate() {
+            extension.calculator = () -> new AbstractControlCalculatable(0, 1) {
+                @Override
+                public void berechneYOUT(double dt) {
+                    worker.set(Thread.currentThread());
+                    if (steps.incrementAndGet() != 2) return;
+                    reached.countDown();
+                    try {
+                        if (!release.await(10, TimeUnit.SECONDS)) {
+                            throw new IllegalStateException("Timed out releasing replacement pre-calculation");
+                        }
+                    } catch (InterruptedException error) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(error);
+                    }
+                }
+            };
+        }
+
+        private void assertRunning() throws Exception {
+            assertNull(failure.get());
+            assertTrue(started.get());
+            assertTrue(reached.await(5, TimeUnit.SECONDS));
+            assertSame(kernel.get(), window._simRunner.simKern);
+            assertTrue(settings.inPreCalculationMode);
+            assertEquals(0.025, kernel.get().getdt());
+            assertEquals(0.05, kernel.get().getTEND());
+            assertEquals(SimulationsKern.SimulationStatus.RUNNING, kernel.get()._simulationStatus);
+            assertEquals(ContainerStatus.RUNNING, receiver.getZVDatenImRAM().getContainerStatus());
+            assertTrue(window.isSimulationRunning());
+            assertFalse(findMainMenuItem(window.getJMenuBar(), "Save").isEnabled());
+            assertEquals("Starting Simulation ... ", statusLabel().getText());
+        }
+
+        @Override
+        public void close() throws Exception {
+            releasePreparation.countDown();
+            release.countDown();
+            assertAll(() -> { if (pending.get() != null) pending.get().get(10, TimeUnit.SECONDS); },
+                    () -> { if (started.get()) assertTrue(reached.await(10, TimeUnit.SECONDS)); },
+                    () -> {
+                        Thread captured = worker.get();
+                        if (captured != null) {
+                            captured.join(10000);
+                            assertFalse(captured.isAlive());
+                        }
+                    });
+        }
     }
 
     @Test
