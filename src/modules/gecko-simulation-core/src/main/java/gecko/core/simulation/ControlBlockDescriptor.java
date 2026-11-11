@@ -148,6 +148,7 @@ public record ControlBlockDescriptor(int type, int inputPorts, int outputPorts, 
         simple(result, 51, SignumCalculator::new);
         simple(result, 53, CounterCalculatable::new);
         simple(result, 58, TimeCalculator::new);
+        simple(result, 59, SparseMatrixCalculator::new);
         add(result, 64, 2, 1, data -> new IntegratorCalculation(value(data, 0, 1), value(data, 1, 0),
                 value(data, 2, -1), value(data, 3, 1)), new Setting("a1", 0, 1), new Setting("y0", 1, 0),
                 new Setting("min", 2, -1), new Setting("max", 3, 1));
