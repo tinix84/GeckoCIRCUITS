@@ -45,6 +45,7 @@ public final class SimulationRunner {
     private volatile PreparationOwner preparationOwner = new PreparationOwner(new Object(), null);
     private volatile Execution execution;
     private SimulationTraceLogger pendingTraceLogger;
+    private final DesktopSimulationController controller;
 
     private record PreparationOwner(Object token, SolverSettings settings) { }
     private record Preparation(Object token, Execution previous, SimulationTraceLogger logger) { }
@@ -61,8 +62,14 @@ public final class SimulationRunner {
     }
 
     public SimulationRunner(final MainWindow mainwindow, final SchematicEditor2 schematicEntry) {
+        this(mainwindow, schematicEntry, () -> NetListContainer.fabricStartSimulation(schematicEntry, null));
+    }
+
+    SimulationRunner(MainWindow mainwindow, SchematicEditor2 schematicEntry,
+            java.util.function.Supplier<NetListContainer> prepareCorePresentation) {
         _mainwindow = mainwindow;
         _se = schematicEntry;
+        controller = new DesktopSimulationController(mainwindow, schematicEntry, prepareCorePresentation);
     }
 
     private Preparation beginPreparation(Execution expected, boolean requireCurrent, boolean takeLogger,
@@ -155,11 +162,21 @@ public final class SimulationRunner {
     }
 
     public void startCalculation(boolean createNewSimThread, SolverSettings settings) throws Exception {
+        controller.reset();
+        if (!createNewSimThread && controller.start(settings)) {
+            simKern = null;
+            return;
+        }
         Execution prepared = prepareExecution(null, false, true, settings, preparation -> prepareStart(preparation, settings));
         if (prepared != null) {
             updatePresentation(prepared, () -> setMenus(prepared, true), prepared.activation());
             startWorker(prepared, createNewSimThread, !createNewSimThread);
         }
+    }
+
+    public double getCurrentTime() {
+        return controller.hasCoreExecution() ? controller.getCurrentTime()
+                : simKern == null ? 0 : simKern.getZeitAktuell();
     }
 
     private Execution prepareStart(Preparation preparation, SolverSettings settings) {

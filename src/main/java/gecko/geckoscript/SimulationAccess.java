@@ -422,7 +422,7 @@ public final class SimulationAccess implements GeckoFileable {
     }
 
     public double getSimulationTime() {
-        return GeckoSim._win._simRunner.simKern.getZeitAktuell();
+        return GeckoSim._win._simRunner.getCurrentTime();
     }
 
     @Override

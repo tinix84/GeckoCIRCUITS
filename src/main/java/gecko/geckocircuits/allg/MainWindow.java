@@ -1583,26 +1583,37 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
                 changes.add(() -> mItemContinue.setEnabled(false));
             }
         } else if (endReached) {
-            if (!IS_BRANDED) {
-                changes.add(() -> mItemNew.setEnabled(true));
-                changes.add(() -> mItemOpen.setEnabled(true));
-            }
-            changes.add(() -> mItemExit.setEnabled(true));
-            changes.add(() -> mItemSave.setEnabled(true));
-            changes.add(() -> mItemSaveAs.setEnabled(true));
-            changes.add(() -> mItemSaveView.setEnabled(true));
-            changes.add(() -> mItemCopy.setEnabled(true));
-            changes.add(() -> mItemMove.setEnabled(true));
-            changes.add(() -> mItemDelete.setEnabled(true));
-
-            if (mItemParameter != null) {
-                changes.add(() -> mItemParameter.setEnabled(true));
-                changes.add(() -> mItemRun.setEnabled(true));
-                changes.add(() -> mItemStop.setEnabled(false));
-                changes.add(() -> mItemContinue.setEnabled(true));
-            }
+            addStoppedMenuChanges(changes, true);
         }
         _simulationMenuUpdates.update(stillCurrent, changes.toArray(Runnable[]::new));
+    }
+
+    /** Restores editing and start actions without enabling continuation of a failed core calculation. */
+    public void setMenusAfterSimulationFailure() {
+        java.util.List<Runnable> changes = new java.util.ArrayList<>();
+        addStoppedMenuChanges(changes, false);
+        changes.add(() -> jtfStatus.setText("Simulation aborted."));
+        _simulationMenuUpdates.update(() -> true, changes.toArray(Runnable[]::new));
+    }
+
+    private void addStoppedMenuChanges(java.util.List<Runnable> changes, boolean canContinue) {
+        if (!IS_BRANDED) {
+            changes.add(() -> mItemNew.setEnabled(true));
+            changes.add(() -> mItemOpen.setEnabled(true));
+        }
+        changes.add(() -> mItemExit.setEnabled(true));
+        changes.add(() -> mItemSave.setEnabled(true));
+        changes.add(() -> mItemSaveAs.setEnabled(true));
+        changes.add(() -> mItemSaveView.setEnabled(true));
+        changes.add(() -> mItemCopy.setEnabled(true));
+        changes.add(() -> mItemMove.setEnabled(true));
+        changes.add(() -> mItemDelete.setEnabled(true));
+        if (mItemParameter != null) {
+            changes.add(() -> mItemParameter.setEnabled(true));
+            changes.add(() -> mItemRun.setEnabled(true));
+            changes.add(() -> mItemStop.setEnabled(false));
+            changes.add(() -> mItemContinue.setEnabled(canContinue));
+        }
     }
 
     /**
