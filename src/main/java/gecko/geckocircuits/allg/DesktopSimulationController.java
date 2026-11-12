@@ -18,6 +18,8 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
@@ -38,6 +40,26 @@ public final class DesktopSimulationController {
     private volatile boolean coreExecution;
     private volatile double completedTime;
     private volatile CoreAsyncExecution asyncExecution;
+    private volatile CoreScriptExecution scriptExecution;
+
+    private static final class CoreScriptExecution {
+        private final SessionHost host;
+        private final NetListContainer netlist;
+        private final Consumer<ContainerStatus> origin;
+        private final LegacySimulationFrontend presentation;
+        private final int[] rows;
+
+        private CoreScriptExecution(SessionHost host, NetListContainer netlist, Consumer<ContainerStatus> origin,
+                LegacySimulationFrontend presentation, int[] rows) {
+            this.host = host;
+            this.netlist = netlist;
+            this.origin = origin;
+            this.presentation = presentation;
+            this.rows = rows;
+        }
+    }
+
+    private static final long SCRIPT_COMMAND_TIMEOUT_SECONDS = 120;
 
     private static final class CoreAsyncExecution {
         private final SessionHost host;
@@ -69,6 +91,7 @@ public final class DesktopSimulationController {
 
     void reset() {
         retireAsyncForReplacement();
+        retireScriptForReplacement();
         coreExecution = false;
         completedTime = 0;
         currentHost = null;
@@ -78,14 +101,161 @@ public final class DesktopSimulationController {
 
     double getCurrentTime() {
         SessionHost host = currentHost;
-        return host == null ? completedTime : host.status().time();
+        if (host == null) return completedTime;
+        SimulationSession.Status status = host.status();
+        return scriptExecution == null ? status.time() : status.nextTime();
     }
 
     boolean hasAsyncExecution() { return asyncExecution != null; }
 
+    /** Initializes a script-owned core session without advancing its first step. */
+    boolean initializeScript(SolverSettings settings, double dt, double end) throws Exception {
+        Backend backend = Backend.valueOf(System.getProperty("gecko.backend", "legacy")
+                .trim().toUpperCase(Locale.ROOT));
+        if (backend == Backend.LEGACY) return false;
+        String source = MainWindow.getOpenFileName();
+        String circuit = new File(source).getName().replaceFirst("\\.ipes$", "");
+        if (settings._T_pre.getValue() > 0) return fallback(backend, circuit, "PRECALC");
+        if (settings._tPAUSE.getValue() >= 0) return fallback(backend, circuit, "PAUSE_TIME");
+
+        var scripts = MainWindow._scripter;
+        var sources = new EditorCircuitCapture.ScriptSources(scripts.getScriptCode(), scripts.getImportCode(),
+                scripts.getDeclarationCode(), scripts.getExtraFilesHashes());
+        var snapshot = new EditorCircuitCapture().capture(editor._circuitSheet.getAllElements(), settings,
+                MainWindow.optimizerParameterData, MainWindow._fileManager, sources, source);
+        var preparation = new CircuitPreparation().prepare(snapshot, PreparationRequest.defaults());
+        if (!(preparation instanceof PreparationResult.Ready ready)) {
+            String codes = preparation.report().diagnostics().stream().map(diagnostic -> diagnostic.code().toString())
+                    .distinct().collect(Collectors.joining(","));
+            return fallback(backend, circuit, codes);
+        }
+        if (SwingUtilities.isEventDispatchThread()) {
+            throw new IllegalStateException("Script simulation initialization must run outside the Swing event thread");
+        }
+
+        SessionHost host = SessionHost.open(ready.execution(), ExecutionOptions.defaults());
+        NetListContainer netlist = null;
+        boolean published = false;
+        try {
+            netlist = preparePresentation.get();
+            Consumer<ContainerStatus> origin = NetzlisteCONTROL.globalData.captureStatusUpdater();
+            String[] names = host.signalNames();
+            int[] rows = new int[NetzlisteCONTROL.globalData.getRowLength()];
+            for (int row = 0; row < rows.length; row++) {
+                rows[row] = Arrays.asList(names).indexOf(NetzlisteCONTROL.globalData.getSignalName(row));
+                if (rows[row] < 0) {
+                    return fallback(backend, circuit, "SIGNAL_MAP:" + NetzlisteCONTROL.globalData.getSignalName(row));
+                }
+            }
+            netlist._nlControl.doMemorInits(dt);
+            LegacySimulationFrontend presentation = new LegacySimulationFrontend(() -> true);
+            presentation.prepare(netlist, () -> true, true).run();
+            setScopeBoundaries(netlist, 0, end);
+            CoreScriptExecution execution = new CoreScriptExecution(host, netlist, origin, presentation, rows);
+            scriptExecution = execution;
+            currentHost = host;
+            coreExecution = true;
+            completedTime = 0;
+            LegacySimulationFrontend.onEventThread(() -> origin.accept(ContainerStatus.RUNNING));
+            published = true;
+            return true;
+        } finally {
+            if (!published) {
+                host.close();
+                if (netlist != null) cancelExporters(netlist);
+            }
+        }
+    }
+
+    void scriptStep(double dt, double end) throws Exception {
+        requireOffEventThread();
+        CoreScriptExecution execution = scriptExecution;
+        if (execution == null) throw new IllegalStateException("No core script simulation is active");
+        double current = execution.host.status().nextTime();
+        if (current + dt > end) {
+            throw new Exception("Specified end of simulation reached! Cannot simulate another step.");
+        }
+        await(execution.host.step());
+        drainScriptSamples(execution);
+    }
+
+    void scriptRunUntil(double target) throws Exception {
+        requireOffEventThread();
+        CoreScriptExecution execution = scriptExecution;
+        if (execution == null) throw new IllegalStateException("No core script simulation is active");
+        SimulationSession.Status status = execution.host.status();
+        while (status.nextTime() <= target && status.state() != SimulationSession.State.COMPLETED) {
+            if (status.state() == SimulationSession.State.FAILED) {
+                throw new IllegalStateException("The core script simulation has failed.");
+            }
+            if (status.state() == SimulationSession.State.CLOSED) {
+                throw new IllegalStateException("The core script simulation is closed.");
+            }
+            // Match the legacy loop's cursor condition exactly: it steps while t <= target.
+            await(execution.host.step());
+            status = execution.host.status();
+        }
+        if (status.state() == SimulationSession.State.FAILED) {
+            throw new IllegalStateException("The core script simulation has failed.");
+        }
+        if (status.state() == SimulationSession.State.CLOSED) {
+            throw new IllegalStateException("The core script simulation is closed.");
+        }
+        drainScriptSamples(execution);
+    }
+
+    private static void requireOffEventThread() {
+        if (SwingUtilities.isEventDispatchThread()) {
+            throw new IllegalStateException("Script simulation stepping must run outside the Swing event thread");
+        }
+    }
+
+    private static <T> T await(Future<T> future) throws Exception {
+        try {
+            return future.get(SCRIPT_COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (TimeoutException timeout) {
+            future.cancel(true);
+            throw new IllegalStateException("Timed out waiting for the core script simulation command", timeout);
+        } catch (ExecutionException failure) {
+            Throwable cause = failure.getCause();
+            if (cause instanceof Exception exception) throw exception;
+            if (cause instanceof Error error) throw error;
+            throw new IllegalStateException("Core script simulation command failed", cause);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw interrupted;
+        }
+    }
+
+    private static void drainScriptSamples(CoreScriptExecution execution) {
+        execution.host.drainSamples(sample -> {
+            float[] sourceValues = sample.values();
+            float[] values = new float[execution.rows.length];
+            for (int row = 0; row < execution.rows.length; row++) values[row] = sourceValues[execution.rows[row]];
+            NetzlisteCONTROL.globalData.insertValuesAtEnd(values, sample.time());
+        });
+    }
+
+    private void retireScriptForReplacement() {
+        CoreScriptExecution execution = scriptExecution;
+        if (execution == null) return;
+        scriptExecution = null;
+        execution.host.close();
+        drainScriptSamples(execution);
+        currentHost = null;
+        coreExecution = false;
+        LegacySimulationFrontend.onEventThread(() -> {
+            execution.origin.accept(ContainerStatus.DELETED);
+            execution.presentation.accept(false);
+            cancelExporters(execution.netlist);
+        });
+    }
+
     SimulationSession.Status getCoreStatus() {
         CoreAsyncExecution run = asyncExecution;
-        return run == null ? null : run.host.status();
+        if (run != null) return run.host.status();
+        CoreScriptExecution script = scriptExecution;
+        return script == null ? null : script.host.status();
     }
 
     /** Returns false when GUI execution must use the legacy backend. */
@@ -213,6 +383,20 @@ public final class DesktopSimulationController {
     }
 
     boolean endAsync() {
+        CoreScriptExecution script = scriptExecution;
+        if (script != null) {
+            scriptExecution = null;
+            drainScriptSamples(script);
+            completedTime = script.host.status().nextTime();
+            script.host.close();
+            currentHost = null;
+            LegacySimulationFrontend.onEventThread(() -> {
+                script.origin.accept(ContainerStatus.PAUSED);
+                script.presentation.accept(false);
+                cancelExporters(script.netlist);
+            });
+            return true;
+        }
         CoreAsyncExecution run = asyncExecution;
         if (run == null) return false;
         run.ending = true;

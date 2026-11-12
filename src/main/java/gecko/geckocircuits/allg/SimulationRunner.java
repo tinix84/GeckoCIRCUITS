@@ -300,7 +300,43 @@ public final class SimulationRunner {
         SolverSettings settings = MainWindow._solverSettings;
         settings._tDURATION.setValueWithoutUndo(end);
         settings.dt.setValueWithoutUndo(dt);
+        controller.reset();
+        try {
+            if (controller.initializeScript(settings, dt, end)) {
+                execution = null;
+                simKern = null;
+                return;
+            }
+        } catch (Exception error) {
+            throw new IllegalStateException("Could not initialize core script simulation", error);
+        }
         initializeScript(settings, end, dt, true);
+    }
+
+    /** Advances one script step through the selected backend. */
+    public void simulateScriptOneStep() throws Exception {
+        if (controller.hasCoreExecution()) {
+            controller.scriptStep(MainWindow._solverSettings.dt.getValue(),
+                    MainWindow._solverSettings._tDURATION.getValue());
+        } else {
+            simKern.simulateOneStep();
+        }
+    }
+
+    /** Advances a script simulation by relative time through the selected backend. */
+    public void simulateScriptTime(double time) throws Exception {
+        if (controller.hasCoreExecution()) {
+            double end = MainWindow._solverSettings._tDURATION.getValue();
+            double requestedEnd = controller.getCurrentTime() + time;
+            boolean overReach = requestedEnd > end;
+            double target = Math.min(requestedEnd, end);
+            controller.scriptRunUntil(target);
+            if (overReach) {
+                throw new Exception("Specified simulation time goes beyond specified simulated end time; simulated only up to end time");
+            }
+        } else {
+            simKern.simulateTime(time);
+        }
     }
 
     public void initSim() {
