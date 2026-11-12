@@ -68,14 +68,25 @@ public class ControlCalculatorFactory {
     public static class BuildResult {
         private final ControlNetlist controlNetlist;
         private final ControlBlockMapping mapping;
+        private final List<FromExternalCalculator> externalInputs;
+        private final List<ToExternalCalculator> externalOutputs;
 
         public BuildResult(ControlNetlist controlNetlist, ControlBlockMapping mapping) {
+            this(controlNetlist, mapping, List.of(), List.of());
+        }
+
+        BuildResult(ControlNetlist controlNetlist, ControlBlockMapping mapping,
+                List<FromExternalCalculator> externalInputs, List<ToExternalCalculator> externalOutputs) {
             this.controlNetlist = controlNetlist;
             this.mapping = mapping;
+            this.externalInputs = List.copyOf(externalInputs);
+            this.externalOutputs = List.copyOf(externalOutputs);
         }
 
         public ControlNetlist getControlNetlist() { return controlNetlist; }
         public ControlBlockMapping getMapping() { return mapping; }
+        List<FromExternalCalculator> externalInputs() { return externalInputs; }
+        List<ToExternalCalculator> externalOutputs() { return externalOutputs; }
     }
 
     /**
@@ -243,7 +254,18 @@ public class ControlCalculatorFactory {
         // Execute each signal producer before its consumers.
         ControlNetlist netlist = ControlNetlist.fromOrderedCalculators(dependencyOrder(entries, timeStep, true));
         netlist.setDependencyOrder((step, activatePending) -> dependencyOrder(entries, step, activatePending));
-        return new BuildResult(netlist, mapping);
+        var externalInputs = orderedExternal(entries, 23, FromExternalCalculator.class);
+        var externalOutputs = orderedExternal(entries, 22, ToExternalCalculator.class);
+        return new BuildResult(netlist, mapping, externalInputs, externalOutputs);
+    }
+
+    private static <T extends AbstractControlCalculatable> List<T> orderedExternal(List<CalculatorEntry> entries,
+            int type, Class<T> calculatorType) {
+        return entries.stream().filter(entry -> entry.component.getType() == type)
+                .sorted(Comparator.comparingInt(entry -> ((Number) entry.component.getParameters()
+                        .getOrDefault("externalOrder", entry.component.getSourceOrdinal() < 0
+                                ? entries.indexOf(entry) : entry.component.getSourceOrdinal())).intValue()))
+                .map(entry -> calculatorType.cast(entry.calculator)).toList();
     }
 
     private static List<AbstractControlCalculatable> dependencyOrder(List<CalculatorEntry> entries, double dt, boolean activatePending) {

@@ -686,6 +686,12 @@ public class CircuitFileParser {
 
                 comp.setTerminalXLabels(readControlPortLabels(elementBlock, "labelAnfangsKnoten[]"));
                 comp.setTerminalYLabels(readControlPortLabels(elementBlock, "labelEndKnoten[]"));
+                if (rawTyp == 22 || rawTyp == 23) {
+                    comp.setParameter("externalWidth", rawTyp == 23
+                            ? elementBlock.readDataLine("tn", comp.getTerminalYLabels().length)
+                            : elementBlock.readDataLine("anzXIN", comp.getTerminalXLabels().length));
+                    comp.setParameter("externalOrder", elementBlock.readDataLine("torder", 0));
+                }
 
                 model.addControlComponent(comp);
             } catch (Exception e) {

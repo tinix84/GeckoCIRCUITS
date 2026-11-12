@@ -229,6 +229,23 @@ public final class SimulationSession implements AutoCloseable {
         return sample;
     }
 
+    public void setExternalInputs(int port, double[] values) {
+        enterOperation();
+        try { control.setExternalInputs(port, values == null ? null : values.clone()); }
+        finally { leaveOperation(); }
+    }
+
+    public double[] externalOutputs(int port) {
+        enterOperation();
+        try { return control.externalOutputs(port); }
+        finally { leaveOperation(); }
+    }
+
+    public int externalInputPorts() { enterOperation(); try { return control.externalInputPorts(); } finally { leaveOperation(); } }
+    public int externalOutputPorts() { enterOperation(); try { return control.externalOutputPorts(); } finally { leaveOperation(); } }
+    public int externalInputWidth(int port) { enterOperation(); try { return control.externalInputWidth(port); } finally { leaveOperation(); } }
+    public int externalOutputWidth(int port) { enterOperation(); try { return control.externalOutputWidth(port); } finally { leaveOperation(); } }
+
     /**
      * Runs the remaining phases on the caller thread.
      *

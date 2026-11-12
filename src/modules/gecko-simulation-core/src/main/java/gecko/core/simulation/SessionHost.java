@@ -15,6 +15,8 @@ import java.util.function.Consumer;
 public final class SessionHost implements AutoCloseable {
     private static final AtomicInteger IDS = new AtomicInteger();
     private final SimulationSession session;
+    private final int[] externalInputWidths;
+    private final int[] externalOutputWidths;
     private final ExecutorService owner;
     private final AtomicBoolean pauseRequested = new AtomicBoolean();
     // ponytail: unbounded. The desktop drains every tick. Bound it if a non-draining caller appears.
@@ -22,6 +24,10 @@ public final class SessionHost implements AutoCloseable {
 
     private SessionHost(SimulationSession session) {
         this.session = session;
+        externalInputWidths = new int[session.externalInputPorts()];
+        for (int port = 0; port < externalInputWidths.length; port++) externalInputWidths[port] = session.externalInputWidth(port);
+        externalOutputWidths = new int[session.externalOutputPorts()];
+        for (int port = 0; port < externalOutputWidths.length; port++) externalOutputWidths[port] = session.externalOutputWidth(port);
         int id = IDS.incrementAndGet();
         this.owner = Executors.newSingleThreadExecutor(task -> {
             Thread thread = new Thread(task, "gecko-session-" + id);
@@ -56,6 +62,41 @@ public final class SessionHost implements AutoCloseable {
             if (sample != null) samples.add(sample);
             return sample;
         });
+    }
+
+    /** Sets every external input, commits one step, queues the sample, and returns same-step outputs. */
+    public Future<double[][]> stepExternal(double[][] inputs) {
+        double[][] detached = validateExternalInputs(inputs);
+        return owner.submit(() -> {
+            for (int port = 0; port < detached.length; port++) session.setExternalInputs(port, detached[port]);
+            SimulationSession.Sample sample = session.step();
+            samples.add(sample);
+            double[][] outputs = new double[externalOutputWidths.length][];
+            for (int port = 0; port < outputs.length; port++) outputs[port] = session.externalOutputs(port);
+            return outputs;
+        });
+    }
+
+    private double[][] validateExternalInputs(double[][] inputs) {
+        int ports = externalInputWidths.length;
+        if (inputs == null || inputs.length != ports) throw new IllegalArgumentException("External input port count does not match.");
+        double[][] detached = new double[ports][];
+        for (int port = 0; port < ports; port++) {
+            if (inputs[port] == null || inputs[port].length != externalInputWidths[port])
+                throw new IllegalArgumentException("External input width does not match at port " + port + ".");
+            detached[port] = inputs[port].clone();
+        }
+        return detached;
+    }
+
+    public int externalInputPorts() { return externalInputWidths.length; }
+    public int externalOutputPorts() { return externalOutputWidths.length; }
+    public int externalInputWidth(int port) { return portWidth(externalInputWidths, port); }
+    public int externalOutputWidth(int port) { return portWidth(externalOutputWidths, port); }
+
+    private static int portWidth(int[] widths, int port) {
+        if (port < 0 || port >= widths.length) throw new IllegalArgumentException("External port is out of range.");
+        return widths[port];
     }
 
     /** Extends execution without resetting committed histories. */

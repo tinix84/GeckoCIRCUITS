@@ -15,6 +15,8 @@ package gecko.core.simulation;
 
 import gecko.core.circuit.netlist.CircuitNetlist;
 import gecko.core.control.calculators.AbstractControlCalculatable;
+import gecko.core.control.calculators.FromExternalCalculator;
+import gecko.core.control.calculators.ToExternalCalculator;
 import gecko.core.io.CircuitModel;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,6 +34,8 @@ final class ControlRuntime implements AutoCloseable {
     private final DomainCoupler domainCoupler;
     private final ScopeDataExtractor scopeExtractor;
     private final List<AbstractControlCalculatable> owners;
+    private final List<FromExternalCalculator> externalInputs;
+    private final List<ToExternalCalculator> externalOutputs;
     private double dt;
     private long stateVersion;
     private Runnable pendingInitialization;
@@ -51,6 +55,8 @@ final class ControlRuntime implements AutoCloseable {
             if (calculator != null && unique.add(calculator)) collected.add(calculator);
         }
         owners = List.copyOf(collected);
+        externalInputs = build.externalInputs();
+        externalOutputs = build.externalOutputs();
         domainCoupler = new DomainCoupler();
         domainCoupler.configureFromMapping(build.getMapping());
         scopeExtractor = ScopeDataExtractor.fromScopes(build.getMapping().getScopeInfos());
@@ -128,6 +134,27 @@ final class ControlRuntime implements AutoCloseable {
                 stateVersion++;
             }
         };
+    }
+
+    int externalInputPorts() { return externalInputs.size(); }
+    int externalOutputPorts() { return externalOutputs.size(); }
+    int externalInputWidth(int port) { return externalInputs.get(requirePort(port, externalInputs.size()))._outputSignal.length; }
+    int externalOutputWidth(int port) { return externalOutputs.get(requirePort(port, externalOutputs.size()))._inputSignal.length; }
+
+    void setExternalInputs(int port, double[] values) {
+        int index = requirePort(port, externalInputs.size());
+        if (values == null || values.length != externalInputWidth(index))
+            throw new IllegalArgumentException("External input width does not match.");
+        externalInputs.get(index).setValues(values);
+    }
+
+    double[] externalOutputs(int port) {
+        return externalOutputs.get(requirePort(port, externalOutputs.size())).values();
+    }
+
+    private static int requirePort(int port, int count) {
+        if (port < 0 || port >= count) throw new IllegalArgumentException("External port is out of range.");
+        return port;
     }
 
     boolean hasScope() { return scopeExtractor != null; }

@@ -40,6 +40,8 @@ public record ControlBlockDescriptor(int type, int inputPorts, int outputPorts, 
      * @return the effective input count
      */
     public int inputs(CircuitModel.ComponentData data) {
+        if (type == 22) return externalWidth(data, data.getTerminalXLabels().length);
+        if (type == 23) return 0;
         if (type == 4) return signalMode(data).inputCount();
         if (type == 11 && value(data, 1, 0) != 0) return 2;
         if (type == 27 && value(data, 2, 0) != 0) return 3;
@@ -53,6 +55,8 @@ public record ControlBlockDescriptor(int type, int inputPorts, int outputPorts, 
      * @return the effective output count
      */
     public int outputs(CircuitModel.ComponentData data) {
+        if (type == 22) return 0;
+        if (type == 23) return externalWidth(data, data.getTerminalYLabels().length);
         return outputPorts < 0 ? data.getTerminalYLabels().length : outputPorts;
     }
 
@@ -111,6 +115,8 @@ public record ControlBlockDescriptor(int type, int inputPorts, int outputPorts, 
         add(result, 20, -1, 1, data -> data.getTerminalXLabels().length == 2 ? new OrCalculatorTwoInputs()
                 : new OrCalculatorMultipleInputs(data.getTerminalXLabels().length));
         simple(result, 21, XORCalculator::new);
+        add(result, 22, -1, 0, data -> new ToExternalCalculator(externalWidth(data, data.getTerminalXLabels().length)));
+        add(result, 23, 0, -1, data -> new FromExternalCalculator(externalWidth(data, data.getTerminalYLabels().length)));
         add(result, 25, 1, 1, data -> new DelayCalculator(value(data, 0, 10e-6)),
                 new Setting("tDelay", 0, 10e-6, ValueRule.NON_NEGATIVE));
         simple(result, 26, SampleHoldCalculator::new);
@@ -295,6 +301,11 @@ public record ControlBlockDescriptor(int type, int inputPorts, int outputPorts, 
      * @return the description, or null if no assembly exists
      */
     public static ControlBlockDescriptor find(int type) { return DESCRIPTORS.get(type); }
+
+    private static int externalWidth(CircuitModel.ComponentData data, int fallback) {
+        Object saved = data.getParameters().get("externalWidth");
+        return saved instanceof Number number ? number.intValue() : fallback;
+    }
 
     static double value(CircuitModel.ComponentData data, int slot, double fallback) {
         double[] values = data.getNumericParameters();
