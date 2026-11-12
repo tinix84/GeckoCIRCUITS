@@ -95,20 +95,31 @@ public final class SimulationSession implements AutoCloseable {
             dt = settings.getPreCalculationStepWidth();
             duration = preTime;
         }
-        control = suppliedControl == null ? ControlRuntime.fromDeferred(model, dt) : suppliedControl;
+        ControlRuntime constructedControl = suppliedControl;
         try {
+            CircuitNetlist constructedNetlist = NetlistBuilder.buildFromCircuitModel(model);
+            if (constructedControl == null) {
+                constructedControl = ControlRuntime.fromDeferred(model, dt, constructedNetlist);
+            }
             // Validate the main grid now. Stage its live histories again after warmup.
-            if (phase == Phase.WARMUP && mainStep != dt) control.prepareTimeStepChange(mainStep);
-            netlist = NetlistBuilder.buildFromCircuitModel(model);
-            signalNames = control.hasScope() ? control.getSignalNames() : fallbackSignalNames(model);
-            recording = new DataContainerGlobal();
-            recording.init(signalNames.length, recordingCapacity(dt, duration), signalNames, "time [s]");
-            recording.setContainerStatus(ContainerStatus.PAUSED);
-            status = statusFor(State.READY, 0, 0, 0, duration, dt);
-            electrical = netlist != null && netlist.getElementCount() > 0
-                    ? new ElectricalTimeStep(netlist, settings.getSolverType()) : null;
+            if (phase == Phase.WARMUP && mainStep != dt) constructedControl.prepareTimeStepChange(mainStep);
+            String[] constructedSignalNames = constructedControl.hasScope()
+                    ? constructedControl.getSignalNames() : fallbackSignalNames(model);
+            DataContainerGlobal constructedRecording = new DataContainerGlobal();
+            constructedRecording.init(constructedSignalNames.length, recordingCapacity(dt, duration),
+                    constructedSignalNames, "time [s]");
+            constructedRecording.setContainerStatus(ContainerStatus.PAUSED);
+            Status constructedStatus = statusFor(State.READY, 0, 0, 0, duration, dt);
+            ElectricalTimeStep constructedElectrical = constructedNetlist != null && constructedNetlist.getElementCount() > 0
+                    ? new ElectricalTimeStep(constructedNetlist, settings.getSolverType()) : null;
+            netlist = constructedNetlist;
+            control = constructedControl;
+            signalNames = constructedSignalNames;
+            recording = constructedRecording;
+            status = constructedStatus;
+            electrical = constructedElectrical;
         } catch (RuntimeException | Error failure) {
-            closeControlAfterFailure(failure);
+            closeControlAfterFailure(constructedControl, failure);
             throw failure;
         }
     }
@@ -514,7 +525,12 @@ public final class SimulationSession implements AutoCloseable {
     }
 
     private void closeControlAfterFailure(Throwable failure) {
-        try { control.close(); }
+        closeControlAfterFailure(control, failure);
+    }
+
+    private static void closeControlAfterFailure(ControlRuntime runtime, Throwable failure) {
+        if (runtime == null) return;
+        try { runtime.close(); }
         catch (Throwable cleanup) {
             if (failure != cleanup) failure.addSuppressed(cleanup);
         }

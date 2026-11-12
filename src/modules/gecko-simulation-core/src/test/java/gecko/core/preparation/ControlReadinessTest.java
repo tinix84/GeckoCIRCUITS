@@ -1,6 +1,7 @@
 package gecko.core.preparation;
 
 import gecko.core.io.CircuitModel;
+import gecko.core.io.SavedCircuitBlock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -85,6 +86,43 @@ class ControlReadinessTest {
                 type == 6 ? new String[]{"drive"} : new String[0], type == 6 ? new String[0] : new String[]{"probe"},
                 reference, "0"));
         diagnostic(model, code, "reference");
+    }
+
+    @Test
+    void voltageProbeCannotResolveANodeLabelFromAnotherSavedSheet() {
+        var model = resistorCircuit();
+        var outerSheet = new CircuitModel.ComponentData(27, "outer sheet");
+        outerSheet.setSavedBlock(SavedCircuitBlock.parse("ElementSPECIAL",
+                new String[]{"uniqueObjectIdentifier 101", "enabledShorted 1"}));
+        model.getSpecialComponents().add(outerSheet);
+        var nestedSheet = new CircuitModel.ComponentData(27, "nested sheet");
+        nestedSheet.setSavedBlock(SavedCircuitBlock.parse("ElementSPECIAL",
+                new String[]{"uniqueObjectIdentifier 202", "parentSheetIdentifier 101", "enabledShorted 1"}));
+        model.getSpecialComponents().add(nestedSheet);
+
+        var voltage = control(1, "nested voltage", new double[0], new String[0], new String[]{"voltage"}, "1", "0");
+        voltage.setSavedBlock(SavedCircuitBlock.parse("ElementCONTROL",
+                new String[]{"parentSheetIdentifier 202", "enabledShorted 1"}));
+        model.addControlComponent(voltage);
+
+        var result = assertInstanceOf(PreparationResult.Inspectable.class, prepare(model));
+        assertFalse(result.report().readyForHeadless());
+        assertTrue(result.report().diagnostics().stream().anyMatch(d -> d.code().equals("INVALID_PROBE_REFERENCE")
+                && d.severity() == Diagnostic.Severity.ERROR && "CONTROL".equals(d.domain())
+                && "nested voltage".equals(d.component())), result.report().toString());
+    }
+
+    @Test
+    void voltageProbeResolvesNumericLabelsAboveTheNetlistNodeMaximum() {
+        var model = resistorCircuit();
+        model.addCircuitComponent(component(1, "R.highLabel", new double[]{10}, "99", "0"));
+        var netlist = gecko.core.circuit.netlist.NetlistBuilder.buildFromCircuitModel(model);
+        assertTrue(99 > netlist.getNodeMax());
+        model.addControlComponent(control(1, "high label voltage", new double[0], new String[0],
+                new String[]{"voltage"}, "99", "0"));
+
+        var result = assertInstanceOf(PreparationResult.Ready.class, prepare(model));
+        assertTrue(result.report().readyForHeadless());
     }
 
     @Test

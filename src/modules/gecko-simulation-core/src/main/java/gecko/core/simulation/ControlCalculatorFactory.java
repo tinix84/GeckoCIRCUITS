@@ -14,6 +14,8 @@
 package gecko.core.simulation;
 
 import gecko.core.circuit.ControlTypCore;
+import gecko.core.circuit.netlist.CircuitNetlist;
+import gecko.core.circuit.netlist.NetlistBuilder;
 import gecko.core.control.calculators.*;
 import gecko.core.io.CircuitModel;
 import gecko.core.io.CircuitTopology;
@@ -100,13 +102,14 @@ public class ControlCalculatorFactory {
      * @throws DependencyCycleException if instantaneous dependencies contain a cycle
      */
     public BuildResult build(List<CircuitModel.ComponentData> controlComponents, double timeStep) {
-        return build(controlComponents, timeStep, null);
+        return build(controlComponents, timeStep, null, null);
     }
 
     /**
      * Builds independent CONTROL calculators from a model and its captured resources.
      * Unresolved saved CONTROL settings use the shared normalizer on a detached model.
-     * Prepared overrides and caller data remain unchanged.
+     * Prepared overrides and caller data remain unchanged. The method builds the electrical netlist
+     * so VOLT terminal labels resolve to their same-sheet node indices.
      *
      * @param model the model with owned resource bytes, or null for an empty runtime
      * @param timeStep the step in seconds, or zero to defer the delay threshold check
@@ -116,11 +119,17 @@ public class ControlCalculatorFactory {
      * @throws DependencyCycleException if instantaneous dependencies contain a cycle
      */
     public BuildResult buildCircuit(CircuitModel model, double timeStep) {
-        var resolved = model == null ? null : CircuitConfiguration.resolveSavedControl(model);
-        return build(resolved == null ? null : resolved.getControlComponents(), timeStep, resolved);
+        CircuitNetlist electricalNetlist = model == null ? null : NetlistBuilder.buildFromCircuitModel(model);
+        return buildCircuit(model, timeStep, electricalNetlist);
     }
 
-    private BuildResult build(List<CircuitModel.ComponentData> controlComponents, double timeStep, CircuitModel model) {
+    public BuildResult buildCircuit(CircuitModel model, double timeStep, CircuitNetlist electricalNetlist) {
+        var resolved = model == null ? null : CircuitConfiguration.resolveSavedControl(model);
+        return build(resolved == null ? null : resolved.getControlComponents(), timeStep, resolved, electricalNetlist);
+    }
+
+    private BuildResult build(List<CircuitModel.ComponentData> controlComponents, double timeStep, CircuitModel model,
+            CircuitNetlist electricalNetlist) {
         if (controlComponents == null || controlComponents.isEmpty()) {
             return new BuildResult(ControlNetlist.createEmpty(), new ControlBlockMapping());
         }
@@ -204,10 +213,10 @@ public class ControlCalculatorFactory {
                     int nodeA = 0;
                     int nodeB = 0;
                     if (paramStrings.length >= 1 && !paramStrings[0].isEmpty()) {
-                        nodeA = parseNodeLabel(paramStrings[0]);
+                        nodeA = resolveProbeNode(model, electricalNetlist, entry.component, paramStrings[0]);
                     }
                     if (paramStrings.length >= 2 && !paramStrings[1].isEmpty()) {
-                        nodeB = parseNodeLabel(paramStrings[1]);
+                        nodeB = resolveProbeNode(model, electricalNetlist, entry.component, paramStrings[1]);
                     }
                     mapping.addVoltProbe(entry.calculator, nodeA, nodeB, entry.component.getName());
                 }
@@ -310,6 +319,26 @@ public class ControlCalculatorFactory {
         } catch (NumberFormatException e) {
             return 0; // ground for unrecognized labels
         }
+    }
+
+    private static int resolveProbeNode(CircuitModel model, CircuitNetlist electricalNetlist,
+            CircuitModel.ComponentData measurement, String label) {
+        if (electricalNetlist == null) return parseNodeLabel(label);
+        long sheet = measurement.getSavedBlock() == null ? 0 : measurement.getSavedBlock().parentSheetIdentifier();
+        for (CircuitModel.ComponentData component : model.getCircuitComponents()) {
+            long componentSheet = component.getSavedBlock() == null ? 0 : component.getSavedBlock().parentSheetIdentifier();
+            if (componentSheet != sheet) continue;
+            int element = electricalNetlist.getElementIndexByName(component.getName());
+            if (element < 0) continue;
+            for (String terminalLabel : component.getTerminalXLabels()) {
+                if (Objects.equals(terminalLabel, label)) return electricalNetlist.getNodeX(element);
+            }
+            for (String terminalLabel : component.getTerminalYLabels()) {
+                if (Objects.equals(terminalLabel, label)) return electricalNetlist.getNodeY(element);
+            }
+        }
+        throw new IllegalArgumentException("Voltage probe '" + measurement.getName()
+                + "' references an unknown electrical terminal label '" + label + "'");
     }
 
     private static class CalculatorEntry {

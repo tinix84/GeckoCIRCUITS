@@ -64,7 +64,11 @@ final class ControlRuntime implements AutoCloseable {
 
     /** Assembles the chain without invoking calculator initialization callbacks. */
     static ControlRuntime fromDeferred(CircuitModel model, double dt) {
-        return fromDeferred(new ControlCalculatorFactory().buildCircuit(model, dt), dt);
+        return fromDeferred(model, dt, null);
+    }
+
+    static ControlRuntime fromDeferred(CircuitModel model, double dt, CircuitNetlist electricalNetlist) {
+        return fromDeferred(new ControlCalculatorFactory().buildCircuit(model, dt, electricalNetlist), dt);
     }
 
     /** Takes ownership of the supplied calculators and their closeable resources. */

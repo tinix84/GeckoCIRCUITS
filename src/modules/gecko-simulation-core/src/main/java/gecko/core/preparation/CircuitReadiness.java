@@ -37,7 +37,7 @@ final class CircuitReadiness {
         if (configurationDiagnostics.stream().noneMatch(item -> "CONTROL".equals(item.domain()) && item.severity() == Diagnostic.Severity.ERROR)
                 && diagnostics.stream().noneMatch(item -> "CONTROL".equals(item.domain()) && item.severity() == Diagnostic.Severity.ERROR)) {
             try {
-                new ControlCalculatorFactory().buildCircuit(model, model.getTimeStep());
+                new ControlCalculatorFactory().buildCircuit(model, model.getTimeStep(), topology);
             } catch (ControlCalculatorFactory.DependencyCycleException cycle) {
                 diagnostics.add(new Diagnostic("CONTROL_DEPENDENCY_CYCLE", Diagnostic.Category.REFERENCES,
                         Diagnostic.Severity.ERROR, cycle.getMessage(), "CONTROL", null, null, null));
@@ -169,6 +169,28 @@ final class CircuitReadiness {
         return labels;
     }
 
+    private static Integer resolveElectricalTerminalNode(CircuitModel model, CircuitModel.ComponentData measurement,
+            String label, CircuitNetlist topology) {
+        long sheet = measurement.getSavedBlock() == null ? 0 : measurement.getSavedBlock().parentSheetIdentifier();
+        for (var component : model.getCircuitComponents()) {
+            long componentSheet = component.getSavedBlock() == null ? 0 : component.getSavedBlock().parentSheetIdentifier();
+            if (componentSheet != sheet) continue;
+            int element = topology == null ? -1 : topology.getElementIndexByName(component.getName());
+            if (topology != null && element < 0) continue;
+            for (String terminalLabel : component.getTerminalXLabels()) {
+                if (java.util.Objects.equals(terminalLabel, label)) {
+                    return topology == null ? 0 : topology.getNodeX(element);
+                }
+            }
+            for (String terminalLabel : component.getTerminalYLabels()) {
+                if (java.util.Objects.equals(terminalLabel, label)) {
+                    return topology == null ? 0 : topology.getNodeY(element);
+                }
+            }
+        }
+        return null;
+    }
+
     private static void checkControl(CircuitModel model, CircuitNetlist topology, List<Diagnostic> diagnostics) {
         CircuitTopology controlTopology = CircuitTopology.resolve(model);
         for (var component : model.getControlComponents()) {
@@ -227,13 +249,22 @@ final class CircuitReadiness {
                 String[] references = component.getParameterStrings();
                 for (int port = 0; port < 2; port++) {
                     String reference = port < references.length ? references[port] : "";
+                    boolean validNode = false;
                     try {
                         if (reference == null || reference.isBlank()) throw new NumberFormatException();
-                        int node = Integer.parseInt(reference.trim());
-                        if (node < 0 || topology != null && node > topology.getNodeMax()) throw new NumberFormatException();
+                        if (Integer.parseInt(reference.trim()) < 0) throw new NumberFormatException();
+                        validNode = true;
                     } catch (NumberFormatException error) {
                         diagnostics.add(control("INVALID_PROBE_REFERENCE", Diagnostic.Category.REFERENCES, component,
                                 "A voltage probe requires two valid numerical node indices."));
+                    }
+                    if (validNode) {
+                        Integer resolvedNode = resolveElectricalTerminalNode(model, component, reference, topology);
+                        if (resolvedNode == null || topology != null
+                                && (resolvedNode < 0 || resolvedNode > topology.getNodeMax())) {
+                            diagnostics.add(control("INVALID_PROBE_REFERENCE", Diagnostic.Category.REFERENCES, component,
+                                    "A voltage probe label must identify a valid electrical terminal in its saved sheet."));
+                        }
                     }
                 }
             } else if (type == 2 || type == 6) {
