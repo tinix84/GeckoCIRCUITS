@@ -13,6 +13,7 @@
  */
 package gecko.geckocircuits.allg;
 
+import gecko.core.simulation.SimulationSession;
 import gecko.geckocircuits.circuit.NetListContainer;
 import gecko.geckocircuits.circuit.SchematicEditor2;
 import gecko.geckocircuits.circuit.SimulationsKern;
@@ -163,7 +164,13 @@ public final class SimulationRunner {
 
     public void startCalculation(boolean createNewSimThread, SolverSettings settings) throws Exception {
         controller.reset();
+        if (createNewSimThread && controller.startAsync(settings)) {
+            execution = null;
+            simKern = null;
+            return;
+        }
         if (!createNewSimThread && controller.start(settings)) {
+            execution = null;
             simKern = null;
             return;
         }
@@ -177,6 +184,11 @@ public final class SimulationRunner {
     public double getCurrentTime() {
         return controller.hasCoreExecution() ? controller.getCurrentTime()
                 : simKern == null ? 0 : simKern.getZeitAktuell();
+    }
+
+    /** Returns core lifecycle status for GUI clients; null while the legacy route is active. */
+    public SimulationSession.Status getCoreStatus() {
+        return controller.getCoreStatus();
     }
 
     private Execution prepareStart(Preparation preparation, SolverSettings settings) {
@@ -208,6 +220,10 @@ public final class SimulationRunner {
     }
 
     public void continueCalculation(boolean createNewSimThread, SolverSettings settings) throws Exception {
+        if (controller.hasAsyncExecution()) {
+            controller.continueAsync(settings);
+            return;
+        }
         Execution prepared = prepareExecution(null, false, false, settings, preparation -> prepareContinuation(preparation, settings));
         activateContinuation(prepared, createNewSimThread);
     }
@@ -260,6 +276,7 @@ public final class SimulationRunner {
 
     /** Stops the captured execution without pausing a replacement started by its completion callbacks. */
     public void endSimulation() {
+        if (controller.endAsync()) return;
         Execution owner = execution;
         if (owner == null || !owner.ticket().endSimulation()) return;
         if (owner.ticket().pause()) {
@@ -271,6 +288,7 @@ public final class SimulationRunner {
     }
 
     public void pauseSimulation() {
+        if (controller.pauseAsync()) return;
         Execution current = execution;
         if (current != null && current.ticket().pause()) {
             commitStatus(current, ContainerStatus.PAUSED);
