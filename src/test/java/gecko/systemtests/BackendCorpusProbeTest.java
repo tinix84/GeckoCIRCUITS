@@ -184,8 +184,11 @@ public class BackendCorpusProbeTest {
     private static void openCircuit(Path file) throws Exception {
         Timer notices = new Timer(100, event -> {
             for (Window window : Window.getWindows()) {
-                if (window instanceof JDialog dialog
-                        && findOptionPane(dialog.getContentPane()) instanceof JOptionPane pane) {
+                if (!(window instanceof JDialog dialog) || !dialog.isShowing()) continue;
+                // A closed dialog can remain in Window.getWindows after its root pane is removed.
+                var rootPane = dialog.getRootPane();
+                if (rootPane == null) continue;
+                if (findOptionPane(rootPane.getContentPane()) instanceof JOptionPane pane) {
                     String message = String.valueOf(pane.getMessage());
                     if (("Info".equals(dialog.getTitle()) && message.startsWith(
                             "This Model file was created with an older version of GeckoCIRCUITS."))
@@ -208,6 +211,7 @@ public class BackendCorpusProbeTest {
     }
 
     private static Component findOptionPane(Container container) {
+        if (container == null) return null;
         if (container instanceof JOptionPane) return container;
         for (Component child : container.getComponents()) {
             if (child instanceof Container nested) {
