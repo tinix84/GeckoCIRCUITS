@@ -92,6 +92,26 @@ class CouplingTransferContractTest {
     }
 
     @Test
+    void currentProbeOnVoltageSourceMatchesLegacyZeroCurrentReporting() {
+        var netlist = new gecko.core.circuit.netlist.CircuitNetlist();
+        netlist.initNetlist(new CircuitTypCore[]{CircuitTypCore.LK_U}, new int[]{1}, new int[]{0},
+                new int[]{1}, new double[][]{new double[13]}, 1, 1, 1);
+        netlist.setComponentNameToIndex(Map.of("source", 0));
+        netlist.storeResults(new double[]{0, 120}, new double[]{18});
+
+        var amp = new NothingToDoCalculator(0, 1);
+        var mapping = new ControlBlockMapping();
+        mapping.addAmpProbe(amp, "source", "AMP.1");
+        var coupler = new DomainCoupler();
+        coupler.configureFromMapping(mapping);
+
+        coupler.transferLkToControlProbes(netlist);
+
+        assertEquals(0, amp._outputSignal[0][0]);
+        assertEquals(18, netlist.getLastComponentCurrents()[0]);
+    }
+
+    @Test
     void thermalPlaceholderArraysAndEmptyMappingsDoNotLeakMutableBuffers() {
         var coupler = new DomainCoupler();
         coupler.configurePowerLossArray(2);

@@ -262,8 +262,11 @@ public class DomainCoupler {
         for (ControlBlockMapping.AmpProbeMapping probe : controlBlockMapping.getAmpProbeMappings()) {
             String compName = probe.getComponentName();
             int elementIndex = circuitNetlist.getElementIndexByName(compName);
-            probe.getCalculator()._outputSignal[0][0] =
-                    elementIndex >= 0 && elementIndex < componentCurrents.length
+            // The legacy LKMatrices current pass does not assign _currentInAmps for LK_U.
+            // Keep AMP output parity even though the core solver retains the physical MNA current.
+            probe.getCalculator()._outputSignal[0][0] = elementIndex >= 0
+                    && elementIndex < componentCurrents.length
+                    && circuitNetlist.getType(elementIndex) != CircuitTypCore.LK_U
                             ? componentCurrents[elementIndex] : 0.0;
         }
     }
