@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.Arrays;
 import java.util.stream.Collectors;
 
 /** Resolves terminal identities and signal groups independently of frontend objects. */
@@ -460,6 +461,13 @@ public final class CircuitTopology {
     }
 
     static String[] portLabels(CircuitModel.ComponentData component, Side side) {
+        if (component.getType() == 22 && side == Side.INPUT) {
+            String[] labels = component.getTerminalXLabels();
+            Object savedWidth = component.getParameters().get("activeInputWidth");
+            if (savedWidth instanceof Number number) {
+                return Arrays.copyOf(labels, Math.min(labels.length, Math.max(0, number.intValue())));
+            }
+        }
         String token = side == Side.INPUT ? "labelAnfangsKnoten[]" : "labelEndKnoten[]";
         var saved = component.getSavedBlock();
         if (saved != null && saved.tokens().containsKey(token)) {

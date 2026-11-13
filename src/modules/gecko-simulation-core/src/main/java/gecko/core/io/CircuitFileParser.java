@@ -687,9 +687,17 @@ public class CircuitFileParser {
                 comp.setTerminalXLabels(readControlPortLabels(elementBlock, "labelAnfangsKnoten[]"));
                 comp.setTerminalYLabels(readControlPortLabels(elementBlock, "labelEndKnoten[]"));
                 if (rawTyp == 22 || rawTyp == 23) {
+                    int savedInputWidth = comp.getTerminalXLabels().length;
                     comp.setParameter("externalWidth", rawTyp == 23
                             ? elementBlock.readDataLine("tn", comp.getTerminalYLabels().length)
-                            : elementBlock.readDataLine("anzXIN", comp.getTerminalXLabels().length));
+                            : savedInputWidth > 0 ? savedInputWidth
+                                    : elementBlock.readDataLine("anzXIN", savedInputWidth));
+                    if (rawTyp == 22) {
+                        int labeledInputCount = (int) Arrays.stream(comp.getTerminalXLabels())
+                                .filter(label -> label != null && !label.isBlank()).count();
+                        comp.setParameter("activeInputWidth",
+                                elementBlock.readDataLine("anzXIN", labeledInputCount));
+                    }
                     comp.setParameter("externalOrder", elementBlock.readDataLine("torder", 0));
                 }
 

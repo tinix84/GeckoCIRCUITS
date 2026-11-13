@@ -231,7 +231,12 @@ final class CircuitReadiness {
             String[] inputs = component.getTerminalXLabels();
             int required = descriptor != null ? descriptor.inputs(component)
                     : type == 6 || type == 7 ? 1 : type == 5 ? inputs.length : 0;
+            int activeInputs = required;
+            if (type == 22 && component.getParameters().get("activeInputWidth") instanceof Number width) {
+                activeInputs = Math.min(required, Math.max(0, width.intValue()));
+            }
             for (int port = 0; port < required; port++) {
+                if (type == 22 && port >= activeInputs) continue;
                 String label = port < inputs.length ? inputs[port] : "";
                 var group = controlTopology.group(component, CircuitTopology.Side.INPUT, port);
                 int producerCount = group == null ? 0 : group.producerTerminals().size();
