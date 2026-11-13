@@ -110,7 +110,7 @@ class CircuitFileE2ETest {
         assertThat(validationResponse.getBody()).isNotNull();
         assertThat(validationResponse.getBody().valid()).isFalse();
         assertThat(validationResponse.getBody().readyForHeadless()).isFalse();
-        assertThat(validationResponse.getBody().outcome()).isEqualTo(gecko.core.preparation.ReadinessReport.Outcome.INVALID);
+        assertThat(validationResponse.getBody().outcome()).isEqualTo(gecko.core.preparation.ReadinessReport.Outcome.UNSUPPORTED);
         assertThat(validationResponse.getBody().warnings()).isNotNull();
         assertThat(validationResponse.getBody().errors()).isNotEmpty();
         assertThat(validationResponse.getBody().diagnostics()).anyMatch(item ->
