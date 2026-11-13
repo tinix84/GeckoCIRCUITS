@@ -16,6 +16,7 @@ package gecko.core.simulation;
 import gecko.core.allg.SolverType;
 import gecko.core.circuit.circuitcomponents.CircuitTypCore;
 import gecko.core.circuit.netlist.CircuitNetlist;
+import gecko.core.circuit.netlist.INetList;
 import gecko.core.simulation.solver.ComponentCurrentCalculator;
 import gecko.core.simulation.solver.MatrixSolver;
 import gecko.core.simulation.solver.InitialConditionSolver;
@@ -24,43 +25,86 @@ import gecko.core.simulation.solver.InitialConditionSolver;
 final class ElectricalTimeStep {
 
     private final CircuitNetlist netlist;
+    private final INetList numericalNetlist;
+    private final int[] nodeOrder;
+    private final double[] publicPotentials;
     private final MatrixSolver matrixSolver;
     private final ComponentCurrentCalculator componentCurrentCalculator = new ComponentCurrentCalculator();
     private final double[] computedCurrents;
+    private final double[][] matrixInputs;
+    private double matrixDt = Double.NaN;
 
     ElectricalTimeStep(CircuitNetlist netlist, SolverType solverType) {
         this.netlist = netlist;
+        nodeOrder = netlist.getNumericalNodeOrder();
+        numericalNetlist = nodeOrder.length == 0 ? netlist : new NumericalNetlist(netlist, nodeOrder);
         matrixSolver = new MatrixSolver(solverType);
         matrixSolver.initializeMatrices(netlist.getNodeMax(), netlist.getVoltageSourceMax(),
                 netlist.getElementCount());
         computedCurrents = new double[netlist.getElementCount()];
-        new InitialConditionSolver(solverType).setDialogInitialConditions(matrixSolver, netlist);
+        matrixInputs = new double[netlist.getElementCount()][4];
+        publicPotentials = new double[matrixSolver.getMatrixSize()];
+        new InitialConditionSolver(solverType).setDialogInitialConditions(matrixSolver, numericalNetlist);
     }
 
     void advance(double dt, double time, HeadlessSimulationEngine.StepTraceListener traceListener) {
         if (!Double.isFinite(dt) || dt <= 0 || !Double.isFinite(time) || time < 0) {
             throw new IllegalArgumentException("Time step must be finite and positive; time must be finite and non-negative");
         }
-        matrixSolver.buildMatrixA(netlist, dt, time, false);
-        matrixSolver.buildVectorB(netlist, dt, time, false);
+        if (!numericalNetlist.usesWireReference() || matrixInputsChanged(dt)) {
+            matrixSolver.buildMatrixA(numericalNetlist, dt, time, false);
+        }
+        matrixSolver.buildVectorB(numericalNetlist, dt, time, false);
         matrixSolver.solve();
-        doDiodeIteration(netlist, dt, time);
+        doDiodeIteration(numericalNetlist, dt, time);
 
         // Compute against previous-step histories before committing the new state.
         componentCurrentCalculator.calculateComponentCurrents(
-                matrixSolver, netlist, computedCurrents, 0.0, dt, time, true);
+                matrixSolver, numericalNetlist, computedCurrents, 0.0, dt, time, true);
         matrixSolver.shiftHistory();
         double[] currents = matrixSolver.getIALT();
         System.arraycopy(computedCurrents, 0, currents, 0, computedCurrents.length);
-        netlist.storeResults(matrixSolver.getPALT(), currents);
+        double[] potentials = matrixSolver.getPALT();
+        System.arraycopy(potentials, 0, publicPotentials, 0, potentials.length);
+        if (nodeOrder.length != 0) {
+            double reference = potentials[nodeOrder[0]];
+            for (int node = 0; node < nodeOrder.length; node++) publicPotentials[node] = potentials[nodeOrder[node]] - reference;
+        }
+        netlist.storeResults(publicPotentials, currents);
+        rememberMatrixInputs(dt);
 
         if (traceListener != null) {
-            traceListener.onStep(time, matrixSolver.getPALT(), currents, netlist);
+            traceListener.onStep(time, publicPotentials, currents, netlist);
         }
     }
 
+    private boolean matrixInputsChanged(double dt) {
+        if (dt != matrixDt) return true;
+        for (int element = 0; element < matrixInputs.length; element++) {
+            double[] parameters = netlist.getParameter(element);
+            for (int slot = 0; slot < 4; slot++) {
+                if (matrixInputs[element][slot] != matrixInput(parameters, slot)) return true;
+            }
+        }
+        return false;
+    }
+
+    private void rememberMatrixInputs(double dt) {
+        matrixDt = dt;
+        for (int element = 0; element < matrixInputs.length; element++) {
+            double[] parameters = netlist.getParameter(element);
+            for (int slot = 0; slot < 4; slot++) matrixInputs[element][slot] = matrixInput(parameters, slot);
+        }
+    }
+
+    private static double matrixInput(double[] parameters, int slot) {
+        // Matrix stamps use resistance/inductance/mode, capacitance, source gain, and source limit state.
+        int index = switch (slot) { case 0 -> 0; case 1 -> 6; case 2 -> 11; default -> 14; };
+        return index < parameters.length ? parameters[index] : 0;
+    }
+
     void copyNodeVoltagesTo(float[] values) {
-        double[] nodeVoltages = matrixSolver.getPALT();
+        double[] nodeVoltages = netlist.getLastNodeVoltagesRef();
         for (int index = 0; index < values.length && index < nodeVoltages.length; index++) {
             values[index] = (float) nodeVoltages[index];
         }
@@ -87,7 +131,7 @@ final class ElectricalTimeStep {
      * @param time current simulation time
      * @return true if a diode or source limit changes during this step
      */
-    private boolean doDiodeIteration(CircuitNetlist netlist, double dt, double time) {
+    private boolean doDiodeIteration(INetList netlist, double dt, double time) {
         double stoergroesse = 1.0;
         int iterCount = 0;
         boolean anyChangedOverall = false;
@@ -182,6 +226,23 @@ final class ElectricalTimeStep {
         }
 
         return anyChangedOverall;
+    }
+
+    private record NumericalNetlist(CircuitNetlist source, int[] order) implements INetList {
+        @Override public boolean usesWireReference() { return true; }
+        @Override public int getNodeMax() { return source.getNodeMax(); }
+        @Override public int getVoltageSourceMax() { return source.getVoltageSourceMax(); }
+        @Override public int getElementCount() { return source.getElementCount(); }
+        @Override public CircuitTypCore getType(int index) { return source.getType(index); }
+        @Override public int getNodeX(int index) { return order[source.getNodeX(index)]; }
+        @Override public int getNodeY(int index) { return order[source.getNodeY(index)]; }
+        @Override public double[] getParameter(int index) { return source.getParameter(index); }
+        @Override public int getVoltageSourceNumber(int index) { return source.getVoltageSourceNumber(index); }
+        @Override public double getSimulationTime() { return source.getSimulationTime(); }
+        @Override public int getControlElementIndex(int index) { return source.getControlElementIndex(index); }
+        @Override public java.util.List<gecko.core.circuit.netlist.MutualCouplingRegistry.Coupling> getAllCouplings() {
+            return source.getAllCouplings();
+        }
     }
 
 }

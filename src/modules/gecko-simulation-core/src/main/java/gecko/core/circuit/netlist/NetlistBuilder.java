@@ -214,7 +214,8 @@ public class NetlistBuilder {
                     && allComponents.stream().allMatch(component -> component.getTerminalData().isEmpty())
                     && allComponents.stream().map(component -> component.getSavedBlock() == null
                             ? 0L : component.getSavedBlock().parentSheetIdentifier()).distinct().count() == 1;
-            CircuitNetlist netlist = buildFromComponentsWithGroups(allComponents, terminalGroups, referenceNodes, legacyLabelOnly);
+            CircuitNetlist netlist = buildFromComponentsWithGroups(allComponents, terminalGroups, referenceNodes,
+                    legacyLabelOnly, topology.connectionGroupOrder());
             registerMagneticCouplings(netlist, allComponents, couplingComponents);
             return netlist;
         } else {
@@ -234,7 +235,8 @@ public class NetlistBuilder {
      * </ul>
      */
     private static CircuitNetlist buildFromComponentsWithGroups(List<CircuitModel.ComponentData> components,
-            CircuitTopology.Group[][] terminalGroups, boolean[][] referenceNodes, boolean legacyLabelOnly) {
+            CircuitTopology.Group[][] terminalGroups, boolean[][] referenceNodes, boolean legacyLabelOnly,
+            List<CircuitTopology.Group> connectionOrder) {
         // Step 1: Build node label → index map
         // Ground reference: label "0" or "" → node 0
         // Legacy label-only models share named numerical nodes across physical component types.
@@ -337,11 +339,26 @@ public class NetlistBuilder {
 
         validateGroundConnectivity(components, nodeX, nodeY);
 
+        boolean wireReference = !legacyLabelOnly && !connectionOrder.isEmpty();
+        int[] order = new int[nodeCount];
+        java.util.Arrays.setAll(order, node -> node);
+        if (wireReference) {
+            var orderedNodes = new java.util.LinkedHashSet<Integer>();
+            for (var group : connectionOrder) {
+                Integer node = groupToNode.get(nodeKey(group, false));
+                if (node != null) orderedNodes.add(node);
+            }
+            for (int node = 0; node < nodeCount; node++) orderedNodes.add(node);
+            int next = 0;
+            for (int node : orderedNodes) order[node] = next++;
+        }
+
         // Step 5: Initialize and return netlist
         CircuitNetlist netlist = new CircuitNetlist();
         netlist.initNetlist(types, nodeX, nodeY, voltageSourceNumbers, params,
                 nodeCount - 1, voltageSourceCount, elementCount);
         netlist.setComponentNameToIndex(nameToIndex);
+        if (wireReference) netlist.setNumericalNodeOrder(order);
         return netlist;
     }
 

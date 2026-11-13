@@ -31,6 +31,8 @@ import gecko.core.circuit.circuitcomponents.CircuitTypCore;
  * @since Sprint 2 - Circuit Refactoring
  */
 public interface INetList {
+    /** @return true when node zero is the first saved wire, as in desktop execution */
+    default boolean usesWireReference() { return false; }
 
     /**
      * Gets the maximum node index in the netlist.

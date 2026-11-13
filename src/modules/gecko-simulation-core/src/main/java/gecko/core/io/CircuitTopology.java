@@ -64,11 +64,13 @@ public final class CircuitTopology {
     private final Set<String> connectionDomains;
     private final List<HiddenComponent> hiddenComponents;
     private final List<String> physicalConnectionIssues;
+    private final List<Integer> connectionGroupOrder;
 
     private CircuitTopology(Map<CircuitModel.ComponentData, ComponentIdentity> identities,
             Map<TerminalIdentity, Integer> terminalGroups, Map<Integer, Group> groups,
             List<ComponentIdentity> activeComponents, List<ComponentIdentity> structuralComponents, List<Wire> wires,
-            List<String> physicalConnectionIssues) {
+            List<String> physicalConnectionIssues, List<Integer> connectionGroupOrder) {
+        this.connectionGroupOrder = List.copyOf(connectionGroupOrder);
         this.hiddenComponents = List.of();
         this.physicalConnectionIssues = List.copyOf(physicalConnectionIssues);
         this.identities = Map.copyOf(identities);
@@ -233,12 +235,20 @@ public final class CircuitTopology {
             groups.put(id, group);
             members.forEach(port -> terminalGroups.put(port.id(), id));
         }
-        return new CircuitTopology(identities, terminalGroups, groups, active, structural, wires, physicalConnectionIssues);
+        var connectionOrder = new java.util.LinkedHashSet<Integer>();
+        for (int i = 0; i < wires.size(); i++) {
+            int root = find(parent, ports.size() + i);
+            var members = roots.get(root);
+            if (members != null) connectionOrder.add(terminalGroups.get(members.getFirst().id()));
+        }
+        return new CircuitTopology(identities, terminalGroups, groups, active, structural, wires,
+                physicalConnectionIssues, new ArrayList<>(connectionOrder));
     }
 
     private CircuitTopology(CircuitTopology source, Map<TerminalIdentity, Integer> terminalGroups,
             Map<Integer, Group> groups, List<ComponentIdentity> activeComponents, List<HiddenComponent> children) {
         this.identities = source.identities;
+        this.connectionGroupOrder = source.connectionGroupOrder;
         this.terminalGroups = Map.copyOf(terminalGroups);
         this.groups = Map.copyOf(groups);
         this.activeComponents = List.copyOf(activeComponents);
@@ -337,6 +347,11 @@ public final class CircuitTopology {
     public Map<TerminalIdentity, Integer> terminalGroups() { return terminalGroups; }
     /** @return the immutable groups indexed by their identifiers */
     public Map<Integer, Group> groups() { return groups; }
+
+    /** @return terminal groups in saved wire order, before unwired terminal groups */
+    public List<Group> connectionGroupOrder() {
+        return connectionGroupOrder.stream().map(groups::get).filter(java.util.Objects::nonNull).toList();
+    }
     /** @return active computational identities in source and child projection order */
     public List<ComponentIdentity> activeComponents() { return activeComponents; }
     /** @return topology-only identities that do not require computational rows */

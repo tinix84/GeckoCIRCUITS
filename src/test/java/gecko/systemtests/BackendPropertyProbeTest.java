@@ -23,24 +23,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class BackendPropertyProbeTest {
     private static final Map<String, Set<String>> CAPTURE_FALLBACKS = Map.ofEntries(
-            Map.entry("boostPFC", Set.of("INVALID_PROBE_REFERENCE")),
-            Map.entry("boostPFC_currentControl", Set.of("INVALID_PROBE_REFERENCE")),
             Map.entry("singlePhase_PWM_converter", Set.of("UNSUPPORTED_SOURCE_MODE", "UNCONNECTED_GROUND",
-                    "INVALID_PROBE_REFERENCE", "MISSING_CONTROL_INPUT")),
-            Map.entry("diode_RL_singlePH_trafo", Set.of("UNCONNECTED_GROUND", "INVALID_PROBE_REFERENCE")),
-            Map.entry("2phaseDiodeBridge_AC-Inductor", Set.of("INVALID_PROBE_REFERENCE")),
-            Map.entry("2phaseDiodeBridge_DC-Inductor", Set.of("INVALID_PROBE_REFERENCE")),
-            Map.entry("thyristor_RL_singlePh_trafo", Set.of("UNCONNECTED_GROUND", "INVALID_PROBE_REFERENCE")),
-            Map.entry("thyristor_RL_3phBridge", Set.of("INVALID_PROBE_REFERENCE")),
-            Map.entry("thyristor_RL_3ph_trafo", Set.of("UNCONNECTED_GROUND", "INVALID_PROBE_REFERENCE")),
-            Map.entry("thyristor_interface_trafo", Set.of("INVALID_PROBE_REFERENCE")),
-            Map.entry("thyristor_commutation_3ph_trafo", Set.of("UNCONNECTED_GROUND", "INVALID_PROBE_REFERENCE")),
-            Map.entry("thyristor_lossOfCommutation", Set.of("UNCONNECTED_GROUND", "INVALID_PROBE_REFERENCE")),
-            Map.entry("thyristor_Jakopovic", Set.of("INVALID_PROBE_REFERENCE")));
-    private static final Set<String> PARSER_ONLY_MISSING_INPUT = Set.of("boostPFC", "boostPFC_currentControl",
-            "thyristor_RL_singlePh_trafo", "thyristor_RL_3phBridge", "thyristor_RL_3ph_trafo",
-            "thyristor_interface_trafo", "thyristor_commutation_3ph_trafo", "thyristor_lossOfCommutation",
-            "thyristor_Jakopovic");
+                    "MISSING_CONTROL_INPUT")),
+            Map.entry("diode_RL_singlePH_trafo", Set.of("UNCONNECTED_GROUND")),
+            Map.entry("thyristor_RL_singlePh_trafo", Set.of("UNCONNECTED_GROUND")),
+            Map.entry("thyristor_RL_3ph_trafo", Set.of("UNCONNECTED_GROUND")),
+            Map.entry("thyristor_commutation_3ph_trafo", Set.of("UNCONNECTED_GROUND")),
+            Map.entry("thyristor_lossOfCommutation", Set.of("UNCONNECTED_GROUND")));
+    private static final Set<String> PARSER_ONLY_MISSING_INPUT = Set.of("thyristor_RL_singlePh_trafo",
+            "thyristor_RL_3ph_trafo", "thyristor_commutation_3ph_trafo", "thyristor_lossOfCommutation");
 
     @Test
     void surefireReceivesBackendProperty() {
@@ -82,11 +73,10 @@ class BackendPropertyProbeTest {
             assertNull(GeckoSim._win._simRunner.simKern, "Core starts must not create a legacy numerical kernel");
             assertTrue(GeckoExternal.getSimulationTime() > 0);
             assertEquals(ContainerStatus.PAUSED, NetzlisteCONTROL.globalData.getContainerStatus());
-            GeckoExternal.openFile(java.nio.file.Path.of("src/test/resources/ipes/education/boostPFC.ipes")
+            GeckoExternal.openFile(java.nio.file.Path.of("src/test/resources/ipes/education/singlePhase_PWM_converter.ipes")
                     .toAbsolutePath().toString());
             RuntimeException failure = assertThrows(RuntimeException.class, GeckoExternal::runSimulation);
-            assertTrue(failure.toString().contains("INVALID_PROBE_REFERENCE"), failure::toString);
-            assertFalse(failure.toString().contains("MISSING_CONTROL_INPUT"), failure::toString);
+            assertTrue(failure.toString().contains("UNSUPPORTED_SOURCE_MODE"), failure::toString);
         } finally {
             restore("gecko.backend", previous);
             SwingUtilities.invokeAndWait(() -> {
@@ -128,7 +118,7 @@ class BackendPropertyProbeTest {
                     assertInstanceOf(PreparationResult.Ready.class, parsed, circuit);
                 }
             }
-            assertEquals(13, rejected);
+            assertEquals(6, rejected);
         } finally { closeWindows(); }
     }
 
@@ -205,7 +195,7 @@ class BackendPropertyProbeTest {
                     assertNull(GeckoSim._win._simRunner.simKern, circuit);
                 }
             }
-            assertEquals(13, messages.size());
+            assertEquals(6, messages.size());
         } finally {
             logger.removeHandler(handler);
             logger.setLevel(previousLevel);

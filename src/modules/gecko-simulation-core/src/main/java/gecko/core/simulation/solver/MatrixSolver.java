@@ -53,6 +53,7 @@ public class MatrixSolver {
     // LU decomposition solver state
     private Matrix matrixSolverA;     // Cached Matrix wrapper for A
     private boolean matrixChanged;    // Flag to indicate A matrix needs refactorization
+    private boolean wireReference;
 
     /**
      * Constructs a MatrixSolver with specified solver type.
@@ -86,6 +87,7 @@ public class MatrixSolver {
         }
         // Matrix size includes all nodes, voltage source variables, plus ground reference
         matrixSize = (int) requiredSize;
+        wireReference = false;
 
         // Allocate system matrix A and solution vector b
         a = new double[matrixSize][matrixSize];
@@ -295,7 +297,8 @@ public class MatrixSolver {
         // Without this, the KCL equations for nodes 0..N are linearly dependent
         // (they sum to zero by Kirchhoff's current law), making the matrix singular.
         // Adding a large conductance to ground forces p[0] ≈ 0.
-        a[0][0] += GROUND_CONDUCTANCE;
+        wireReference = netlist.usesWireReference();
+        if (!wireReference) a[0][0] += GROUND_CONDUCTANCE;
 
         double alpha = solverType == SolverType.SOLVER_BE ? 1
                 : solverType == SolverType.SOLVER_TRZ ? 2 : 1.5;
@@ -692,18 +695,21 @@ public class MatrixSolver {
         // Step 1: Create or update Matrix wrapper for A (only if matrix changed)
         if (matrixSolverA == null) {
             // First time: create Matrix wrapper from a[][]
-            matrixSolverA = new Matrix(a, matrixSize, matrixSize);
+            matrixSolverA = solveMatrix();
         } else if (matrixChanged) {
             // Matrix changed: reset cached LU decomposition and update wrapper
-            matrixSolverA.resetLUDecomp();
+            if (wireReference) matrixSolverA = solveMatrix();
+            else matrixSolverA.resetLUDecomp();
             // The underlying a[][] is already modified by buildMatrixA(),
             // so Matrix wrapper points to updated data
         }
 
         // Step 2: Create column vector B from b[] (nx1 matrix)
-        double[][] bArray = new double[matrixSize][1];
-        for (int i = 0; i < matrixSize; i++) {
-            bArray[i][0] = bVector[i];
+        int offset = wireReference ? 1 : 0;
+        int size = matrixSize - offset;
+        double[][] bArray = new double[size][1];
+        for (int i = 0; i < size; i++) {
+            bArray[i][0] = bVector[i + offset];
         }
         Matrix bMatrix = new Matrix(bArray);
 
@@ -714,16 +720,27 @@ public class MatrixSolver {
 
         // Step 4: Extract solution back to p[] array
         double[][] x = xMatrix.getArray();
-        for (int i = 0; i < matrixSize; i++) {
+        for (int i = 0; i < size; i++) {
             if (!Double.isFinite(x[i][0])) {
                 throw new IllegalStateException("Nonfinite solution at row " + i);
             }
         }
-        for (int i = 0; i < matrixSize; i++) {
-            p[i] = x[i][0];
+        if (wireReference) p[0] = 0;
+        for (int i = 0; i < size; i++) {
+            p[i + offset] = x[i][0];
         }
 
         // Mark that matrix is no longer changed (until next buildMatrixA or explicit flag)
         matrixChanged = false;
+    }
+
+    private Matrix solveMatrix() {
+        if (!wireReference) return new Matrix(a, matrixSize, matrixSize);
+        // Desktop excludes its reference row and column from LU decomposition.
+        double[][] reduced = new double[matrixSize - 1][matrixSize - 1];
+        for (int row = 1; row < matrixSize; row++) {
+            System.arraycopy(a[row], 1, reduced[row - 1], 0, matrixSize - 1);
+        }
+        return new Matrix(reduced);
     }
 }

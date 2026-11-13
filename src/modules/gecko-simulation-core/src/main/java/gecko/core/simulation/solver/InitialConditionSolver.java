@@ -157,6 +157,7 @@ public class InitialConditionSolver {
         CircuitNetlist initialNetwork = new CircuitNetlist();
         initialNetwork.initNetlist(types, x, y, sources, parameters,
                 netlist.getNodeMax(), sourceCount, count);
+        initialNetwork.setWireReference(netlist.usesWireReference());
         if (inductorCutset) {
             for (var coupling : netlist.getAllCouplings()) {
                 int first = coupling.getInductor1Index();

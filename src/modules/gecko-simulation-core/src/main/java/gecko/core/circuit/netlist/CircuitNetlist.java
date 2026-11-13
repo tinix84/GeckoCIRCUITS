@@ -48,6 +48,28 @@ import java.util.*;
  * @since v2.18.0 Phase 3 - Netlist migration to core
  */
 public class CircuitNetlist implements INetList {
+    private boolean wireReference;
+    private int[] numericalNodeOrder = new int[0];
+
+    /** @return a detached mapping from public node indexes to the desktop numerical order */
+    public int[] getNumericalNodeOrder() { return numericalNodeOrder.clone(); }
+
+    /** Retains a detached permutation for numerical execution. Public node indexes remain unchanged. */
+    public void setNumericalNodeOrder(int[] order) {
+        if (order.length != nodeCount + 1) throw new IllegalArgumentException("Numerical node count does not match.");
+        boolean[] seen = new boolean[order.length];
+        for (int value : order) {
+            if (value < 0 || value >= order.length || seen[value]) throw new IllegalArgumentException("Invalid numerical node order.");
+            seen[value] = true;
+        }
+        numericalNodeOrder = order.clone();
+    }
+
+    /** Sets the numerical reference convention for this run-owned netlist. */
+    public void setWireReference(boolean value) { wireReference = value; }
+
+    @Override
+    public boolean usesWireReference() { return wireReference; }
 
     // Basic circuit topology
     private CircuitTypCore[] componentTypes;
@@ -97,6 +119,8 @@ public class CircuitNetlist implements INetList {
             copy.initNetlist(componentTypes, nodeX, nodeY, voltageSourceNumbers, parameters,
                     nodeCount, voltageSourceCount, elementCount);
         }
+        copy.wireReference = wireReference;
+        copy.numericalNodeOrder = numericalNodeOrder.clone();
         copy.controlElementIndices = controlElementIndices.clone();
         copy.componentNameToIndex = Collections.unmodifiableMap(new LinkedHashMap<>(componentNameToIndex));
         copy.simulationTime = simulationTime;
@@ -183,6 +207,8 @@ public class CircuitNetlist implements INetList {
         Arrays.fill(controlElementIndices, -1);
 
         // A new circuit must not inherit results, probe mappings or simulation history.
+        wireReference = false;
+        numericalNodeOrder = new int[0];
         couplingRegistry.clear();
         simulationTime = 0.0;
         componentNameToIndex = Collections.emptyMap();
@@ -698,6 +724,8 @@ public class CircuitNetlist implements INetList {
      * After calling this, you must call initNetlist() again to repopulate.
      */
     public void clear() {
+        wireReference = false;
+        numericalNodeOrder = new int[0];
         componentTypes = null;
         nodeX = null;
         nodeY = null;
