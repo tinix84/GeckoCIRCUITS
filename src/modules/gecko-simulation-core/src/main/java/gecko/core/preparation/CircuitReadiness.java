@@ -254,22 +254,12 @@ final class CircuitReadiness {
                 String[] references = component.getParameterStrings();
                 for (int port = 0; port < 2; port++) {
                     String reference = port < references.length ? references[port] : "";
-                    boolean validNode = false;
-                    try {
-                        if (reference == null || reference.isBlank()) throw new NumberFormatException();
-                        if (Integer.parseInt(reference.trim()) < 0) throw new NumberFormatException();
-                        validNode = true;
-                    } catch (NumberFormatException error) {
+                    Integer resolvedNode = reference == null || reference.isBlank() ? null
+                            : resolveElectricalTerminalNode(model, component, reference, topology);
+                    if (resolvedNode == null || topology != null
+                            && (resolvedNode < 0 || resolvedNode > topology.getNodeMax())) {
                         diagnostics.add(control("INVALID_PROBE_REFERENCE", Diagnostic.Category.REFERENCES, component,
-                                "A voltage probe requires two valid numerical node indices."));
-                    }
-                    if (validNode) {
-                        Integer resolvedNode = resolveElectricalTerminalNode(model, component, reference, topology);
-                        if (resolvedNode == null || topology != null
-                                && (resolvedNode < 0 || resolvedNode > topology.getNodeMax())) {
-                            diagnostics.add(control("INVALID_PROBE_REFERENCE", Diagnostic.Category.REFERENCES, component,
-                                    "A voltage probe label must identify a valid electrical terminal in its saved sheet."));
-                        }
+                                "A voltage probe label must identify a valid electrical terminal in its saved sheet."));
                     }
                 }
             } else if (type == 2 || type == 6) {

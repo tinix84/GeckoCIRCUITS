@@ -42,24 +42,13 @@ class EducationCircuitReadinessTest {
     // These circuits remain preparation probes but are excluded from completion checks.
     // Exact outcomes and diagnostic codes keep new failures and stale exclusions visible.
     private static final Set<KnownGap> KNOWN_GAPS = Set.of(
-            new KnownGap("boostPFC", Set.of("INVALID_PROBE_REFERENCE", "MISSING_CONTROL_INPUT")),
-            new KnownGap("boostPFC_currentControl", Set.of("INVALID_PROBE_REFERENCE", "MISSING_CONTROL_INPUT")),
             new KnownGap("singlePhase_PWM_converter", Set.of("UNSUPPORTED_SOURCE_MODE", "UNCONNECTED_GROUND",
-                    "INVALID_PROBE_REFERENCE", "MISSING_CONTROL_INPUT")),
-            new KnownGap("diode_RL_singlePH_trafo", Set.of("UNCONNECTED_GROUND", "INVALID_PROBE_REFERENCE")),
-            new KnownGap("2phaseDiodeBridge_AC-Inductor", Set.of("INVALID_PROBE_REFERENCE")),
-            new KnownGap("2phaseDiodeBridge_DC-Inductor", Set.of("INVALID_PROBE_REFERENCE")),
-            new KnownGap("thyristor_RL_singlePh_trafo", Set.of("UNCONNECTED_GROUND", "INVALID_PROBE_REFERENCE",
                     "MISSING_CONTROL_INPUT")),
-            new KnownGap("thyristor_RL_3phBridge", Set.of("INVALID_PROBE_REFERENCE", "MISSING_CONTROL_INPUT")),
-            new KnownGap("thyristor_RL_3ph_trafo", Set.of("UNCONNECTED_GROUND", "INVALID_PROBE_REFERENCE",
-                    "MISSING_CONTROL_INPUT")),
-            new KnownGap("thyristor_interface_trafo", Set.of("INVALID_PROBE_REFERENCE", "MISSING_CONTROL_INPUT")),
-            new KnownGap("thyristor_commutation_3ph_trafo", Set.of("UNCONNECTED_GROUND", "INVALID_PROBE_REFERENCE",
-                    "MISSING_CONTROL_INPUT")),
-            new KnownGap("thyristor_lossOfCommutation", Set.of("UNCONNECTED_GROUND", "INVALID_PROBE_REFERENCE",
-                    "MISSING_CONTROL_INPUT")),
-            new KnownGap("thyristor_Jakopovic", Set.of("INVALID_PROBE_REFERENCE", "MISSING_CONTROL_INPUT")));
+            new KnownGap("diode_RL_singlePH_trafo", Set.of("UNCONNECTED_GROUND")),
+            new KnownGap("thyristor_RL_singlePh_trafo", Set.of("UNCONNECTED_GROUND", "MISSING_CONTROL_INPUT")),
+            new KnownGap("thyristor_RL_3ph_trafo", Set.of("UNCONNECTED_GROUND", "MISSING_CONTROL_INPUT")),
+            new KnownGap("thyristor_commutation_3ph_trafo", Set.of("UNCONNECTED_GROUND", "MISSING_CONTROL_INPUT")),
+            new KnownGap("thyristor_lossOfCommutation", Set.of("UNCONNECTED_GROUND", "MISSING_CONTROL_INPUT")));
 
     static Stream<String> circuitFiles() {
         return CIRCUITS.stream();

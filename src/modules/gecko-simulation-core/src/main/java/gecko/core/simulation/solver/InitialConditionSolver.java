@@ -128,6 +128,7 @@ public class InitialConditionSolver {
         }
 
         int count = netlist.getElementCount();
+        boolean inductorCutset = hasInductorCutset(netlist);
         CircuitTypCore[] types = new CircuitTypCore[count];
         int[] x = new int[count], y = new int[count], sources = new int[count];
         double[][] parameters = new double[count][];
@@ -139,7 +140,9 @@ public class InitialConditionSolver {
             y[i] = netlist.getNodeY(i);
             double[] values = netlist.getParameter(i);
             parameters[i] = Arrays.copyOf(values, Math.max(13, values.length));
-            if (isDynamic(original)) {
+            boolean zeroStartCapacitor = (original == CircuitTypCore.LK_C || original == CircuitTypCore.TH_CTH)
+                    && parameters[i][1] == 0;
+            if (isDynamic(original) && !(inductorCutset && (isInductor(original) || zeroStartCapacitor))) {
                 double initial = parameters[i][1];
                 types[i] = original == CircuitTypCore.LK_C || original == CircuitTypCore.TH_CTH
                         ? CircuitTypCore.LK_U : CircuitTypCore.LK_I;
@@ -148,23 +151,42 @@ public class InitialConditionSolver {
                 parameters[i][1] = initial;
             }
             boolean voltageSource = types[i] == CircuitTypCore.LK_U || types[i] == CircuitTypCore.TH_TEMP
-                    || types[i] == CircuitTypCore.REL_MMF;
+                    || types[i] == CircuitTypCore.REL_MMF || types[i] == CircuitTypCore.LK_LKOP2;
             sources[i] = voltageSource ? ++sourceCount : -1;
         }
         CircuitNetlist initialNetwork = new CircuitNetlist();
         initialNetwork.initNetlist(types, x, y, sources, parameters,
                 netlist.getNodeMax(), sourceCount, count);
-        MatrixSolver initialSolver = new MatrixSolver(SolverType.SOLVER_BE);
+        if (inductorCutset) {
+            for (var coupling : netlist.getAllCouplings()) {
+                int first = coupling.getInductor1Index();
+                int second = coupling.getInductor2Index();
+                initialNetwork.registerMutualCoupling(first, second, coupling.getCouplingCoefficient(),
+                        parameters[first][0], parameters[second][0]);
+            }
+        }
+        MatrixSolver initialSolver = new MatrixSolver(inductorCutset ? solverType : SolverType.SOLVER_BE);
         initialSolver.initializeMatrices(netlist.getNodeMax(), sourceCount, count);
-        initialSolver.buildMatrixA(initialNetwork, 1, 0, false);
-        initialSolver.buildVectorB(initialNetwork, 1, 0, false);
+        // A cutset requires the complete LKMatrices 1 ns pre-step, including every dynamic branch and source.
+        // Its histories start at zero. Configured inductor currents are restored after the voltage solve.
+        double initialStep = inductorCutset ? 1e-9 : 1;
+        double initialTime = inductorCutset ? -initialStep : 0;
+        initialSolver.buildMatrixA(initialNetwork, initialStep, initialTime, false);
+        initialSolver.buildVectorB(initialNetwork, initialStep, initialTime, false);
         initialSolver.solve();
         double[] currents = new double[count];
         new ComponentCurrentCalculator().calculateComponentCurrents(
-                initialSolver, initialNetwork, currents, 0, 1, 0, true);
+                initialSolver, initialNetwork, currents, 0, initialStep, initialTime, true);
         double[] potentials = new double[matrixSolver.getMatrixSize()];
         System.arraycopy(initialSolver.getP(), 0, potentials, 0, netlist.getNodeMax() + 1);
         for (int i = 0; i < count; i++) {
+            if (inductorCutset && isInductor(netlist.getType(i))) {
+                currents[i] = parameters[i][1];
+            } else if (inductorCutset && (netlist.getType(i) == CircuitTypCore.LK_C
+                    || netlist.getType(i) == CircuitTypCore.TH_CTH)) {
+                // LKMatrices clears all capacitor current histories after its dialog-start pre-step.
+                currents[i] = 0;
+            }
             if (!Double.isFinite(currents[i])) {
                 throw new IllegalStateException("Nonfinite initial current for element " + i);
             }
@@ -174,6 +196,41 @@ public class InitialConditionSolver {
             }
         }
         seedHistories(matrixSolver, potentials, currents);
+    }
+
+    private static boolean hasInductorCutset(INetList netlist) {
+        int[] components = new int[netlist.getNodeMax() + 1];
+        Arrays.setAll(components, node -> node);
+        for (int i = 0; i < netlist.getElementCount(); i++) {
+            CircuitTypCore type = netlist.getType(i);
+            if (isInductor(type) || type == CircuitTypCore.LK_I || type == CircuitTypCore.TH_FLOW) {
+                continue;
+            }
+            int x = componentRoot(components, netlist.getNodeX(i));
+            int y = componentRoot(components, netlist.getNodeY(i));
+            components[y] = x;
+        }
+        for (int i = 0; i < netlist.getElementCount(); i++) {
+            if (isInductor(netlist.getType(i))
+                    && componentRoot(components, netlist.getNodeX(i))
+                    != componentRoot(components, netlist.getNodeY(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static int componentRoot(int[] components, int node) {
+        while (components[node] != node) {
+            components[node] = components[components[node]];
+            node = components[node];
+        }
+        return node;
+    }
+
+    private static boolean isInductor(CircuitTypCore type) {
+        return type == CircuitTypCore.LK_L || type == CircuitTypCore.NONLIN_REL
+                || type == CircuitTypCore.LK_LKOP2;
     }
 
     private static boolean isDynamic(CircuitTypCore type) {

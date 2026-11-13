@@ -113,6 +113,50 @@ class ControlReadinessTest {
     }
 
     @Test
+    void voltageProbeResolvesNamedElectricalTerminalPair() {
+        var model = resistorCircuit();
+        for (var component : model.getCircuitComponents()) {
+            component.setTerminalXLabels(new String[]{"NR"});
+            component.setTerminalYLabels(new String[]{"GND"});
+        }
+        model.addControlComponent(control(1, "named voltage", new double[0], new String[0],
+                new String[]{"voltage"}, "NR", "GND"));
+
+        var result = assertInstanceOf(PreparationResult.Ready.class, prepare(model));
+        assertTrue(result.report().readyForHeadless());
+        assertTrue(result.report().diagnostics().stream()
+                .noneMatch(d -> d.code().equals("INVALID_PROBE_REFERENCE")));
+    }
+
+    @Test
+    void voltageProbeRejectsUnknownNamedElectricalTerminal() {
+        var model = resistorCircuit();
+        model.addCircuitComponent(component(1, "R.named", new double[]{10}, "NR", "0"));
+        model.addControlComponent(control(1, "unknown voltage", new double[0], new String[0],
+                new String[]{"voltage"}, "NR", "unknown"));
+
+        diagnostic(model, "INVALID_PROBE_REFERENCE", "unknown voltage");
+        assertEquals(1, prepare(model).report().diagnostics().stream()
+                .filter(d -> d.code().equals("INVALID_PROBE_REFERENCE")).count());
+    }
+
+    @Test
+    void voltageProbeCannotResolveANamedTerminalFromAnotherSavedSheet() {
+        var model = resistorCircuit();
+        model.addCircuitComponent(component(1, "R.named", new double[]{10}, "NR", "0"));
+        var voltage = control(1, "nested named voltage", new double[0], new String[0],
+                new String[]{"voltage"}, "NR", "0");
+        voltage.setSavedBlock(SavedCircuitBlock.parse("ElementCONTROL",
+                new String[]{"parentSheetIdentifier 202", "enabledShorted 1"}));
+        model.addControlComponent(voltage);
+
+        diagnostic(model, "INVALID_PROBE_REFERENCE", "nested named voltage");
+        assertEquals(2, prepare(model).report().diagnostics().stream()
+                .filter(d -> d.code().equals("INVALID_PROBE_REFERENCE")
+                        && "nested named voltage".equals(d.component())).count());
+    }
+
+    @Test
     void voltageProbeResolvesNumericLabelsAboveTheNetlistNodeMaximum() {
         var model = resistorCircuit();
         model.addCircuitComponent(component(1, "R.highLabel", new double[]{10}, "99", "0"));
