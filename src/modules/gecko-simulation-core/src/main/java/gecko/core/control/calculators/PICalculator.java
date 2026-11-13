@@ -30,6 +30,8 @@ public final class PICalculator extends AbstractControlCalculatable implements I
     public void initializeAtSimulationStart(final double deltaT) {
         y1alt = 0;
         xalt = 0;
+        y11 = 0;
+        _outputSignal[0][0] = 0;
     }
 
     @Override

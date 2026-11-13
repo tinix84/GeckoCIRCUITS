@@ -209,6 +209,7 @@ public class ComponentCurrentCalculator {
                         }
                         case SourceType.QUELLE_VOLTAGECONTROLLED_DIRECTLY_NEW:
                         case SourceType.QUELLE_VOLTAGECONTROLLED_DIRECTLY:
+                            // Preserve desktop reporting. The matrix still uses the physical source current.
                             current = 0.0;
                             parameters[1] = current;
                             break;

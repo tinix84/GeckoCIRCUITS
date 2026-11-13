@@ -13,15 +13,17 @@ public final class PreparedCircuit {
      *
      * @return an independently writable copy of the prepared configuration
      */
-    public CircuitModel newRunModel() { return circuit.toModel(); }
+    public CircuitModel newRunModel() { return circuit.executionModel(); }
     /**
-     * Returns a new settings object with the resolved solver, time step, and duration.
+     * Returns detached settings with all captured solver and simulation values.
      * Changes to this object cannot change the prepared circuit.
      *
      * @return detached settings for one execution
      */
     public SolverSettingsCore solverSettings() {
         var model = circuit.toModel();
-        return new SolverSettingsCore(model.getSolverType(), model.getTimeStep(), model.getSimulationDuration());
+        return new SolverSettingsCore(model.getSolverType(), model.getTimeStep(), model.getSimulationDuration())
+                .withPreCalculation(model.getPreSimulationTime(), model.getPreSimulationTimeStep())
+                .withPauseTime(model.getPauseTime());
     }
 }

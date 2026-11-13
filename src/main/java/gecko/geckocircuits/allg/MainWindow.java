@@ -1537,27 +1537,9 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
         mItemConnectorTest.setState(cb);
     }
 
-    //end simulation - control from GeckoSCRIPT
+    /** Stops the simulation requested by GeckoSCRIPT. */
     public void endSim() {
-        _simRunner.simKern.endSim();
-        jtfStatus.setText("Stopped after  ");
-        //
-
-        if (IS_BRANDED) {
-            mItemNew.setEnabled(false);
-            mItemOpen.setEnabled(false);
-        } else {
-            mItemNew.setEnabled(true);
-            mItemOpen.setEnabled(true);
-        }
-        mItemExit.setEnabled(true);
-        mItemSave.setEnabled(true);
-        mItemSaveAs.setEnabled(true);
-        mItemSaveView.setEnabled(true);
-        setzeSTATUS("Stopped after  ");
-        pauseSimulation();
-        setMenuDuringSimulation(false, true);
-
+        _simRunner.endSimulation();
     }
 
     public void continueCalculation(final boolean createNewSimThread) throws Exception {
@@ -1569,44 +1551,69 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
     }
 
     public void setMenuDuringSimulation(boolean simulationRunning, boolean endReached) {
+        setMenuDuringSimulation(simulationRunning, endReached, () -> true);
+    }
+
+    private final LatestOwnedPresentation _simulationMenuUpdates = new LatestOwnedPresentation();
+
+    /**
+     * Updates simulation menus while the caller owns their presentation.
+     *
+     * @param simulationRunning true while execution is active
+     * @param endReached true when stopped simulation actions are available
+     * @param stillCurrent checks ownership before each widget change
+     */
+    public void setMenuDuringSimulation(boolean simulationRunning, boolean endReached,
+            java.util.function.BooleanSupplier stillCurrent) {
+        java.util.List<Runnable> changes = new java.util.ArrayList<>();
         if (simulationRunning) {
-            mItemNew.setEnabled(false);
-            mItemOpen.setEnabled(false);
-            mItemSave.setEnabled(false);
-            mItemSaveAs.setEnabled(false);
-            mItemExit.setEnabled(false);
-            mItemSaveView.setEnabled(false);
-            mItemCopy.setEnabled(false);
-            mItemMove.setEnabled(false);
-            mItemDelete.setEnabled(false);
+            changes.add(() -> mItemNew.setEnabled(false));
+            changes.add(() -> mItemOpen.setEnabled(false));
+            changes.add(() -> mItemSave.setEnabled(false));
+            changes.add(() -> mItemSaveAs.setEnabled(false));
+            changes.add(() -> mItemExit.setEnabled(false));
+            changes.add(() -> mItemSaveView.setEnabled(false));
+            changes.add(() -> mItemCopy.setEnabled(false));
+            changes.add(() -> mItemMove.setEnabled(false));
+            changes.add(() -> mItemDelete.setEnabled(false));
             if (mItemParameter != null) {
-                mItemParameter.setEnabled(false);
-                mItemRun.setEnabled(false);
-                mItemStop.setEnabled(true);
-                mItemContinue.setEnabled(false);
+                changes.add(() -> mItemParameter.setEnabled(false));
+                changes.add(() -> mItemRun.setEnabled(false));
+                changes.add(() -> mItemStop.setEnabled(true));
+                changes.add(() -> mItemContinue.setEnabled(false));
             }
         } else if (endReached) {
-            if (!IS_BRANDED) {
-                mItemNew.setEnabled(true);
-                mItemOpen.setEnabled(true);
-            }
-            mItemExit.setEnabled(true);
-            mItemSave.setEnabled(true);
-            mItemSaveAs.setEnabled(true);
-            mItemSaveView.setEnabled(true);
-
-            mItemCopy.setEnabled(true);
-            mItemMove.setEnabled(true);
-            mItemDelete.setEnabled(true);
-
-            if (mItemParameter != null) {
-                mItemParameter.setEnabled(true);
-                mItemRun.setEnabled(true);
-                mItemStop.setEnabled(false);
-                mItemContinue.setEnabled(true);
-            }
+            addStoppedMenuChanges(changes, true);
         }
+        _simulationMenuUpdates.update(stillCurrent, changes.toArray(Runnable[]::new));
+    }
 
+    /** Restores editing and start actions without enabling continuation of a failed core calculation. */
+    public void setMenusAfterSimulationFailure() {
+        java.util.List<Runnable> changes = new java.util.ArrayList<>();
+        addStoppedMenuChanges(changes, false);
+        changes.add(() -> jtfStatus.setText("Simulation aborted."));
+        _simulationMenuUpdates.update(() -> true, changes.toArray(Runnable[]::new));
+    }
+
+    private void addStoppedMenuChanges(java.util.List<Runnable> changes, boolean canContinue) {
+        if (!IS_BRANDED) {
+            changes.add(() -> mItemNew.setEnabled(true));
+            changes.add(() -> mItemOpen.setEnabled(true));
+        }
+        changes.add(() -> mItemExit.setEnabled(true));
+        changes.add(() -> mItemSave.setEnabled(true));
+        changes.add(() -> mItemSaveAs.setEnabled(true));
+        changes.add(() -> mItemSaveView.setEnabled(true));
+        changes.add(() -> mItemCopy.setEnabled(true));
+        changes.add(() -> mItemMove.setEnabled(true));
+        changes.add(() -> mItemDelete.setEnabled(true));
+        if (mItemParameter != null) {
+            changes.add(() -> mItemParameter.setEnabled(true));
+            changes.add(() -> mItemRun.setEnabled(true));
+            changes.add(() -> mItemStop.setEnabled(false));
+            changes.add(() -> mItemContinue.setEnabled(canContinue));
+        }
     }
 
     /**
@@ -1937,9 +1944,6 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
                     ex.getMessage(),
                     "Error",
                     JOptionPane.ERROR_MESSAGE);
-            pauseSimulation();
-            _simRunner.simKern._simulationStatus = SimulationsKern.SimulationStatus.FINISHED;
-            jtfStatus.setText("Simulation aborted.");
         }
     }
 
@@ -1967,9 +1971,6 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
         try {
             this.continueCalculation(true);
         } catch (Throwable ex) {
-            pauseSimulation();
-            _simRunner.simKern._simulationStatus = SimulationsKern.SimulationStatus.FINISHED;
-            jtfStatus.setText("Simulation aborted.");
             JOptionPane.showMessageDialog(this,
                     ex.getMessage(),
                     "Error",

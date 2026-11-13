@@ -2,6 +2,7 @@ package gecko.core.preparation;
 
 import gecko.core.io.CircuitModel;
 import gecko.core.io.ImportIssue;
+import gecko.core.simulation.ControlBlockDescriptor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -10,14 +11,48 @@ import java.util.Map;
 import java.util.Objects;
 
 /** One table binds saved slots and public names to configured fields. */
-final class CircuitConfiguration {
+public final class CircuitConfiguration {
+    private CircuitConfiguration() {}
+
+    /**
+     * Resolves unnormalized saved CONTROL settings on a detached model.
+     * The copy retains file version, optimizer definitions, and captured resources.
+     * Electrical and thermal settings do not pass through normalization or validation.
+     * Resolved and synthetic descriptions retain their existing numeric settings.
+     *
+     * @param model the model with its saved configuration context
+     * @return a detached resolved model, or the original model when no resolution is necessary
+     * @throws IllegalArgumentException if a saved CONTROL setting is invalid
+     */
+    public static CircuitModel resolveSavedControl(CircuitModel model) {
+        if (unresolvedControl(model).isEmpty()) return model;
+        var resolved = new CircuitSnapshot(model).toModel();
+        var entries = unresolvedControl(resolved);
+        var diagnostics = normalize(resolved, entries);
+        diagnostics.addAll(validate(resolved, entries));
+        for (var diagnostic : diagnostics) {
+            if (diagnostic.severity() == Diagnostic.Severity.ERROR) {
+                throw new IllegalArgumentException(diagnostic.message() + " [" + diagnostic.parameterPath() + "]");
+            }
+        }
+        return resolved;
+    }
+
+    private static List<Component> unresolvedControl(CircuitModel model) {
+        return model.getControlComponents().stream().map(data -> new Component("CONTROL", data))
+                .filter(entry -> entry.data().isParsedInput() && !entry.data().isConfigurationNormalized())
+                .filter(entry -> !fields(entry).isEmpty()).toList();
+    }
+
+
     enum Rule {
-        FINITE, NON_NEGATIVE, POSITIVE, INTEGER, UNIT_INTERVAL, SIGNED_UNIT_INTERVAL, SOURCE_MODE, SIGNAL_MODE;
+        FINITE, NON_NEGATIVE, POSITIVE, BOOLEAN, INTEGER, UNIT_INTERVAL, SIGNED_UNIT_INTERVAL, SOURCE_MODE, SIGNAL_MODE;
         boolean accepts(double value) {
             return Double.isFinite(value) && switch (this) {
                 case FINITE -> true;
                 case NON_NEGATIVE -> value >= 0;
                 case POSITIVE -> value > 0;
+                case BOOLEAN -> value == 0 || value == 1;
                 case INTEGER -> value == Math.rint(value);
                 case UNIT_INTERVAL -> value >= 0 && value <= 1;
                 case SIGNED_UNIT_INTERVAL -> value >= -1 && value <= 1;
@@ -52,17 +87,10 @@ final class CircuitConfiguration {
             };
         }
         if (component.domain().equals("CONTROL")) {
-            return switch (component.data().getType()) {
-                case 3 -> List.of(new Field("value", 0, Rule.FINITE, "constant", "constantValue"));
-                case 4 -> List.of(new Field("subtype", 0, Rule.SIGNAL_MODE, "typQuelle"),
-                        new Field("amplitude", 1, Rule.NON_NEGATIVE, "amplitudeAC"),
-                        new Field("frequency", 2, Rule.NON_NEGATIVE, "frequenz"),
-                        new Field("phaseDegrees", 3, Rule.FINITE, "phase"),
-                        new Field("offset", 4, Rule.FINITE, "anteilDC"),
-                        new Field("duty", 5, Rule.UNIT_INTERVAL, "dutyRatio", "tastverhaeltnis"));
-                case 7 -> List.of(new Field("gain", 0, Rule.FINITE, "k"));
-                default -> List.of();
-            };
+            var descriptor = ControlBlockDescriptor.find(component.data().getType());
+            return descriptor == null ? List.of() : descriptor.settings().stream()
+                    .map(setting -> new Field(setting.name(), setting.slot(), Rule.valueOf(setting.rule().name()), setting.aliases()))
+                    .toList();
         }
         return List.of();
     }
@@ -95,8 +123,12 @@ final class CircuitConfiguration {
     }
 
     static List<Diagnostic> normalize(CircuitModel model) {
+        return normalize(model, components(model));
+    }
+
+    private static List<Diagnostic> normalize(CircuitModel model, List<Component> entries) {
         List<Diagnostic> diagnostics = new ArrayList<>();
-        for (var entry : components(model)) {
+        for (var entry : entries) {
             var component = entry.data();
             if (fields(entry).isEmpty()) continue;
             double[] original = component.getNumericParameters();
@@ -107,6 +139,12 @@ final class CircuitConfiguration {
             double[] values = Arrays.copyOf(original, count);
             boolean[] supplied = new boolean[count];
             Arrays.fill(supplied, 0, original.length, true);
+            if (entry.domain().equals("CONTROL")) {
+                var descriptor = ControlBlockDescriptor.find(component.getType());
+                if (descriptor != null) for (var setting : descriptor.settings()) {
+                    if (!supplied[setting.slot()]) values[setting.slot()] = setting.defaultValue();
+                }
+            }
             for (int slot = 0; slot < count; slot++) {
                 Object indexed = component.getParameters().get("param" + slot);
                 if (indexed instanceof Number number) {
@@ -123,8 +161,8 @@ final class CircuitConfiguration {
                 double offset = values[3];
                 values[3] = model.getFileVersion() == 170 ? Math.toRadians(values[4]) : values[4];
                 values[4] = offset;
-                values[0] = signalSubtype(values[0]);
             }
+            if (isSignal(entry)) values[0] = canonicalSignalSubtype(values[0]);
             for (var field : fields(entry)) {
                 double value = values[field.slot()];
                 if (component.isParsedInput() && !component.isConfigurationNormalized()) {
@@ -144,7 +182,8 @@ final class CircuitConfiguration {
                             : isSignal(entry) && field.slot() == 4 ? 3 : field.slot();
                     String binding = legacyBinding(component, savedSlot);
                     if (raw != null) {
-                        try { value = fromNamed(entry, field, Double.parseDouble(raw)); }
+                        try { value = fromNamed(entry, field, field.rule() == Rule.BOOLEAN && (raw.equals("true") || raw.equals("false"))
+                                ? Boolean.parseBoolean(raw) ? 1 : 0 : Double.parseDouble(raw)); }
                         catch (NumberFormatException error) {
                             diagnostics.add(configuration("INVALID_PARAMETER", entry, field.name(), "The saved value must be numeric"));
                         }
@@ -169,8 +208,9 @@ final class CircuitConfiguration {
                     boolean named = false;
                     for (String name : names) {
                         Object candidate = component.getParameters().get(name);
-                        if (candidate instanceof Number number) {
-                            double candidateValue = fromNamed(entry, field, number.doubleValue());
+                        if (candidate instanceof Number || candidate instanceof Boolean) {
+                            double candidateValue = fromNamed(entry, field, candidate instanceof Number number
+                                    ? number.doubleValue() : Boolean.TRUE.equals(candidate) ? 1 : 0);
                             if ((supplied[field.slot()] || named) && !(isSignal(entry) && field.slot() == 3 ? sameValue(value, candidateValue) : value == candidateValue)) {
                                 diagnostics.add(configuration("INPUT_REPRESENTATION_CONFLICT", entry, name,
                                         "The named and indexed configuration values must agree"));
@@ -231,12 +271,22 @@ final class CircuitConfiguration {
     }
 
     static List<Diagnostic> validate(CircuitModel model) {
+        return validate(model, components(model));
+    }
+
+    private static List<Diagnostic> validate(CircuitModel model, List<Component> entries) {
         List<Diagnostic> diagnostics = new ArrayList<>();
-        for (var component : components(model)) {
+        for (var component : entries) {
             for (var field : fields(component)) {
                 Object value = component.data().getParameters().get("param" + field.slot());
                 if (!(value instanceof Number number) || !field.rule().accepts(number.doubleValue())) {
                     diagnostics.add(configuration("INVALID_PARAMETER", component, field.name(), "The configured value is outside its permitted range"));
+                }
+            }
+            if (component.domain().equals("CONTROL")) {
+                var descriptor = ControlBlockDescriptor.find(component.data().getType());
+                if (descriptor != null) for (String error : descriptor.validateConfiguration(component.data(), model)) {
+                    diagnostics.add(configuration("INVALID_PARAMETER", component, "configuration", error));
                 }
             }
             if (isSource(component)) {
@@ -327,12 +377,20 @@ final class CircuitConfiguration {
         return component.domain().equals("CONTROL") && component.data().getType() == 4;
     }
     private static double fromNamed(Component component, Field field, double value) {
-        if (isSignal(component) && field.slot() == 0) return signalSubtype(value);
+        if (isSignal(component) && field.slot() == 0) return canonicalSignalSubtype(value);
         return isSignal(component) && field.slot() == 3 ? Math.toRadians(value) : value;
     }
-    private static double signalSubtype(double value) {
+    /**
+     * Maps accepted CONTROL waveform identifiers to their calculator identifiers.
+     *
+     * @param value the saved or programmatic waveform identifier
+     * @return the canonical identifier, or the original value when it is unknown
+     */
+    public static double canonicalSignalSubtype(double value) {
         if (value != Math.rint(value)) return value;
-        return switch ((int) value) { case 0, 402 -> 400; case 1, 403 -> 401; case 2 -> 404; default -> value; };
+        return switch ((int) value) {
+            case 0, 402 -> 400; case 1, 403 -> 401; case 2 -> 404; case 3 -> 405; case 4 -> 406; default -> value;
+        };
     }
     private static boolean sameValue(double first, double second) {
         return Double.compare(first, second) == 0 || Math.abs(first - second) <= 1e-12 * Math.max(1, Math.max(Math.abs(first), Math.abs(second)));

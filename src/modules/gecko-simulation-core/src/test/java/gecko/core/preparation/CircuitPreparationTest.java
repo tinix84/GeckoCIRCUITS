@@ -1,6 +1,7 @@
 package gecko.core.preparation;
 
 import gecko.core.io.CircuitModel;
+import gecko.core.io.ImportIssue;
 import gecko.core.simulation.HeadlessSimulationEngine;
 import java.util.ArrayList;
 import java.util.List;
@@ -173,4 +174,57 @@ class CircuitPreparationTest {
         assertEquals(ReadinessReport.Outcome.UNSUPPORTED,
                 preparation.prepare(preparation.capture(unsupportedOnly), PreparationRequest.defaults()).report().outcome());
     }
+    @Test
+    void malformedWireRemainsInspectableAndInvalidOverridesStillReject() {
+        var model = new CircuitModel();
+        model.addConnection(new CircuitModel.ConnectionData("LK", new int[][]{{4, 5}}));
+        var preparation = new CircuitPreparation();
+        var snapshot = preparation.capture(model);
+        model.getConnections().getFirst().getPoints()[0][0] = 99;
+        var inspectable = assertInstanceOf(PreparationResult.Inspectable.class,
+                preparation.prepare(snapshot, PreparationRequest.defaults()));
+        assertEquals(ReadinessReport.Outcome.INVALID, inspectable.report().outcome());
+        assertTrue(inspectable.report().diagnostics().stream().anyMatch(diagnostic ->
+                diagnostic.code().equals("INVALID_TOPOLOGY") && diagnostic.message().contains("wire")));
+        assertArrayEquals(new int[]{4, 5}, inspectable.circuit().toModel().getConnections().getFirst().getPoints()[0]);
+        assertArrayEquals(new int[]{4, 5}, snapshot.toModel().getConnections().getFirst().getPoints()[0]);
+        var rejected = assertInstanceOf(PreparationResult.Rejected.class, preparation.prepare(snapshot,
+                new PreparationRequest(SolverOverrides.none(), Map.of("missing.value", 1.0))));
+        assertTrue(rejected.report().diagnostics().stream().anyMatch(diagnostic -> diagnostic.code().equals("UNKNOWN_PARAMETER")));
+        assertTrue(rejected.report().diagnostics().stream().anyMatch(diagnostic -> diagnostic.code().equals("INVALID_TOPOLOGY")));
+        assertEquals(inspectable.report(), preparation.prepare(snapshot, PreparationRequest.defaults()).report());
+    }
+
+    @Test
+    void malformedTopologyRetainsIndependentEffectiveSettingsAndImportFindings() {
+        var model = resistorCircuit();
+        model.setTimeStep(-1);
+        model.addConnection(new CircuitModel.ConnectionData("LK", new int[][]{{4, 5}}));
+        model.getImportIssues().add(new ImportIssue("MALFORMED_SIMULATION_BLOCK", "CONTROL", "broken",
+                "The closing tag is missing.", "fixture.ipes: line 14", false));
+        var preparation = new CircuitPreparation();
+        var snapshot = preparation.capture(model);
+        var invalid = assertInstanceOf(PreparationResult.Inspectable.class,
+                preparation.prepare(snapshot, PreparationRequest.defaults()));
+        assertEquals(List.of("MALFORMED_SIMULATION_BLOCK", "INVALID_TOPOLOGY", "INVALID_SETTING"),
+                invalid.report().diagnostics().stream().map(Diagnostic::code).toList());
+        assertEquals(Diagnostic.Category.PARSING, invalid.report().diagnostics().getFirst().category());
+        assertEquals("fixture.ipes: line 14", invalid.report().diagnostics().getFirst().sourceLocation());
+        assertEquals("timeStep", invalid.report().diagnostics().getLast().parameterPath());
+        var repairedStep = assertInstanceOf(PreparationResult.Inspectable.class, preparation.prepare(snapshot,
+                new PreparationRequest(new SolverOverrides(null, 0.1, null), Map.of())));
+        assertEquals(List.of("MALFORMED_SIMULATION_BLOCK", "INVALID_TOPOLOGY"),
+                repairedStep.report().diagnostics().stream().map(Diagnostic::code).toList());
+        assertEquals(0.1, repairedStep.circuit().toModel().getTimeStep());
+        var rejected = assertInstanceOf(PreparationResult.Rejected.class, preparation.prepare(snapshot,
+                new PreparationRequest(new SolverOverrides(null, 0.1, 0.0), Map.of())));
+        assertEquals(List.of("INVALID_SETTING", "MALFORMED_SIMULATION_BLOCK", "INVALID_TOPOLOGY"),
+                rejected.report().diagnostics().stream().map(Diagnostic::code).toList());
+        assertEquals("duration", rejected.report().diagnostics().getFirst().parameterPath());
+        assertEquals(-1, snapshot.toModel().getTimeStep());
+        assertEquals(1, snapshot.toModel().getImportIssues().size());
+        assertArrayEquals(new int[]{4, 5}, snapshot.toModel().getConnections().getFirst().getPoints()[0]);
+        assertEquals(invalid.report(), preparation.prepare(snapshot, PreparationRequest.defaults()).report());
+    }
+
 }

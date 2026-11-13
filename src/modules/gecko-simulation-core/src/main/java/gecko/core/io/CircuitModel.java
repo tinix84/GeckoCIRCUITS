@@ -27,6 +27,11 @@ import java.util.Map;
  * <p>This class is designed for headless operation and contains no Swing/AWT dependencies.</p>
  */
 public class CircuitModel {
+    /** Captured grid geometry. Hidden proxy terminals do not have physical junctions. */
+    public record TerminalData(String domain, long sheetIdentifier, CircuitTopology.Side side, int port,
+                               int x, int y, boolean geometric) { }
+    /** Retains a nonexecuting block that still defines terminal connectivity. */
+    public record StructuralComponent(String domain, ComponentData component) { }
 
     // Simulation parameters
     private double simulationDuration;
@@ -54,6 +59,21 @@ public class CircuitModel {
     private final List<ComponentData> controlComponents = new ArrayList<>();
     private final List<ComponentData> thermalComponents = new ArrayList<>();
     private final List<ConnectionData> connections = new ArrayList<>();
+    private final List<StructuralComponent> structuralComponents = new ArrayList<>();
+    private final List<ComponentData> specialComponents = new ArrayList<>();
+    private final List<SavedCircuitBlock> savedBlocks = new ArrayList<>();
+    private final Map<String, String> savedSettings = new HashMap<>();
+    private final List<SavedCircuitBlock.Section> savedSections = new ArrayList<>();
+    private final Map<Long, CircuitResource> resources = new HashMap<>();
+    private final Map<Long, CircuitResourceFailure> resourceFailures = new HashMap<>();
+
+    public List<ComponentData> getSpecialComponents() { return specialComponents; }
+    public List<StructuralComponent> getStructuralComponents() { return structuralComponents; }
+    public List<SavedCircuitBlock> getSavedBlocks() { return savedBlocks; }
+    public Map<String, String> getSavedSettings() { return savedSettings; }
+    public List<SavedCircuitBlock.Section> getSavedSections() { return savedSections; }
+    public Map<Long, CircuitResource> getResources() { return resources; }
+    public Map<Long, CircuitResourceFailure> getResourceFailures() { return resourceFailures; }
 
     private final List<ImportIssue> importIssues = new ArrayList<>();
 
@@ -336,6 +356,22 @@ public class CircuitModel {
         private final Map<String, String> importTokens = new HashMap<>();
         private int importedParameterCount = -1;
         private String sourceLocation;
+        private SavedCircuitBlock savedBlock;
+        private int sourceOrdinal = -1;
+        private final List<TerminalData> terminalData = new ArrayList<>();
+
+        public List<TerminalData> getTerminalData() { return terminalData; }
+        /** Keeps the original domain-list order when an execution view excludes components. */
+        public int getSourceOrdinal() { return sourceOrdinal; }
+        public void setSourceOrdinal(int ordinal) { sourceOrdinal = ordinal; }
+
+        /** @return the shared immutable saved configuration, or null when absent */
+        public SavedCircuitBlock getSavedBlock() { return savedBlock; }
+        /**
+         * Retains immutable saved configuration without copying it.
+         * @param block the saved configuration, or null to clear it
+         */
+        public void setSavedBlock(SavedCircuitBlock block) { savedBlock = block; }
 
         public boolean isParsedInput() { return parsedInput; }
         public void setParsedInput(boolean parsedInput) { this.parsedInput = parsedInput; }
@@ -432,6 +468,15 @@ public class CircuitModel {
         private final String type; // LK, CONTROL, THERMAL
         private final String label;
         private final int[][] points;
+        private SavedCircuitBlock savedBlock;
+
+        /** @return the shared immutable saved configuration, or null when absent */
+        public SavedCircuitBlock getSavedBlock() { return savedBlock; }
+        /**
+         * Retains immutable saved configuration without copying it.
+         * @param block the saved configuration, or null to clear it
+         */
+        public void setSavedBlock(SavedCircuitBlock block) { savedBlock = block; }
 
         public ConnectionData(String type, int[][] points) {
             this(type, points, "");

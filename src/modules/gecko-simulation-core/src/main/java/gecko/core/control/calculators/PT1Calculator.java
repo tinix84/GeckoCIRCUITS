@@ -13,7 +13,7 @@
  */
 package gecko.core.control.calculators;
 
-public final class PT1Calculator extends AbstractPTCalculator {
+public final class PT1Calculator extends AbstractPTCalculator implements InitializableAtSimulationStart {
         
         private double _yOld = 0;  // Speicherung des I-Anteils
         private double _xOld = 0;
@@ -21,6 +21,14 @@ public final class PT1Calculator extends AbstractPTCalculator {
         public PT1Calculator(final double timeConstant, final double gainFactor) {            
             super(timeConstant, gainFactor);            
         }        
+
+        /** Restores the initial history and output without changing configured coefficients. */
+        @Override
+        public void initializeAtSimulationStart(double deltaT) {
+            _yOld = 0;
+            _xOld = 0;
+            _outputSignal[0][0] = 0;
+        }
 
         @Override
         public void berechneYOUT(final double deltaT) {

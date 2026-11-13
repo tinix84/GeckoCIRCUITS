@@ -56,6 +56,29 @@ class ControlCalculatorFactoryTest {
     }
 
     @Test
+    void buildCircuitResolvesVOLTLabelsThroughTheElectricalNetlist() {
+        var model = new CircuitModel();
+        var resistor = new CircuitModel.ComponentData(1, "R.highLabel");
+        resistor.setTerminalXLabels(new String[]{"99"});
+        resistor.setTerminalYLabels(new String[]{"0"});
+        resistor.setParameter("param0", 10.0);
+        model.addCircuitComponent(resistor);
+        var voltage = new CircuitModel.ComponentData(1, "VOLT.1");
+        voltage.setTerminalYLabels(new String[]{"voltage"});
+        voltage.setParameterStrings(new String[]{"99", "0", "0"});
+        model.addControlComponent(voltage);
+
+        var electricalNetlist = gecko.core.circuit.netlist.NetlistBuilder.buildFromCircuitModel(model);
+        int expectedNode = electricalNetlist.getNodeX(electricalNetlist.getElementIndexByName("R.highLabel"));
+        assertTrue(expectedNode < 99);
+
+        var result = new ControlCalculatorFactory().buildCircuit(model, 0.1);
+
+        assertEquals(expectedNode, result.getMapping().getVoltProbeMappings().getFirst().getNodeA());
+        assertEquals(0, result.getMapping().getVoltProbeMappings().getFirst().getNodeB());
+    }
+
+    @Test
     void buildSimpleChain_signalToGate() throws Exception {
         // Create a SIGNAL → GATE chain wired through label "gate"
         List<CircuitModel.ComponentData> components = new ArrayList<>();

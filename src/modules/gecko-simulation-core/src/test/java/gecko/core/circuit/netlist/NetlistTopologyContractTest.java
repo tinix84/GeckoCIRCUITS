@@ -4,6 +4,8 @@ import gecko.core.allg.SolverType;
 import gecko.core.circuit.SourceType;
 import gecko.core.circuit.circuitcomponents.CircuitTypCore;
 import gecko.core.io.CircuitModel;
+import gecko.core.io.CircuitTopology;
+import gecko.core.io.SavedCircuitBlock;
 import gecko.core.simulation.solver.MatrixSolver;
 import java.util.List;
 import java.util.stream.Stream;
@@ -12,6 +14,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NetlistTopologyContractTest {
@@ -155,4 +158,38 @@ class NetlistTopologyContractTest {
         assertEquals(netlist.getNodeX(0),netlist.getNodeX(1));
         assertEquals(0,netlist.getVoltageSourceMax());
     }
+    @Test
+    void legacyLabelsRemainIndependentAcrossSavedSheets() {
+        var model = new CircuitModel();
+        var first = component(CircuitTypCore.LK_R, "first", "local", "0", 2);
+        var second = component(CircuitTypCore.LK_R, "second", "local", "0", 3);
+        first.setSavedBlock(SavedCircuitBlock.parse("ElementLK", new String[]{"parentSheetIdentifier 101"}));
+        second.setSavedBlock(SavedCircuitBlock.parse("ElementLK", new String[]{"parentSheetIdentifier 202"}));
+        model.addCircuitComponent(first);
+        model.addCircuitComponent(second);
+        var topology = CircuitTopology.resolve(model);
+        assertNotEquals(topology.group(first, CircuitTopology.Side.INPUT, 0),
+                topology.group(second, CircuitTopology.Side.INPUT, 0));
+        var netlist = NetlistBuilder.buildFromCircuitModel(model);
+        assertNotEquals(netlist.getNodeX(0), netlist.getNodeX(1));
+        assertEquals(0, netlist.getNodeY(0));
+        assertEquals(0, netlist.getNodeY(1));
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = {0, 101})
+    void sameSheetLegacyAnalogueRowsShareTheirNamedNode(long sheet) {
+        var model = new CircuitModel();
+        var resistor = component(CircuitTypCore.LK_R, "load", "local", "0", 10);
+        var capacitor = component(CircuitTypCore.TH_CTH, "state", "local", "0", 0.02);
+        var saved = SavedCircuitBlock.parse("ElementLK", new String[]{"parentSheetIdentifier " + sheet});
+        resistor.setSavedBlock(saved);
+        capacitor.setSavedBlock(saved);
+        model.addCircuitComponent(resistor);
+        model.addCircuitComponent(capacitor);
+        var netlist = NetlistBuilder.buildFromCircuitModel(model);
+        assertEquals(netlist.getNodeX(0), netlist.getNodeX(1));
+        assertEquals(1, netlist.getNodeMax());
+    }
+
 }

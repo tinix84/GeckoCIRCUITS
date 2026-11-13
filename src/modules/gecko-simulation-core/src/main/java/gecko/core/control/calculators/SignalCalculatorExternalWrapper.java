@@ -36,6 +36,7 @@ public final class SignalCalculatorExternalWrapper extends AbstractControlCalcul
 
     @Override
     public void berechneYOUT(final double deltaT) {
+        _wrapped.setSimulationTime(getTime());
         for (int input = 0; input < NO_INPUTS; input++) {
             if (!Double.isFinite(_inputSignal[input][0])) {
                 throw new IllegalArgumentException("External signal input " + input + " must be finite.");
@@ -50,7 +51,7 @@ public final class SignalCalculatorExternalWrapper extends AbstractControlCalcul
         }
         _wrapped.setFrequency(_inputSignal[1][0]);
 
-        if (_time == deltaT) { // when external parameters are used, the initialization is done 1 timestep later.
+        if (getTime() == deltaT) { // when external parameters are used, the initialization is done 1 timestep later.
             // the reason is that, for e.g. for setting a proper phaseshift value, we first have to calculate a 
             // proper input signal.
             initializeAtSimulationStart(deltaT);

@@ -71,8 +71,20 @@ public final class CircuitPreparation {
                 });
         boolean rejected = !overrideDiagnostics.isEmpty() || diagnostics.stream().anyMatch(item -> item.code().equals("INVALID_SETTING"));
         CircuitConfiguration.derive(model);
-        diagnostics.addAll(CircuitConfiguration.validate(model));
-        diagnostics.addAll(CircuitReadiness.check(model, diagnostics));
+        var snapshot = capture(model);
+        CircuitModel execution;
+        try {
+            execution = snapshot.executionModel();
+        } catch (IllegalArgumentException error) {
+            CircuitReadiness.appendImportDiagnostics(model, diagnostics);
+            diagnostics.add(new Diagnostic("INVALID_TOPOLOGY", Diagnostic.Category.TOPOLOGY, Diagnostic.Severity.ERROR,
+                    error.getMessage(), null, null, null, model.getFilePath()));
+            CircuitReadiness.appendTimingDiagnostics(model, diagnostics);
+            var report = new ReadinessReport(ReadinessReport.Outcome.INVALID, diagnostics);
+            return rejected ? new PreparationResult.Rejected(report) : new PreparationResult.Inspectable(snapshot, report);
+        }
+        diagnostics.addAll(CircuitConfiguration.validate(execution));
+        diagnostics.addAll(CircuitReadiness.check(execution, diagnostics));
         boolean invalid = diagnostics.stream().anyMatch(item -> item.severity() == Diagnostic.Severity.ERROR
                 && item.category() != Diagnostic.Category.CAPABILITY);
         var outcome = invalid ? ReadinessReport.Outcome.INVALID
@@ -80,7 +92,6 @@ public final class CircuitPreparation {
                     ? ReadinessReport.Outcome.UNSUPPORTED : ReadinessReport.Outcome.READY;
         var report = new ReadinessReport(outcome, diagnostics);
         if (rejected) return new PreparationResult.Rejected(report);
-        var snapshot = capture(model);
         if (!report.readyForHeadless()) return new PreparationResult.Inspectable(snapshot, report);
         return new PreparationResult.Ready(snapshot, new PreparedCircuit(snapshot), report);
     }

@@ -59,4 +59,42 @@ public final class DelayCalculator extends AbstractSingleInputSingleOutputCalcul
 
     /** @return the delay activated by the most recent lifecycle callback. */
     public double getDelayTime() { return history.getDelayTime(); }
+
+    /** @return the configured delay without changing the active history. */
+    public double getConfiguredDelayTime() { return history.getConfiguredDelayTime(); }
+
+    /**
+     * Checks the configured history size without changing active state.
+     *
+     * @param dt the finite, positive step in seconds
+     * @throws IllegalArgumentException if the step or history size is invalid
+     */
+    public void validateTimeStep(double dt) { DelayHistory.validateHistorySize(getConfiguredDelayTime(), dt); }
+
+    /**
+     * Allocates a restart update without changing history or output.
+     *
+     * @param dt the finite, positive step in seconds
+     * @return the action that commits this staged restart once
+     * @throws IllegalArgumentException if the step or history size is invalid
+     */
+    public Runnable prepareInitialization(double dt) {
+        var update = history.prepareRestart(dt);
+        return () -> {
+            update.commit();
+            _outputSignal[0][0] = 0;
+        };
+    }
+
+    /**
+     * Allocates a resampling update without changing active history.
+     *
+     * @param dt the finite, positive step in seconds
+     * @return the action that commits this staged step change once
+     * @throws IllegalArgumentException if the step or history size is invalid
+     */
+    public Runnable prepareStepChange(double dt) { return history.prepareTimeStepChange(dt)::commit; }
+
+    @Override
+    public Runnable prepareTimeStepChange(double dt) { return prepareStepChange(dt); }
 }

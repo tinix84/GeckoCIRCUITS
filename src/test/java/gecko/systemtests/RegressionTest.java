@@ -117,16 +117,18 @@ public class RegressionTest {
             "thyristor_Jakopovic"
         };
 
-        for (String circuit : knownCircuits) {
-            // Only include circuits that have both .ipes and .golden.csv
-            if (RegressionTest.class.getResource(IPES_RESOURCE_DIR + circuit + ".ipes") != null
-                    && RegressionTest.class.getResource(GOLDEN_RESOURCE_DIR + circuit + ".golden.csv") != null) {
-                circuits.add(circuit);
+        String selection = System.getProperty("gecko.regression.circuits");
+        List<String> requested = selection == null ? Arrays.asList(knownCircuits)
+                : Arrays.stream(selection.split(",", -1)).map(String::trim).toList();
+        for (String circuit : requested) {
+            if (!Arrays.asList(knownCircuits).contains(circuit) || circuits.contains(circuit)) {
+                throw new IllegalArgumentException("Unknown or repeated regression circuit: " + circuit);
             }
-        }
-
-        if (circuits.isEmpty()) {
-            fail("No regression test circuits found. Ensure .ipes and .golden.csv files are in test resources.");
+            if (RegressionTest.class.getResource(IPES_RESOURCE_DIR + circuit + ".ipes") == null
+                    || RegressionTest.class.getResource(GOLDEN_RESOURCE_DIR + circuit + ".golden.csv") == null) {
+                throw new IllegalArgumentException("Missing regression resources for circuit: " + circuit);
+            }
+            circuits.add(circuit);
         }
 
         return circuits.stream();

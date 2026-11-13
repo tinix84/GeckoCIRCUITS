@@ -37,6 +37,7 @@ public class ControlBlockMapping {
 
     /** SCOPE: calculator + input signal names */
     private ScopeInfo scopeInfo;
+    private final java.util.List<ScopeInfo> scopeInfos = new java.util.ArrayList<>();
 
     // --- VOLT probe ---
 
@@ -72,7 +73,17 @@ public class ControlBlockMapping {
 
     public void setScopeInfo(AbstractControlCalculatable scopeCalculator, String[] signalNames) {
         this.scopeInfo = new ScopeInfo(scopeCalculator, signalNames);
+        scopeInfos.clear();
+        scopeInfos.add(scopeInfo);
     }
+
+    public void addScopeInfo(AbstractControlCalculatable calculator, String[] signalNames, String name, long identifier) {
+        var info = new ScopeInfo(calculator, signalNames, name, identifier);
+        scopeInfos.add(info);
+        if (scopeInfo == null) scopeInfo = info;
+    }
+
+    public java.util.List<ScopeInfo> getScopeInfos() { return java.util.List.copyOf(scopeInfos); }
 
     public ScopeInfo getScopeInfo() {
         return scopeInfo;
@@ -131,14 +142,24 @@ public class ControlBlockMapping {
     public static class ScopeInfo {
         private final AbstractControlCalculatable calculator;
         private final String[] signalNames;
+        private final String name;
+        private final long identifier;
 
         public ScopeInfo(AbstractControlCalculatable calculator, String[] signalNames) {
+            this(calculator, signalNames, "", 0);
+        }
+
+        public ScopeInfo(AbstractControlCalculatable calculator, String[] signalNames, String name, long identifier) {
             this.calculator = calculator;
-            this.signalNames = signalNames;
+            this.signalNames = signalNames.clone();
+            this.name = name;
+            this.identifier = identifier;
         }
 
         public AbstractControlCalculatable getCalculator() { return calculator; }
-        public String[] getSignalNames() { return signalNames; }
+        public String[] getSignalNames() { return signalNames.clone(); }
         public int getSignalCount() { return signalNames.length; }
+        public String getName() { return name; }
+        public long getIdentifier() { return identifier; }
     }
 }

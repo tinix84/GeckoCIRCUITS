@@ -42,3 +42,16 @@ _Avoid_: File parsing, metadata validation
 An execution-ready circuit description with fixed configuration values and solver settings.
 Each run has independent electrical and CONTROL state.
 _Avoid_: Live engine, stored circuit ID
+**Simulation session**:
+The independent numerical state, CONTROL state, and recordings retained while one prepared circuit executes.
+A session can retain its state after a Simulation segment ends.
+_Avoid_: Simulation job, frontend controller
+
+**Simulation segment**:
+A requested interval of simulation within a Simulation session.
+A later segment can continue from the last committed state.
+_Avoid_: Session lifetime, new simulation
+
+**Committed step**:
+One completed electrical and CONTROL calculation with its corresponding recorded sample, when logging is enabled.
+_Avoid_: Partial solve, display update

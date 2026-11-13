@@ -31,6 +31,8 @@ import gecko.core.circuit.circuitcomponents.CircuitTypCore;
  * @since Sprint 2 - Circuit Refactoring
  */
 public interface INetList {
+    /** @return true when node zero is the first saved wire, as in desktop execution */
+    default boolean usesWireReference() { return false; }
 
     /**
      * Gets the maximum node index in the netlist.
@@ -111,6 +113,12 @@ public interface INetList {
      * @return simulation time in seconds
      */
     double getSimulationTime();
+
+    /** Returns the controlling element index, or -1 when no target is configured. */
+    default int getControlElementIndex(int sourceIndex) {
+        return -1;
+    }
+
     /** Magnetic metadata is optional for netlist implementations without coupled windings. */
     default java.util.List<MutualCouplingRegistry.Coupling> getAllCouplings() {
         return java.util.List.of();

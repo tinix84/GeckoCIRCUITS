@@ -37,12 +37,13 @@ import java.util.zip.GZIPInputStream;
  * }</pre>
  */
 public class CircuitFileParser {
+    enum ResourceAccess { SUPPLIED_BYTES_ONLY, LOCAL_FILES }
 
     private static final String NIX = "NIX_NIX_NIX";
     private static final String SEPARATOR_ASCII_STRINGARRAY = "/";
 
     /**
-     * Parses a .ipes circuit file and returns the circuit model.
+     * Parses a trusted local file and captures its local resource references.
      *
      * @param filePath path to the .ipes file
      * @return parsed circuit model
@@ -55,11 +56,11 @@ public class CircuitFileParser {
             throw new FileNotFoundException("Circuit file not found: " + filePath);
         }
 
-        return parse(new FileInputStream(file), filePath);
+        return parse(new FileInputStream(file), filePath, ResourceAccess.LOCAL_FILES);
     }
 
     /**
-     * Parses circuit data from a BufferedReader.
+     * Parses supplied circuit data. Resource references cannot read local files.
      *
      * @param reader the reader containing circuit data
      * @param sourceName name/path for error messages
@@ -68,17 +69,22 @@ public class CircuitFileParser {
      * @throws CircuitParseException if the format is invalid
      */
     public CircuitModel parse(BufferedReader reader, String sourceName) throws IOException, CircuitParseException {
+        return parse(reader, sourceName, ResourceAccess.SUPPLIED_BYTES_ONLY);
+    }
+
+    private CircuitModel parse(BufferedReader reader, String sourceName, ResourceAccess resourceAccess)
+            throws IOException, CircuitParseException {
         List<String> lineList = new ArrayList<>();
         String line;
         while ((line = reader.readLine()) != null) {
             lineList.add(line);
         }
         String[] lines = lineList.toArray(new String[0]);
-        return parseLines(lines, sourceName);
+        return parseLines(lines, sourceName, resourceAccess);
     }
 
     /**
-     * Parses circuit data from an InputStream.
+     * Parses supplied circuit data. The source name is diagnostic provenance only.
      *
      * @param inputStream the input stream containing circuit data
      * @param sourceName name/path for error messages
@@ -87,6 +93,11 @@ public class CircuitFileParser {
      * @throws CircuitParseException if the format is invalid
      */
     public CircuitModel parse(InputStream inputStream, String sourceName) throws IOException, CircuitParseException {
+        return parse(inputStream, sourceName, ResourceAccess.SUPPLIED_BYTES_ONLY);
+    }
+
+    private CircuitModel parse(InputStream inputStream, String sourceName, ResourceAccess resourceAccess)
+            throws IOException, CircuitParseException {
         try (BufferedInputStream buffered = new BufferedInputStream(inputStream)) {
             buffered.mark(2);
             int first = buffered.read();
@@ -95,7 +106,7 @@ public class CircuitFileParser {
             InputStream decoded = first == 0x1f && second == 0x8b
                     ? new GZIPInputStream(buffered) : buffered;
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(decoded, StandardCharsets.UTF_8))) {
-                return parse(reader, sourceName);
+                return parse(reader, sourceName, resourceAccess);
             }
         }
     }
@@ -103,7 +114,7 @@ public class CircuitFileParser {
     /**
      * Parses the array of lines into a CircuitModel.
      */
-    private CircuitModel parseLines(String[] lines, String filePath) throws CircuitParseException {
+    private CircuitModel parseLines(String[] lines, String filePath, ResourceAccess resourceAccess) throws CircuitParseException {
         CircuitModel model = new CircuitModel();
         model.setFilePath(filePath);
 
@@ -137,6 +148,8 @@ public class CircuitFileParser {
         parseControlComponents(simulationLines, model);
         parseThermalComponents(simulationLines, model);
         inspectUnrecognizedSimulationBlocks(simulationLines, model);
+        CircuitDescriptionReader.retain(model, lines, simulationLines);
+        CircuitResourceReader.retain(model, lines, simulationLines, resourceAccess);
 
         // Validate pre-simulation time step
         if (model.getPreSimulationTimeStep() <= 0) {
@@ -502,14 +515,10 @@ public class CircuitFileParser {
                 end++;
             }
             TokenMap block = new TokenMap(Arrays.copyOfRange(lines, start + 1, end));
-            if (tag.equals("ElementSPECIAL") && block.readDataLine("typ", -1) == 70) {
-                continue;
-            }
             String name = block.containsToken("idStringDialog") ? block.readDataLine("idStringDialog", "") : "";
-            model.getImportIssues().add(new ImportIssue("UNSUPPORTED_SIMULATION_BLOCK",
-                    tag.substring("Element".length()), name,
-                    "The saved block is unsupported by the headless engine.",
-                    model.getFilePath() + ": line " + (start + 1) + " " + tag, true));
+            var issue = SimulationBlockClassification.savedBlockIssue(tag, block.readDataLine("typ", -1), name,
+                    model.getFilePath() + ": line " + (start + 1) + " " + tag);
+            if (issue != null) model.getImportIssues().add(issue);
         }
     }
     private void parseThermalComponents(String[] lines, CircuitModel model) {
@@ -595,8 +604,10 @@ public class CircuitFileParser {
                     if (label.equals(NIX)) {
                         label = "";
                     }
-                    model.addConnection(new CircuitModel.ConnectionData(
-                            domain.equals("THERM") ? "THERMAL" : domain, points, label));
+                    var connection = new CircuitModel.ConnectionData(
+                            domain.equals("THERM") ? "THERMAL" : domain, points, label);
+                    connection.setSavedBlock(SavedCircuitBlock.parse("Verbindung", block.getLines()));
+                    model.addConnection(connection);
                 } catch (IllegalArgumentException error) {
                     throw new CircuitParseException(sourceName + ": invalid " + domain
                             + " wire: " + error.getMessage(), error);
@@ -658,9 +669,6 @@ public class CircuitFileParser {
                 // Format: "parameterString[] /value1/value2/value3"
                 String[] paramStrings = elementBlock.readDataLine("parameterString[]", new String[0]);
 
-                // SCOPE inputs define the connected channel list.
-                String[] xLabels = elementBlock.readDataLine("labelAnfangsKnoten[]", new String[0]);
-
                 // For SIGNAL sources, parameter[0] contains the sub-type (e.g. 404)
                 // The actual control type is determined by the typ field
                 CircuitModel.ComponentData comp = new CircuitModel.ComponentData(rawTyp, name, x, y, orientation);
@@ -676,9 +684,22 @@ public class CircuitFileParser {
                 // Store parameterString values (critical for VOLT/AMP probe coupling)
                 comp.setParameterStrings(filterNixStrings(paramStrings));
 
-                comp.setTerminalXLabels(rawTyp == 5 ? filterNix(xLabels)
-                        : readControlPortLabels(elementBlock, "labelAnfangsKnoten[]"));
+                comp.setTerminalXLabels(readControlPortLabels(elementBlock, "labelAnfangsKnoten[]"));
                 comp.setTerminalYLabels(readControlPortLabels(elementBlock, "labelEndKnoten[]"));
+                if (rawTyp == 22 || rawTyp == 23) {
+                    int savedInputWidth = comp.getTerminalXLabels().length;
+                    comp.setParameter("externalWidth", rawTyp == 23
+                            ? elementBlock.readDataLine("tn", comp.getTerminalYLabels().length)
+                            : savedInputWidth > 0 ? savedInputWidth
+                                    : elementBlock.readDataLine("anzXIN", savedInputWidth));
+                    if (rawTyp == 22) {
+                        int labeledInputCount = (int) Arrays.stream(comp.getTerminalXLabels())
+                                .filter(label -> label != null && !label.isBlank()).count();
+                        comp.setParameter("activeInputWidth",
+                                elementBlock.readDataLine("anzXIN", labeledInputCount));
+                    }
+                    comp.setParameter("externalOrder", elementBlock.readDataLine("torder", 0));
+                }
 
                 model.addControlComponent(comp);
             } catch (Exception e) {

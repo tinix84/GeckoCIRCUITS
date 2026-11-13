@@ -32,7 +32,7 @@ public class SignalCalculatorSinus extends AbstractSignalCalculatorPeriodic {
 
     @Override
     public void berechneYOUT(final double deltaT) {
-        _outputSignal[0][0] = _amplitudeAC * Math.sin(TWO_PI * _frequency * _time 
+        _outputSignal[0][0] = _amplitudeAC * Math.sin(TWO_PI * _frequency * getTime()
                 - _phase) + _anteilDC;
     }
 

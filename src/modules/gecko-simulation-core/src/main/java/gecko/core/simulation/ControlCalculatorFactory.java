@@ -14,8 +14,12 @@
 package gecko.core.simulation;
 
 import gecko.core.circuit.ControlTypCore;
+import gecko.core.circuit.netlist.CircuitNetlist;
+import gecko.core.circuit.netlist.NetlistBuilder;
 import gecko.core.control.calculators.*;
 import gecko.core.io.CircuitModel;
+import gecko.core.io.CircuitTopology;
+import gecko.core.preparation.CircuitConfiguration;
 
 import java.util.*;
 import java.util.logging.Logger;
@@ -25,7 +29,7 @@ import java.util.logging.Logger;
  *
  * <p>This class converts the parsed control component data (from .ipes file
  * {@code <ElementCONTROL>} blocks) into a set of {@link AbstractControlCalculatable}
- * instances, wires their signal connections by terminal label matching, and returns
+ * instances, wires their signal connections by canonical terminal groups, and returns
  * a ready-to-execute {@link ControlNetlist} along with a {@link ControlBlockMapping}
  * for domain coupling.</p>
  *
@@ -34,11 +38,6 @@ import java.util.logging.Logger;
 public class ControlCalculatorFactory {
 
     private static final Logger LOG = Logger.getLogger(ControlCalculatorFactory.class.getName());
-
-    /** Signal generator sub-type IDs encoded in parameter[0] for typ=4 (SIGNAL) */
-    private static final int SIGNAL_SUBTYPE_SINUS = 400;
-    private static final int SIGNAL_SUBTYPE_TRIANGLE = 401;
-    private static final int SIGNAL_SUBTYPE_RECTANGLE = 404;
 
     /** Reports a wired CONTROL graph that has an instantaneous dependency cycle. */
     public static final class DependencyCycleException extends IllegalArgumentException {
@@ -49,64 +48,146 @@ public class ControlCalculatorFactory {
         }
     }
 
+    /** Reports a connected vector width that the selected calculator cannot execute. */
+    public static final class InvalidSignalWidthException extends IllegalArgumentException {
+        private static final long serialVersionUID = 1L;
+        private final String component;
+
+        private InvalidSignalWidthException(String component, IllegalArgumentException cause) {
+            super("CONTROL block '" + component + "': " + cause.getMessage(), cause);
+            this.component = component;
+        }
+
+        /** @return the saved name of the component with an invalid signal width */
+        public String component() { return component; }
+    }
+
     /**
      * Result of building the control calculator chain.
      */
     public static class BuildResult {
         private final ControlNetlist controlNetlist;
         private final ControlBlockMapping mapping;
+        private final List<FromExternalCalculator> externalInputs;
+        private final List<ToExternalCalculator> externalOutputs;
 
         public BuildResult(ControlNetlist controlNetlist, ControlBlockMapping mapping) {
+            this(controlNetlist, mapping, List.of(), List.of());
+        }
+
+        BuildResult(ControlNetlist controlNetlist, ControlBlockMapping mapping,
+                List<FromExternalCalculator> externalInputs, List<ToExternalCalculator> externalOutputs) {
             this.controlNetlist = controlNetlist;
             this.mapping = mapping;
+            this.externalInputs = List.copyOf(externalInputs);
+            this.externalOutputs = List.copyOf(externalOutputs);
         }
 
         public ControlNetlist getControlNetlist() { return controlNetlist; }
         public ControlBlockMapping getMapping() { return mapping; }
+        List<FromExternalCalculator> externalInputs() { return externalInputs; }
+        List<ToExternalCalculator> externalOutputs() { return externalOutputs; }
     }
 
     /**
-     * Builds and wires the control calculator chain from parsed control components.
+     * Builds and wires CONTROL descriptions with effective numeric settings.
+     * Use {@link #buildCircuit(CircuitModel, double)} for saved layouts, named settings, bindings, or resources.
      *
-     * @param controlComponents list of control component data from the parser
+     * @param controlComponents CONTROL descriptions with resolved numeric settings
      * @return a BuildResult containing the wired ControlNetlist and ControlBlockMapping
+     * @throws InvalidSignalWidthException if a connected vector has an invalid width
      * @throws DependencyCycleException if the wired blocks contain an instantaneous dependency cycle
      */
     public BuildResult build(List<CircuitModel.ComponentData> controlComponents) {
+        return build(controlComponents, 0);
+    }
+
+    /**
+     * Builds calculators and checks dependencies for the selected step.
+     *
+     * @param controlComponents CONTROL descriptions with resolved numeric settings
+     * @param timeStep the step in seconds, or zero to defer the delay threshold check
+     * @return the wired runtime and its coupling and SCOPE mappings
+     * @throws IllegalArgumentException if configuration is invalid
+     * @throws InvalidSignalWidthException if a connected vector has an invalid width
+     * @throws DependencyCycleException if instantaneous dependencies contain a cycle
+     */
+    public BuildResult build(List<CircuitModel.ComponentData> controlComponents, double timeStep) {
+        return build(controlComponents, timeStep, null, null);
+    }
+
+    /**
+     * Builds independent CONTROL calculators from a model and its captured resources.
+     * Unresolved saved CONTROL settings use the shared normalizer on a detached model.
+     * Prepared overrides and caller data remain unchanged. The method builds the electrical netlist
+     * so VOLT terminal labels resolve to their same-sheet node indices.
+     *
+     * @param model the model with owned resource bytes, or null for an empty runtime
+     * @param timeStep the step in seconds, or zero to defer the delay threshold check
+     * @return the wired CONTROL runtime and its coupling and SCOPE mappings
+     * @throws IllegalArgumentException if configuration or required resources are invalid
+     * @throws InvalidSignalWidthException if a connected vector has an invalid width
+     * @throws DependencyCycleException if instantaneous dependencies contain a cycle
+     */
+    public BuildResult buildCircuit(CircuitModel model, double timeStep) {
+        CircuitNetlist electricalNetlist = model == null ? null : NetlistBuilder.buildFromCircuitModel(model);
+        return buildCircuit(model, timeStep, electricalNetlist);
+    }
+
+    public BuildResult buildCircuit(CircuitModel model, double timeStep, CircuitNetlist electricalNetlist) {
+        var resolved = model == null ? null : CircuitConfiguration.resolveSavedControl(model);
+        return build(resolved == null ? null : resolved.getControlComponents(), timeStep, resolved, electricalNetlist);
+    }
+
+    private BuildResult build(List<CircuitModel.ComponentData> controlComponents, double timeStep, CircuitModel model,
+            CircuitNetlist electricalNetlist) {
         if (controlComponents == null || controlComponents.isEmpty()) {
             return new BuildResult(ControlNetlist.createEmpty(), new ControlBlockMapping());
         }
 
         ControlBlockMapping mapping = new ControlBlockMapping();
+        CircuitModel wiringModel = model;
+        if (wiringModel == null) {
+            wiringModel = new CircuitModel();
+            wiringModel.getControlComponents().addAll(controlComponents);
+        }
+        CircuitTopology topology = CircuitTopology.resolve(wiringModel);
 
         // Step 1: Create calculator instances for each component
         List<CalculatorEntry> entries = new ArrayList<>();
         for (CircuitModel.ComponentData comp : controlComponents) {
-            AbstractControlCalculatable calc = createCalculator(comp);
+            AbstractControlCalculatable calc = createCalculator(comp, model);
             if (calc != null) {
                 entries.add(new CalculatorEntry(comp, calc));
             }
         }
 
-        // Step 2: Build output label → (calculator, port) map
-        Map<String, SignalPort> outputMap = new LinkedHashMap<>();
+        if (timeStep > 0 && Double.isFinite(timeStep)) {
+            for (var entry : entries) {
+                if (entry.calculator instanceof DelayCalculator delay) delay.validateTimeStep(timeStep);
+            }
+        }
+
+        // Step 2: Index output ports by their canonical signal groups.
+        Map<Integer, SignalPort> outputMap = new LinkedHashMap<>();
         for (CalculatorEntry entry : entries) {
             String[] yLabels = entry.component.getTerminalYLabels();
             for (int port = 0; port < yLabels.length; port++) {
-                String label = yLabels[port];
-                if (label != null && !label.isEmpty()) {
-                    outputMap.put(label, new SignalPort(entry.calculator, port));
+                var group = topology.group(entry.component, CircuitTopology.Side.OUTPUT, port);
+                if (group != null) {
+                    outputMap.put(group.id(), new SignalPort(entry.calculator, port));
                 }
             }
         }
 
-        // Step 3: Wire input signals by label matching
+        // Step 3: Wire input ports through the same canonical signal groups.
         for (CalculatorEntry entry : entries) {
             String[] xLabels = entry.component.getTerminalXLabels();
             for (int inputPort = 0; inputPort < xLabels.length; inputPort++) {
                 String label = xLabels[inputPort];
-                if (label != null && !label.isEmpty() && outputMap.containsKey(label)) {
-                    SignalPort source = outputMap.get(label);
+                var group = topology.group(entry.component, CircuitTopology.Side.INPUT, inputPort);
+                if (group != null && outputMap.containsKey(group.id())) {
+                    SignalPort source = outputMap.get(group.id());
                     try {
                         entry.calculator.setInputSignal(inputPort, source.calculator, source.portIndex);
                     } catch (Exception e) {
@@ -118,6 +199,14 @@ public class ControlCalculatorFactory {
             // Fill unconnected inputs with zero
             for (int i = 0; i < entry.calculator._inputSignal.length; i++) {
                 entry.calculator.checkInputWithoutConnectionAndFill(i);
+            }
+        }
+
+        for (CalculatorEntry entry : entries) {
+            try {
+                entry.calculator.validateInputSignalWidths();
+            } catch (IllegalArgumentException error) {
+                throw new InvalidSignalWidthException(entry.component.getName(), error);
             }
         }
 
@@ -135,10 +224,10 @@ public class ControlCalculatorFactory {
                     int nodeA = 0;
                     int nodeB = 0;
                     if (paramStrings.length >= 1 && !paramStrings[0].isEmpty()) {
-                        nodeA = parseNodeLabel(paramStrings[0]);
+                        nodeA = resolveProbeNode(model, electricalNetlist, entry.component, paramStrings[0]);
                     }
                     if (paramStrings.length >= 2 && !paramStrings[1].isEmpty()) {
-                        nodeB = parseNodeLabel(paramStrings[1]);
+                        nodeB = resolveProbeNode(model, electricalNetlist, entry.component, paramStrings[1]);
                     }
                     mapping.addVoltProbe(entry.calculator, nodeA, nodeB, entry.component.getName());
                 }
@@ -155,18 +244,31 @@ public class ControlCalculatorFactory {
                 case SCOPE -> {
                     // Input labels are the signal names
                     String[] xLabels = entry.component.getTerminalXLabels();
-                    mapping.setScopeInfo(entry.calculator, xLabels);
+                    mapping.addScopeInfo(entry.calculator, xLabels, entry.component.getName(),
+                            entry.component.getSavedBlock() == null ? 0 : entry.component.getSavedBlock().uniqueObjectIdentifier());
                 }
                 default -> { /* SIGNAL, CONST, GAIN — no special mapping needed */ }
             }
         }
 
         // Execute each signal producer before its consumers.
-        ControlNetlist netlist = ControlNetlist.fromOrderedCalculators(dependencyOrder(entries));
-        return new BuildResult(netlist, mapping);
+        ControlNetlist netlist = ControlNetlist.fromOrderedCalculators(dependencyOrder(entries, timeStep, true));
+        netlist.setDependencyOrder((step, activatePending) -> dependencyOrder(entries, step, activatePending));
+        var externalInputs = orderedExternal(entries, 23, FromExternalCalculator.class);
+        var externalOutputs = orderedExternal(entries, 22, ToExternalCalculator.class);
+        return new BuildResult(netlist, mapping, externalInputs, externalOutputs);
     }
 
-    private static List<AbstractControlCalculatable> dependencyOrder(List<CalculatorEntry> entries) {
+    private static <T extends AbstractControlCalculatable> List<T> orderedExternal(List<CalculatorEntry> entries,
+            int type, Class<T> calculatorType) {
+        return entries.stream().filter(entry -> entry.component.getType() == type)
+                .sorted(Comparator.comparingInt(entry -> ((Number) entry.component.getParameters()
+                        .getOrDefault("externalOrder", entry.component.getSourceOrdinal() < 0
+                                ? entries.indexOf(entry) : entry.component.getSourceOrdinal())).intValue()))
+                .map(entry -> calculatorType.cast(entry.calculator)).toList();
+    }
+
+    private static List<AbstractControlCalculatable> dependencyOrder(List<CalculatorEntry> entries, double dt, boolean activatePending) {
         Map<double[], Integer> producers = new IdentityHashMap<>();
         List<Set<Integer>> consumers = new ArrayList<>();
         int[] dependencies = new int[entries.size()];
@@ -177,6 +279,12 @@ public class ControlCalculatorFactory {
             }
         }
         for (int index = 0; index < entries.size(); index++) {
+            var entry = entries.get(index);
+            if (entry.calculator instanceof PT2Calculator) continue;
+            if (entry.calculator instanceof DelayCalculator delay) {
+                double delayTime = activatePending ? delay.getConfiguredDelayTime() : delay.getDelayTime();
+                if (delayTime > 0 && dt <= delayTime) continue;
+            }
             for (double[] input : entries.get(index).calculator._inputSignal) {
                 Integer producer = producers.get(input);
                 if (producer != null && consumers.get(producer).add(index)) {
@@ -210,62 +318,14 @@ public class ControlCalculatorFactory {
     /**
      * Creates the appropriate calculator for a control component.
      */
-    private AbstractControlCalculatable createCalculator(CircuitModel.ComponentData comp) {
+    private AbstractControlCalculatable createCalculator(CircuitModel.ComponentData comp, CircuitModel model) {
         int type = comp.getType();
-        double[] params = comp.getNumericParameters();
-        String[] xLabels = comp.getTerminalXLabels();
-
-        if (!ControlTypCore.isKnown(type)) {
+        ControlBlockDescriptor descriptor = ControlBlockDescriptor.find(type);
+        if (descriptor == null) {
             throw new IllegalArgumentException("Unsupported CONTROL component '" + comp.getName()
                     + "' with type " + type);
         }
-
-        ControlTypCore controlType = ControlTypCore.fromTypeNumber(type);
-        return switch (controlType) {
-            case VOLT -> new NothingToDoCalculator(0, 1);
-            case AMP -> new NothingToDoCalculator(0, 1);
-            case CONST -> {
-                double value = (params.length > 0) ? params[0] : 0.0;
-                yield new ConstantCalculator(value);
-            }
-            case SIGNAL -> createSignalCalculator(params);
-            case SCOPE -> new NothingToDoCalculator(xLabels.length, 0);
-            case GATE -> new GateCalculator();
-            case GAIN -> {
-                double gain = (params.length > 0) ? params[0] : 1.0;
-                yield new GainCalculator(gain);
-            }
-        };
-    }
-
-    /**
-     * Creates the right signal calculator sub-type based on parameter[0].
-     */
-    private AbstractControlCalculatable createSignalCalculator(double[] params) {
-        if (params.length < 6) {
-            LOG.warning("SIGNAL source has fewer than 6 parameters, using defaults");
-            return new SignalCalculatorRectangle(0, 1.0, 1000.0, 0.0, 0.0, 0.5);
-        }
-
-        int subType = (int) params[0];
-        double amplitudeAC = params[1];
-        double frequency = params[2];
-        double phase = params[3];
-        double dcOffset = params[4];
-        double duty = params[5];
-
-        return switch (subType) {
-            case SIGNAL_SUBTYPE_SINUS ->
-                    new SignalCalculatorSinus(0, amplitudeAC, frequency, phase, dcOffset, duty);
-            case SIGNAL_SUBTYPE_TRIANGLE ->
-                    new SignalCalculatorTriangle(0, amplitudeAC, frequency, phase, dcOffset, duty);
-            case SIGNAL_SUBTYPE_RECTANGLE ->
-                    new SignalCalculatorRectangle(0, amplitudeAC, frequency, phase, dcOffset, duty);
-            default -> {
-                LOG.warning("Unknown SIGNAL sub-type " + subType + ", defaulting to rectangle");
-                yield new SignalCalculatorRectangle(0, amplitudeAC, frequency, phase, dcOffset, duty);
-            }
-        };
+        return descriptor.createCalculator(comp, model);
     }
 
     /**
@@ -281,6 +341,26 @@ public class ControlCalculatorFactory {
         } catch (NumberFormatException e) {
             return 0; // ground for unrecognized labels
         }
+    }
+
+    private static int resolveProbeNode(CircuitModel model, CircuitNetlist electricalNetlist,
+            CircuitModel.ComponentData measurement, String label) {
+        if (electricalNetlist == null) return parseNodeLabel(label);
+        long sheet = measurement.getSavedBlock() == null ? 0 : measurement.getSavedBlock().parentSheetIdentifier();
+        for (CircuitModel.ComponentData component : model.getCircuitComponents()) {
+            long componentSheet = component.getSavedBlock() == null ? 0 : component.getSavedBlock().parentSheetIdentifier();
+            if (componentSheet != sheet) continue;
+            int element = electricalNetlist.getElementIndexByName(component.getName());
+            if (element < 0) continue;
+            for (String terminalLabel : component.getTerminalXLabels()) {
+                if (Objects.equals(terminalLabel, label)) return electricalNetlist.getNodeX(element);
+            }
+            for (String terminalLabel : component.getTerminalYLabels()) {
+                if (Objects.equals(terminalLabel, label)) return electricalNetlist.getNodeY(element);
+            }
+        }
+        throw new IllegalArgumentException("Voltage probe '" + measurement.getName()
+                + "' references an unknown electrical terminal label '" + label + "'");
     }
 
     private static class CalculatorEntry {

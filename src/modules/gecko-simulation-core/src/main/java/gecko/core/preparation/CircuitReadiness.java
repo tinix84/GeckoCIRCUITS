@@ -1,30 +1,28 @@
 package gecko.core.preparation;
 
 import gecko.core.circuit.ControlTypCore;
+import gecko.core.simulation.ControlBlockDescriptor;
+import gecko.core.simulation.SimulationTiming;
+import gecko.core.allg.SolverSettingsCore;
 import gecko.core.circuit.circuitcomponents.CircuitTypCore;
 import gecko.core.circuit.matrix.StamperRegistry;
 import gecko.core.circuit.netlist.CircuitNetlist;
 import gecko.core.circuit.netlist.NetlistBuilder;
 import gecko.core.circuit.netlist.TopologyValidationException;
 import gecko.core.io.CircuitModel;
+import gecko.core.io.CircuitTopology;
 import gecko.core.io.ImportIssue;
 import gecko.core.simulation.ControlCalculatorFactory;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Set;
 
 /** Preflight constructs descriptions and never advances an electrical time step. */
 final class CircuitReadiness {
     static List<Diagnostic> check(CircuitModel model, List<Diagnostic> configurationDiagnostics) {
         List<Diagnostic> diagnostics = new ArrayList<>();
-        for (var issue : model.getImportIssues()) {
-            diagnostics.add(new Diagnostic(issue.code(), issue.unsupported() ? Diagnostic.Category.CAPABILITY
-                    : configurationIssue(issue) ? Diagnostic.Category.CONFIGURATION : Diagnostic.Category.PARSING, Diagnostic.Severity.ERROR, issue.message(), issue.domain(),
-                    issue.component(), issue.parameterPath(), issue.sourceLocation()));
-        }
+        appendImportDiagnostics(model, diagnostics);
         for (var component : model.getThermalComponents()) {
             if (diagnostics.stream().noneMatch(d -> d.code().equals("UNSUPPORTED_DOMAIN")
                     && "THERMAL".equals(d.domain()) && component.getName().equals(d.component()))) {
@@ -36,23 +34,41 @@ final class CircuitReadiness {
         checkComponentModes(model, diagnostics);
         CircuitNetlist topology = checkTopology(model, diagnostics);
         checkControl(model, topology, diagnostics);
-        if (configurationDiagnostics.stream().noneMatch(item -> "CONTROL".equals(item.domain()))
-                && diagnostics.stream().noneMatch(item -> "CONTROL".equals(item.domain()))) {
+        if (configurationDiagnostics.stream().noneMatch(item -> "CONTROL".equals(item.domain()) && item.severity() == Diagnostic.Severity.ERROR)
+                && diagnostics.stream().noneMatch(item -> "CONTROL".equals(item.domain()) && item.severity() == Diagnostic.Severity.ERROR)) {
             try {
-                new ControlCalculatorFactory().build(model.getControlComponents());
+                new ControlCalculatorFactory().buildCircuit(model, model.getTimeStep(), topology);
             } catch (ControlCalculatorFactory.DependencyCycleException cycle) {
                 diagnostics.add(new Diagnostic("CONTROL_DEPENDENCY_CYCLE", Diagnostic.Category.REFERENCES,
                         Diagnostic.Severity.ERROR, cycle.getMessage(), "CONTROL", null, null, null));
+            } catch (ControlCalculatorFactory.InvalidSignalWidthException width) {
+                diagnostics.add(new Diagnostic("INVALID_CONTROL_WIDTH", Diagnostic.Category.REFERENCES,
+                        Diagnostic.Severity.ERROR, width.getMessage(), "CONTROL", width.component(), null, null));
             }
         }
-        if (!Double.isFinite(model.getTimeStep()) || model.getTimeStep() <= 0) {
-            diagnostics.add(setting("timeStep", "Time step must be finite and positive."));
-        }
-        if (!Double.isFinite(model.getSimulationDuration()) || model.getSimulationDuration() <= 0) {
-            diagnostics.add(setting("duration", "Simulation duration must be finite and positive."));
-        }
-        if (model.getSolverType() == null) diagnostics.add(setting("solver", "A solver type is required."));
+        appendTimingDiagnostics(model, diagnostics);
         return diagnostics;
+    }
+
+    static void appendImportDiagnostics(CircuitModel model, List<Diagnostic> diagnostics) {
+        for (var issue : model.getImportIssues()) {
+            appendUnique(diagnostics, new Diagnostic(issue.code(), issue.unsupported() ? Diagnostic.Category.CAPABILITY
+                    : configurationIssue(issue) ? Diagnostic.Category.CONFIGURATION : Diagnostic.Category.PARSING,
+                    Diagnostic.Severity.ERROR, issue.message(), issue.domain(), issue.component(),
+                    issue.parameterPath(), issue.sourceLocation()));
+        }
+    }
+
+    static void appendTimingDiagnostics(CircuitModel model, List<Diagnostic> diagnostics) {
+        var settings = new SolverSettingsCore(model.getSolverType(), model.getTimeStep(), model.getSimulationDuration())
+                .withPreCalculation(model.getPreSimulationTime(), model.getPreSimulationTimeStep());
+        for (var issue : SimulationTiming.settingsIssues(settings)) {
+            appendUnique(diagnostics, setting(issue.parameterPath(), issue.message()));
+        }
+    }
+
+    private static void appendUnique(List<Diagnostic> diagnostics, Diagnostic diagnostic) {
+        if (!diagnostics.contains(diagnostic)) diagnostics.add(diagnostic);
     }
 
     private static boolean configurationIssue(ImportIssue issue) {
@@ -153,11 +169,34 @@ final class CircuitReadiness {
         return labels;
     }
 
+    private static Integer resolveElectricalTerminalNode(CircuitModel model, CircuitModel.ComponentData measurement,
+            String label, CircuitNetlist topology) {
+        long sheet = measurement.getSavedBlock() == null ? 0 : measurement.getSavedBlock().parentSheetIdentifier();
+        for (var component : model.getCircuitComponents()) {
+            long componentSheet = component.getSavedBlock() == null ? 0 : component.getSavedBlock().parentSheetIdentifier();
+            if (componentSheet != sheet) continue;
+            int element = topology == null ? -1 : topology.getElementIndexByName(component.getName());
+            if (topology != null && element < 0) continue;
+            for (String terminalLabel : component.getTerminalXLabels()) {
+                if (java.util.Objects.equals(terminalLabel, label)) {
+                    return topology == null ? 0 : topology.getNodeX(element);
+                }
+            }
+            for (String terminalLabel : component.getTerminalYLabels()) {
+                if (java.util.Objects.equals(terminalLabel, label)) {
+                    return topology == null ? 0 : topology.getNodeY(element);
+                }
+            }
+        }
+        return null;
+    }
+
     private static void checkControl(CircuitModel model, CircuitNetlist topology, List<Diagnostic> diagnostics) {
-        Map<String, List<CircuitModel.ComponentData>> producers = new LinkedHashMap<>();
+        CircuitTopology controlTopology = CircuitTopology.resolve(model);
         for (var component : model.getControlComponents()) {
             int type = component.getType();
-            if (!ControlTypCore.isKnown(type)) {
+            var descriptor = ControlBlockDescriptor.find(type);
+            if (!ControlTypCore.isKnown(type) && descriptor == null) {
                 diagnostics.add(control("UNSUPPORTED_CONTROL_COMPONENT", Diagnostic.Category.CAPABILITY, component,
                         "The headless engine does not support this CONTROL type."));
             } else {
@@ -169,56 +208,58 @@ final class CircuitReadiness {
                 if (type == 4 && component.getNumericParameters().length > 0) {
                     double subtype = component.getNumericParameters()[0];
                     if (Double.isFinite(subtype) && subtype == Math.rint(subtype)
-                            && subtype != 400 && subtype != 401 && subtype != 404) {
+                            && subtype != 400 && subtype != 401 && subtype != 404 && subtype != 405 && subtype != 406
+                            && subtype != 0 && subtype != 1 && subtype != 2 && subtype != 3 && subtype != 4) {
                         diagnostics.add(control("UNSUPPORTED_CONTROL_SUBTYPE", Diagnostic.Category.CAPABILITY, component,
                                 "The headless engine does not support this SIGNAL subtype."));
                     }
                 }
-                int outputs = type == 5 || type == 6 ? 0 : 1;
+                int outputs = descriptor != null ? descriptor.outputs(component) : type == 5 || type == 6 ? 0 : 1;
+                int inputs = descriptor != null ? descriptor.inputs(component) : type == 6 || type == 7 ? 1 : 0;
                 if (hasUsedPortAfter(component.getTerminalYLabels(), outputs)
-                        || (type != 5 && hasUsedPortAfter(component.getTerminalXLabels(), type == 6 || type == 7 ? 1 : 0))) {
+                        || (type != 5 && hasUsedPortAfter(component.getTerminalXLabels(), inputs))) {
                     diagnostics.add(control("INVALID_CONTROL_PORT", Diagnostic.Category.REFERENCES, component,
                             "The CONTROL block uses a port that its calculator does not provide."));
                 }
             }
-            for (String label : component.getTerminalYLabels()) {
-                if (label != null && !label.isBlank()) producers.computeIfAbsent(label, ignored -> new ArrayList<>()).add(component);
-            }
         }
         Set<String> gateTargets = new HashSet<>();
-        boolean hasScope = false;
         for (var component : model.getControlComponents()) {
             int type = component.getType();
-            if (!ControlTypCore.isKnown(type)) continue;
-            if (type == 5) {
-                if (hasScope) diagnostics.add(control("UNSUPPORTED_CONTROL_LAYOUT", Diagnostic.Category.CAPABILITY, component,
-                        "The headless engine supports one SCOPE block per circuit."));
-                hasScope = true;
-            }
+            var descriptor = ControlBlockDescriptor.find(type);
+            if (!ControlTypCore.isKnown(type) && descriptor == null) continue;
             String[] inputs = component.getTerminalXLabels();
-            int required = type == 6 || type == 7 ? 1 : type == 5 ? inputs.length : 0;
+            int required = descriptor != null ? descriptor.inputs(component)
+                    : type == 6 || type == 7 ? 1 : type == 5 ? inputs.length : 0;
+            int activeInputs = required;
+            if (type == 22 && component.getParameters().get("activeInputWidth") instanceof Number width) {
+                activeInputs = Math.min(required, Math.max(0, width.intValue()));
+            }
             for (int port = 0; port < required; port++) {
+                if (type == 22 && port >= activeInputs) continue;
                 String label = port < inputs.length ? inputs[port] : "";
-                List<CircuitModel.ComponentData> matches = producers.getOrDefault(label, List.of());
-                if (label == null || label.isBlank() || matches.isEmpty()) {
-                    diagnostics.add(control("MISSING_CONTROL_INPUT", Diagnostic.Category.REFERENCES, component,
-                            "A required CONTROL input has no signal producer."));
-                } else if (matches.size() > 1) {
+                var group = controlTopology.group(component, CircuitTopology.Side.INPUT, port);
+                int producerCount = group == null ? 0 : group.producerTerminals().size();
+                if (type == 5 && (label == null || label.isBlank()) && producerCount == 0) continue;
+                if (producerCount == 0) {
+                    diagnostics.add(new Diagnostic("MISSING_CONTROL_INPUT", Diagnostic.Category.REFERENCES,
+                            Diagnostic.Severity.WARNING, "An unconnected CONTROL input uses zero.", "CONTROL",
+                            component.getName(), component.getName() + ".input[" + port + "]", component.getSourceLocation()));
+                } else if (producerCount > 1) {
                     diagnostics.add(control("AMBIGUOUS_CONTROL_SIGNAL", Diagnostic.Category.REFERENCES, component,
-                            "The CONTROL input label identifies more than one signal producer."));
+                            "The CONTROL input group identifies more than one signal producer."));
                 }
             }
             if (type == 1) {
                 String[] references = component.getParameterStrings();
                 for (int port = 0; port < 2; port++) {
                     String reference = port < references.length ? references[port] : "";
-                    try {
-                        if (reference == null || reference.isBlank()) throw new NumberFormatException();
-                        int node = Integer.parseInt(reference.trim());
-                        if (node < 0 || topology != null && node > topology.getNodeMax()) throw new NumberFormatException();
-                    } catch (NumberFormatException error) {
+                    Integer resolvedNode = reference == null || reference.isBlank() ? null
+                            : resolveElectricalTerminalNode(model, component, reference, topology);
+                    if (resolvedNode == null || topology != null
+                            && (resolvedNode < 0 || resolvedNode > topology.getNodeMax())) {
                         diagnostics.add(control("INVALID_PROBE_REFERENCE", Diagnostic.Category.REFERENCES, component,
-                                "A voltage probe requires two valid numerical node indices."));
+                                "A voltage probe label must identify a valid electrical terminal in its saved sheet."));
                     }
                 }
             } else if (type == 2 || type == 6) {
