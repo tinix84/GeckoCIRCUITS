@@ -52,7 +52,7 @@ public final class CircuitTopology {
 
     private record Alias(String domain, long sheet, String label) { }
     private record Port(TerminalIdentity id, String domain, long sheet, String label, boolean producer,
-                        CircuitModel.TerminalData geometry) { }
+                        CircuitModel.TerminalData geometry, boolean externalInput, int componentOrder) { }
     private record Position(String domain, long sheet, int x, int y) { }
     private record Wire(CircuitModel.ConnectionData data, String domain, long sheet) { }
     private final Map<CircuitModel.ComponentData, ComponentIdentity> identities;
@@ -134,7 +134,7 @@ public final class CircuitTopology {
         int[] parent = new int[ports.size() + wires.size()];
         for (int i = 0; i < parent.length; i++) parent[i] = i;
         var aliases = new LinkedHashMap<Alias, Integer>();
-        var positions = new LinkedHashMap<Position, Integer>();
+        var positions = new LinkedHashMap<Position, List<Integer>>();
         for (int i = 0; i < ports.size(); i++) {
             Port port = ports.get(i);
             if (!port.label().isEmpty()) {
@@ -143,8 +143,27 @@ public final class CircuitTopology {
             }
             var geometry = port.geometry();
             if (geometry != null && geometry.geometric()) {
-                Integer previous = positions.putIfAbsent(new Position(port.domain(), port.sheet(), geometry.x(), geometry.y()), i);
-                if (previous != null) union(parent, i, previous);
+                positions.computeIfAbsent(new Position(port.domain(), port.sheet(), geometry.x(), geometry.y()),
+                        key -> new ArrayList<>()).add(i);
+            }
+        }
+        for (var colocated : positions.values()) {
+            var ordinaryTerminals = colocated.stream().filter(index -> !ports.get(index).externalInput()).toList();
+            if (ordinaryTerminals.size() > 1) {
+                int first = ordinaryTerminals.getFirst();
+                for (int index = 1; index < ordinaryTerminals.size(); index++) {
+                    union(parent, first, ordinaryTerminals.get(index));
+                }
+            }
+            var labelledRoots = new LinkedHashMap<Integer, Integer>();
+            for (int terminal : colocated) {
+                if (!ports.get(terminal).label().isEmpty()) labelledRoots.putIfAbsent(find(parent, terminal), terminal);
+            }
+            if (labelledRoots.size() == 1) {
+                int labelledTerminal = labelledRoots.values().iterator().next();
+                for (int terminal : colocated) {
+                    if (ports.get(terminal).label().isEmpty()) union(parent, labelledTerminal, terminal);
+                }
             }
         }
         var pointsToWires = new LinkedHashMap<Position, List<Integer>>();
@@ -159,8 +178,7 @@ public final class CircuitTopology {
             for (int[] point : wire.data().getPoints()) {
                 var position = new Position(wire.domain(), wire.sheet(), point[0], point[1]);
                 pointsToWires.computeIfAbsent(position, key -> new ArrayList<>()).add(node);
-                Integer terminal = positions.get(position);
-                if (terminal != null) union(parent, node, terminal);
+                for (int terminal : positions.getOrDefault(position, List.of())) union(parent, node, terminal);
             }
         }
         // Interior wire crossings join only at a wire endpoint or a component terminal.
@@ -241,7 +259,42 @@ public final class CircuitTopology {
             var members = roots.get(root);
             if (members != null) connectionOrder.add(terminalGroups.get(members.getFirst().id()));
         }
-        return new CircuitTopology(identities, terminalGroups, groups, active, structural, wires,
+        var externalPortsByPosition = new LinkedHashMap<Position, List<Port>>();
+        for (var port : ports) {
+            var geometry = port.geometry();
+            if (port.externalInput() && geometry != null && geometry.geometric()) {
+                externalPortsByPosition.computeIfAbsent(new Position(port.domain(), port.sheet(), geometry.x(), geometry.y()),
+                        key -> new ArrayList<>()).add(port);
+            }
+        }
+        for (var colocated : externalPortsByPosition.values()) {
+            if (colocated.size() < 2) continue;
+            var ordered = colocated.stream().sorted(java.util.Comparator.comparingInt(Port::componentOrder)
+                    .thenComparingInt(port -> port.id().port())).toList();
+            Port firstExternal = ordered.stream().filter(port -> {
+                Integer group = terminalGroups.get(port.id());
+                return group != null && !groups.get(group).producerTerminals().isEmpty();
+            }).findFirst().orElse(ordered.getFirst());
+            Integer firstExternalGroup = terminalGroups.get(firstExternal.id());
+            if (firstExternalGroup == null) continue;
+            for (var external : ordered) {
+                if (!external.id().equals(firstExternal.id())) terminalGroups.put(external.id(), firstExternalGroup);
+            }
+        }
+        var updatedGroups = new LinkedHashMap<Integer, Group>();
+        for (var entry : groups.entrySet()) {
+            int groupId = entry.getKey();
+            var members = new java.util.LinkedHashSet<TerminalIdentity>();
+            for (var terminal : entry.getValue().terminals()) {
+                if (java.util.Objects.equals(terminalGroups.get(terminal), groupId)) members.add(terminal);
+            }
+            terminalGroups.forEach((terminal, assignedGroup) -> {
+                if (assignedGroup == groupId) members.add(terminal);
+            });
+            updatedGroups.put(groupId, new Group(entry.getValue().id(), entry.getValue().domain(),
+                    entry.getValue().canonicalLabel(), new ArrayList<>(members), entry.getValue().producerTerminals()));
+        }
+        return new CircuitTopology(identities, terminalGroups, updatedGroups, active, structural, wires,
                 physicalConnectionIssues, new ArrayList<>(connectionOrder));
     }
 
@@ -435,7 +488,9 @@ public final class CircuitTopology {
                         geometry = new CircuitModel.TerminalData(terminalDomain, terminalSheet, side, port, x, y, true);
                     }
                     ports.add(new Port(new TerminalIdentity(identity, side, port), geometry == null ? terminalDomain : geometry.domain(),
-                            geometry == null ? terminalSheet : geometry.sheetIdentifier(), normalizeLabel(labels[port]), producer, geometry));
+                            geometry == null ? terminalSheet : geometry.sheetIdentifier(), normalizeLabel(labels[port]), producer,
+                            geometry, component.getType() == 22 && side == Side.INPUT,
+                            component.getSourceOrdinal() < 0 ? ordinal : component.getSourceOrdinal()));
                 }
             }
         }
@@ -480,7 +535,10 @@ public final class CircuitTopology {
             String[] labels = component.getTerminalXLabels();
             Object savedWidth = component.getParameters().get("activeInputWidth");
             if (savedWidth instanceof Number number) {
-                return Arrays.copyOf(labels, Math.min(labels.length, Math.max(0, number.intValue())));
+                int activeWidth = Math.min(labels.length, Math.max(0, number.intValue()));
+                boolean hasPaddedGeometry = component.getTerminalData().stream().anyMatch(terminal ->
+                        terminal.side() == Side.INPUT && terminal.port() >= activeWidth && terminal.geometric());
+                if (!hasPaddedGeometry) return Arrays.copyOf(labels, activeWidth);
             }
         }
         String token = side == Side.INPUT ? "labelAnfangsKnoten[]" : "labelEndKnoten[]";

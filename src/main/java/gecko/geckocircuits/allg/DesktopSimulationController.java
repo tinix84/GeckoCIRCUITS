@@ -13,10 +13,14 @@ import gecko.geckocircuits.circuit.SolverSettings;
 import gecko.geckocircuits.control.NetzlisteCONTROL;
 import gecko.geckocircuits.control.ReglerOSZI;
 import gecko.geckocircuits.control.ReglerSaveData;
+import gecko.geckocircuits.control.ReglerFromEXTERNAL;
+import gecko.geckocircuits.control.ReglerToEXTERNAL;
 import gecko.geckocircuits.datacontainer.ContainerStatus;
 import java.io.File;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -33,6 +37,7 @@ public final class DesktopSimulationController {
     public enum Backend { LEGACY, CORE, AUTO }
 
     private static final Logger FALLBACK = Logger.getLogger("gecko.backend.fallback");
+    private static final Logger EXTERNAL = Logger.getLogger("gecko.backend.external");
     private final MainWindow window;
     private final SchematicEditor2 editor;
     private final Supplier<NetListContainer> preparePresentation;
@@ -48,14 +53,17 @@ public final class DesktopSimulationController {
         private final Consumer<ContainerStatus> origin;
         private final LegacySimulationFrontend presentation;
         private final int[] rows;
+        private final double dt;
+        private boolean warnedExternalTime;
 
         private CoreScriptExecution(SessionHost host, NetListContainer netlist, Consumer<ContainerStatus> origin,
-                LegacySimulationFrontend presentation, int[] rows) {
+                LegacySimulationFrontend presentation, int[] rows, double dt) {
             this.host = host;
             this.netlist = netlist;
             this.origin = origin;
             this.presentation = presentation;
             this.rows = rows;
+            this.dt = dt;
         }
     }
 
@@ -139,10 +147,15 @@ public final class DesktopSimulationController {
         try {
             netlist = preparePresentation.get();
             Consumer<ContainerStatus> origin = NetzlisteCONTROL.globalData.captureStatusUpdater();
-            String[] names = host.signalNames();
             int[] rows = new int[NetzlisteCONTROL.globalData.getRowLength()];
+            Map<String, Integer> rowBySignal = new HashMap<>();
+            String[] names = host.signalNames();
+            for (int row = 0; row < names.length; row++) rowBySignal.putIfAbsent(names[row], row);
+            for (var channel : host.scopeChannels()) {
+                rowBySignal.putIfAbsent(channel.signalName(), channel.row());
+            }
             for (int row = 0; row < rows.length; row++) {
-                rows[row] = Arrays.asList(names).indexOf(NetzlisteCONTROL.globalData.getSignalName(row));
+                rows[row] = rowBySignal.getOrDefault(NetzlisteCONTROL.globalData.getSignalName(row), -1);
                 if (rows[row] < 0) {
                     return fallback(backend, circuit, "SIGNAL_MAP:" + NetzlisteCONTROL.globalData.getSignalName(row));
                 }
@@ -151,7 +164,7 @@ public final class DesktopSimulationController {
             LegacySimulationFrontend presentation = new LegacySimulationFrontend(() -> true);
             presentation.prepare(netlist, () -> true, true).run();
             setScopeBoundaries(netlist, 0, end);
-            CoreScriptExecution execution = new CoreScriptExecution(host, netlist, origin, presentation, rows);
+            CoreScriptExecution execution = new CoreScriptExecution(host, netlist, origin, presentation, rows, dt);
             scriptExecution = execution;
             currentHost = host;
             coreExecution = true;
@@ -165,6 +178,62 @@ public final class DesktopSimulationController {
                 if (netlist != null) cancelExporters(netlist);
             }
         }
+    }
+
+    /** Prepares external execution with the requested end time and no pre-calculation. */
+    boolean initializeExternal(SolverSettings settings, double end) throws Exception {
+        SolverSettings externalSettings = new SolverSettings();
+        externalSettings.dt.setValueWithoutUndo(settings.dt.getValue());
+        externalSettings._tDURATION.setValueWithoutUndo(end);
+        externalSettings._tPAUSE.setValueWithoutUndo(settings._tPAUSE.getValue());
+        externalSettings.SOLVER_TYPE.setValueWithoutUndo(settings.SOLVER_TYPE.getValue());
+        return initializeScript(externalSettings, settings.dt.getValue(), end);
+    }
+
+    double externalStepWidth() {
+        CoreScriptExecution execution = scriptExecution;
+        if (execution == null) throw new IllegalStateException("No core external simulation is active");
+        return execution.dt;
+    }
+
+    void externalStep(double time) throws Exception {
+        requireOffEventThread();
+        CoreScriptExecution execution = scriptExecution;
+        if (execution == null) throw new IllegalStateException("No core external simulation is active");
+        SessionHost host = execution.host;
+        if (!execution.warnedExternalTime && Math.abs(time - host.status().nextTime()) > execution.dt / 2) {
+            execution.warnedExternalTime = true;
+            EXTERNAL.warning("External time differs from the core fixed-step grid. The core retains its configured step width.");
+        }
+        if (ReglerFromEXTERNAL.fromExternals.size() != host.externalInputPorts()
+                || ReglerToEXTERNAL.toExternals.size() != host.externalOutputPorts()) {
+            throw new IllegalStateException("External port counts do not match the core session");
+        }
+        double[][] inputs = new double[host.externalInputPorts()][];
+        for (int port = 0; port < inputs.length; port++) {
+            inputs[port] = ((ReglerFromEXTERNAL) ReglerFromEXTERNAL.fromExternals.get(port)).dataVector;
+            if (inputs[port] == null || inputs[port].length != host.externalInputWidth(port)) {
+                throw new IllegalStateException("External input width does not match at port " + port);
+            }
+        }
+        for (int port = 0; port < host.externalOutputPorts(); port++) {
+            double[] target = ((ReglerToEXTERNAL) ReglerToEXTERNAL.toExternals.get(port)).dataVector;
+            if (target == null || target.length != host.externalOutputWidth(port)) {
+                throw new IllegalStateException("External output width does not match at port " + port);
+            }
+        }
+        double[][] outputs = await(host.stepExternal(inputs));
+        if (outputs.length != host.externalOutputPorts()) {
+            throw new IllegalStateException("Core external output port count does not match");
+        }
+        for (int port = 0; port < outputs.length; port++) {
+            double[] target = ((ReglerToEXTERNAL) ReglerToEXTERNAL.toExternals.get(port)).dataVector;
+            if (outputs[port] == null || outputs[port].length != target.length) {
+                throw new IllegalStateException("Core external output width does not match at port " + port);
+            }
+            System.arraycopy(outputs[port], 0, target, 0, target.length);
+        }
+        drainScriptSamples(execution);
     }
 
     void scriptStep(double dt, double end) throws Exception {

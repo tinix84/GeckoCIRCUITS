@@ -36,6 +36,49 @@ class CircuitTopologyTest {
     }
 
     @Test
+    void geometricallyConnectedPaddedExternalPortsRemainInTheTopology() throws Exception {
+        String text = block(3, "source", 1, 0, "", "/activeNet")
+                + block(22, "toExternal", 2, 0, "/activeNet/NIX_NIX_NIX", "");
+        var model = new CircuitFileParser().parse(new BufferedReader(new StringReader(text)), "padded-external.ipes");
+        var source = model.getControlComponents().get(0);
+        var toExternal = model.getControlComponents().get(1);
+        toExternal.setParameter("activeInputWidth", 1);
+        source.getTerminalData().add(
+                new CircuitModel.TerminalData("CONTROL", 0, CircuitTopology.Side.OUTPUT, 0, 40, 10, true));
+        toExternal.getTerminalData().add(
+                new CircuitModel.TerminalData("CONTROL", 0, CircuitTopology.Side.INPUT, 1, 40, 10, true));
+
+        var topology = CircuitTopology.resolve(model);
+
+        assertEquals(topology.group(source, CircuitTopology.Side.OUTPUT, 0),
+                topology.group(toExternal, CircuitTopology.Side.INPUT, 1),
+                "A geometrically connected padded external slot inherits its single labeled net");
+    }
+
+    @Test
+    void overlappingExternalPortsUseTheEarlierPortNetWithoutShortingTheirLabels() throws Exception {
+        String text = block(3, "firstSource", 1, 0, "", "/firstNet")
+                + block(3, "secondSource", 2, 0, "", "/secondNet")
+                + block(22, "firstExternal", 3, 0, "/firstNet", "")
+                + block(22, "secondExternal", 4, 0, "/secondNet", "");
+        var model = new CircuitFileParser().parse(new BufferedReader(new StringReader(text)), "overlapping-external.ipes");
+        var components = model.getControlComponents();
+        for (int index = 2; index < components.size(); index++) {
+            components.get(index).getTerminalData().add(
+                    new CircuitModel.TerminalData("CONTROL", 0, CircuitTopology.Side.INPUT, 0, 50, 10, true));
+        }
+
+        var topology = CircuitTopology.resolve(model);
+
+        assertNotEquals(topology.group(components.get(0), CircuitTopology.Side.OUTPUT, 0),
+                topology.group(components.get(1), CircuitTopology.Side.OUTPUT, 0),
+                "Overlapping external blocks must not short their distinct producer nets");
+        assertEquals(topology.group(components.get(2), CircuitTopology.Side.INPUT, 0),
+                topology.group(components.get(3), CircuitTopology.Side.INPUT, 0),
+                "Later external blocks inherit the earlier external terminal's physical node");
+    }
+
+    @Test
     void globalMarkersJoinByTheirComponentNameAcrossDifferentLocalLabels() throws Exception {
         String text = subcircuit(101, 0, 1) + subcircuit(202, 0, 1)
                 + block(3, "source", 1, 101, "", "/localLeft")
