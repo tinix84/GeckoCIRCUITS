@@ -36,7 +36,7 @@ class CircuitTopologyTest {
     }
 
     @Test
-    void geometricallyConnectedPaddedExternalPortsRemainInTheTopology() throws Exception {
+    void geometricallyConnectedPaddedExternalPortsRemainExternalOnlyAliases() throws Exception {
         String text = block(3, "source", 1, 0, "", "/activeNet")
                 + block(22, "toExternal", 2, 0, "/activeNet/NIX_NIX_NIX", "");
         var model = new CircuitFileParser().parse(new BufferedReader(new StringReader(text)), "padded-external.ipes");
@@ -50,9 +50,11 @@ class CircuitTopologyTest {
 
         var topology = CircuitTopology.resolve(model);
 
-        assertEquals(topology.group(source, CircuitTopology.Side.OUTPUT, 0),
-                topology.group(toExternal, CircuitTopology.Side.INPUT, 1),
-                "A geometrically connected padded external slot inherits its single labeled net");
+        var sourceGroup = topology.group(source, CircuitTopology.Side.OUTPUT, 0);
+        assertNull(topology.group(toExternal, CircuitTopology.Side.INPUT, 1),
+                "An inactive padded slot is not part of ordinary circuit topology");
+        assertEquals(sourceGroup, topology.externalOutputGroup(toExternal, 1),
+                "A captured padded channel keeps its single-net alias for external output routing");
     }
 
     @Test

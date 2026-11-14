@@ -57,6 +57,7 @@ public final class CircuitTopology {
     private record Wire(CircuitModel.ConnectionData data, String domain, long sheet) { }
     private final Map<CircuitModel.ComponentData, ComponentIdentity> identities;
     private final Map<TerminalIdentity, Integer> terminalGroups;
+    private final Map<TerminalIdentity, Integer> externalOutputGroups;
     private final Map<Integer, Group> groups;
     private final List<ComponentIdentity> activeComponents;
     private final List<ComponentIdentity> structuralComponents;
@@ -67,7 +68,8 @@ public final class CircuitTopology {
     private final List<Integer> connectionGroupOrder;
 
     private CircuitTopology(Map<CircuitModel.ComponentData, ComponentIdentity> identities,
-            Map<TerminalIdentity, Integer> terminalGroups, Map<Integer, Group> groups,
+            Map<TerminalIdentity, Integer> terminalGroups, Map<TerminalIdentity, Integer> externalOutputGroups,
+            Map<Integer, Group> groups,
             List<ComponentIdentity> activeComponents, List<ComponentIdentity> structuralComponents, List<Wire> wires,
             List<String> physicalConnectionIssues, List<Integer> connectionGroupOrder) {
         this.connectionGroupOrder = List.copyOf(connectionGroupOrder);
@@ -75,6 +77,7 @@ public final class CircuitTopology {
         this.physicalConnectionIssues = List.copyOf(physicalConnectionIssues);
         this.identities = Map.copyOf(identities);
         this.terminalGroups = Map.copyOf(terminalGroups);
+        this.externalOutputGroups = Map.copyOf(externalOutputGroups);
         this.groups = Map.copyOf(groups);
         this.activeComponents = List.copyOf(activeComponents);
         this.structuralComponents = List.copyOf(structuralComponents);
@@ -294,7 +297,34 @@ public final class CircuitTopology {
             updatedGroups.put(groupId, new Group(entry.getValue().id(), entry.getValue().domain(),
                     entry.getValue().canonicalLabel(), new ArrayList<>(members), entry.getValue().producerTerminals()));
         }
-        return new CircuitTopology(identities, terminalGroups, updatedGroups, active, structural, wires,
+        var paddedExternalTerminals = new HashSet<TerminalIdentity>();
+        var externalOutputGroups = new LinkedHashMap<TerminalIdentity, Integer>();
+        for (var component : model.getControlComponents()) {
+            if (component.getType() != 22) continue;
+            Object savedWidth = component.getParameters().get("activeInputWidth");
+            if (!(savedWidth instanceof Number number)) continue;
+            int activeWidth = Math.min(component.getTerminalXLabels().length,
+                    Math.max(0, number.intValue()));
+            for (int port = activeWidth; port < component.getTerminalXLabels().length; port++) {
+                var terminal = new TerminalIdentity(identities.get(component), Side.INPUT, port);
+                paddedExternalTerminals.add(terminal);
+                Integer group = terminalGroups.get(terminal);
+                if (group != null) externalOutputGroups.put(terminal, group);
+            }
+        }
+        var publicTerminalGroups = new LinkedHashMap<TerminalIdentity, Integer>(terminalGroups);
+        paddedExternalTerminals.forEach(publicTerminalGroups::remove);
+        var publicGroups = new LinkedHashMap<Integer, Group>();
+        for (var entry : updatedGroups.entrySet()) {
+            var members = entry.getValue().terminals().stream()
+                    .filter(terminal -> !paddedExternalTerminals.contains(terminal)).toList();
+            var producers = entry.getValue().producerTerminals().stream()
+                    .filter(terminal -> !paddedExternalTerminals.contains(terminal)).toList();
+            publicGroups.put(entry.getKey(), new Group(entry.getValue().id(), entry.getValue().domain(),
+                    entry.getValue().canonicalLabel(), members, producers));
+        }
+        return new CircuitTopology(identities, publicTerminalGroups, externalOutputGroups, publicGroups, active,
+                structural, wires,
                 physicalConnectionIssues, new ArrayList<>(connectionOrder));
     }
 
@@ -303,6 +333,7 @@ public final class CircuitTopology {
         this.identities = source.identities;
         this.connectionGroupOrder = source.connectionGroupOrder;
         this.terminalGroups = Map.copyOf(terminalGroups);
+        this.externalOutputGroups = source.externalOutputGroups;
         this.groups = Map.copyOf(groups);
         this.activeComponents = List.copyOf(activeComponents);
         this.structuralComponents = source.structuralComponents;
@@ -436,6 +467,19 @@ public final class CircuitTopology {
      */
     public Group group(CircuitModel.ComponentData component, Side side, int port) {
         Integer group = terminalGroups.get(new TerminalIdentity(identities.get(component), side, port));
+        return group == null ? null : groups.get(group);
+    }
+
+    /**
+     * Finds the external output channel group for a padded TO_EXTERNAL input.
+     * Padded channels remain absent from ordinary circuit topology while retaining
+     * their captured external-channel wiring.
+     * @param component the TO_EXTERNAL component from the resolved source model
+     * @param port the saved zero-based input port index
+     * @return its group, or null if the padded channel has no resolved group
+     */
+    public Group externalOutputGroup(CircuitModel.ComponentData component, int port) {
+        Integer group = externalOutputGroups.get(new TerminalIdentity(identities.get(component), Side.INPUT, port));
         return group == null ? null : groups.get(group);
     }
 

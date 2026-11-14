@@ -118,7 +118,7 @@ public final class DesktopSimulationController {
 
     /** Initializes a script-owned core session without advancing its first step. */
     boolean initializeScript(SolverSettings settings, double dt, double end) throws Exception {
-        Backend backend = Backend.valueOf(System.getProperty("gecko.backend", "legacy")
+        Backend backend = Backend.valueOf(System.getProperty("gecko.backend", "auto")
                 .trim().toUpperCase(Locale.ROOT));
         if (backend == Backend.LEGACY) return false;
         String source = MainWindow.getOpenFileName();
@@ -329,7 +329,7 @@ public final class DesktopSimulationController {
 
     /** Returns false when GUI execution must use the legacy backend. */
     boolean startAsync(SolverSettings settings) throws Exception {
-        Backend backend = Backend.valueOf(System.getProperty("gecko.backend", "legacy")
+        Backend backend = Backend.valueOf(System.getProperty("gecko.backend", "auto")
                 .trim().toUpperCase(Locale.ROOT));
         if (backend == Backend.LEGACY) return false;
 
@@ -585,7 +585,7 @@ public final class DesktopSimulationController {
 
     /** Returns false when the caller must use the existing legacy start path. */
     boolean start(SolverSettings settings) throws Exception {
-        Backend backend = Backend.valueOf(System.getProperty("gecko.backend", "legacy")
+        Backend backend = Backend.valueOf(System.getProperty("gecko.backend", "auto")
                 .trim().toUpperCase(Locale.ROOT));
         if (backend == Backend.LEGACY) return false;
         String source = MainWindow.getOpenFileName();

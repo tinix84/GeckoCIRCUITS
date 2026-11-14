@@ -186,6 +186,9 @@ public class ControlCalculatorFactory {
             for (int inputPort = 0; inputPort < xLabels.length; inputPort++) {
                 String label = xLabels[inputPort];
                 var group = topology.group(entry.component, CircuitTopology.Side.INPUT, inputPort);
+                if (group == null && entry.component.getType() == 22) {
+                    group = topology.externalOutputGroup(entry.component, inputPort);
+                }
                 if (group != null && outputMap.containsKey(group.id())) {
                     SignalPort source = outputMap.get(group.id());
                     try {

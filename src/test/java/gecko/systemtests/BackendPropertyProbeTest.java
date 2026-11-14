@@ -35,8 +35,8 @@ class BackendPropertyProbeTest {
 
     @Test
     void surefireReceivesBackendProperty() {
-        assertEquals(System.getProperty("gecko.backend.expected", "legacy"),
-                System.getProperty("gecko.backend", "legacy"));
+        assertEquals(System.getProperty("gecko.backend.expected", "auto"),
+                System.getProperty("gecko.backend", "auto"));
     }
 
     @Test
@@ -160,7 +160,7 @@ class BackendPropertyProbeTest {
 
     @Test
     @Tag("regression")
-    void autoLogsExactlyTheVerifiedEditorCaptureFallbacks() throws Exception {
+    void defaultAutoLogsExactlyTheVerifiedEditorCaptureFallbacks() throws Exception {
         String previous = System.getProperty("gecko.backend");
         var logger = java.util.logging.Logger.getLogger("gecko.backend.fallback");
         var previousLevel = logger.getLevel();
@@ -178,7 +178,7 @@ class BackendPropertyProbeTest {
         logger.addHandler(handler);
         logger.setLevel(java.util.logging.Level.INFO);
         try {
-            System.setProperty("gecko.backend", "auto");
+            System.clearProperty("gecko.backend");
             for (String circuit : SignalOrderProbeTest.circuitFiles().toList()) {
                 int before = messages.size();
                 GeckoExternal.openFile(circuitPath(circuit).toString());
