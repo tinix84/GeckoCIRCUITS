@@ -42,15 +42,10 @@ public class BackendCorpusProbeTest {
             "boostPFC", "boostPFC_currentControl", "2phaseDiodeBridge_AC-Inductor",
             "2phaseDiodeBridge_DC-Inductor", "thyristor_RL_single", "thyristor_RL_2phBridge",
             "thyristor_RL_3phBridge", "thyristor_freeWheelingDiode", "thyristor_interface_trafo",
-            "thyristor_Jakopovic");
+            "thyristor_Jakopovic", "diode_RL_singlePH_trafo", "thyristor_RL_singlePh_trafo",
+            "thyristor_RL_3ph_trafo", "thyristor_commutation_3ph_trafo", "thyristor_lossOfCommutation");
     private static final Map<String, Set<String>> FALLBACK_EDUCATION = Map.of(
-            "singlePhase_PWM_converter", Set.of("UNSUPPORTED_SOURCE_MODE", "UNCONNECTED_GROUND",
-                    "MISSING_CONTROL_INPUT"),
-            "diode_RL_singlePH_trafo", Set.of("UNCONNECTED_GROUND"),
-            "thyristor_RL_singlePh_trafo", Set.of("UNCONNECTED_GROUND"),
-            "thyristor_RL_3ph_trafo", Set.of("UNCONNECTED_GROUND"),
-            "thyristor_commutation_3ph_trafo", Set.of("UNCONNECTED_GROUND"),
-            "thyristor_lossOfCommutation", Set.of("UNCONNECTED_GROUND"));
+            "singlePhase_PWM_converter", Set.of("UNSUPPORTED_SOURCE_MODE", "MISSING_CONTROL_INPUT"));
     private static void startApplication() throws Exception {
         GeckoSim._isTestingMode = true;
         GeckoSim.applicationProps = new Properties();
