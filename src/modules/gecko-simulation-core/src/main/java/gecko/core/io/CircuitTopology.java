@@ -59,6 +59,7 @@ public final class CircuitTopology {
     private final Map<TerminalIdentity, Integer> terminalGroups;
     private final Map<TerminalIdentity, Integer> externalOutputGroups;
     private final Map<Integer, Group> groups;
+    private final Map<Alias, Integer> labelGroups;
     private final List<ComponentIdentity> activeComponents;
     private final List<ComponentIdentity> structuralComponents;
     private final Set<CircuitModel.ConnectionData> activeConnections;
@@ -69,9 +70,10 @@ public final class CircuitTopology {
 
     private CircuitTopology(Map<CircuitModel.ComponentData, ComponentIdentity> identities,
             Map<TerminalIdentity, Integer> terminalGroups, Map<TerminalIdentity, Integer> externalOutputGroups,
-            Map<Integer, Group> groups,
+            Map<Integer, Group> groups, Map<Alias, Integer> labelGroups,
             List<ComponentIdentity> activeComponents, List<ComponentIdentity> structuralComponents, List<Wire> wires,
             List<String> physicalConnectionIssues, List<Integer> connectionGroupOrder) {
+        this.labelGroups = Map.copyOf(labelGroups);
         this.connectionGroupOrder = List.copyOf(connectionGroupOrder);
         this.hiddenComponents = List.of();
         this.physicalConnectionIssues = List.copyOf(physicalConnectionIssues);
@@ -167,6 +169,9 @@ public final class CircuitTopology {
                 for (int terminal : colocated) {
                     if (ports.get(terminal).label().isEmpty()) union(parent, labelledTerminal, terminal);
                 }
+            } else if (labelledRoots.isEmpty() && !ordinaryTerminals.isEmpty()) {
+                // Unlabelled abutting terminals share one potential, like desktop geometricOnSamePotential.
+                for (int terminal : colocated) union(parent, ordinaryTerminals.getFirst(), terminal);
             }
         }
         var pointsToWires = new LinkedHashMap<Position, List<Integer>>();
@@ -225,6 +230,7 @@ public final class CircuitTopology {
             roots.computeIfAbsent(find(parent, i), key -> new ArrayList<>()).add(ports.get(i));
         }
         var groups = new LinkedHashMap<Integer, Group>();
+        var rootGroups = new LinkedHashMap<Integer, Integer>();
         var terminalGroups = new LinkedHashMap<TerminalIdentity, Integer>();
         var physicalConnectionIssues = new ArrayList<String>();
         for (var entry : roots.entrySet()) {
@@ -254,6 +260,7 @@ public final class CircuitTopology {
                     members.stream().map(Port::id).toList(),
                     members.stream().filter(Port::producer).map(Port::id).toList());
             groups.put(id, group);
+            rootGroups.put(entry.getKey(), id);
             members.forEach(port -> terminalGroups.put(port.id(), id));
         }
         var connectionOrder = new java.util.LinkedHashSet<Integer>();
@@ -323,7 +330,12 @@ public final class CircuitTopology {
             publicGroups.put(entry.getKey(), new Group(entry.getValue().id(), entry.getValue().domain(),
                     entry.getValue().canonicalLabel(), members, producers));
         }
-        return new CircuitTopology(identities, publicTerminalGroups, externalOutputGroups, publicGroups, active,
+        var labelGroups = new LinkedHashMap<Alias, Integer>();
+        aliases.forEach((alias, index) -> {
+            Integer group = rootGroups.get(find(parent, index));
+            if (group != null) labelGroups.put(alias, group);
+        });
+        return new CircuitTopology(identities, publicTerminalGroups, externalOutputGroups, publicGroups, labelGroups, active,
                 structural, wires,
                 physicalConnectionIssues, new ArrayList<>(connectionOrder));
     }
@@ -335,6 +347,7 @@ public final class CircuitTopology {
         this.terminalGroups = Map.copyOf(terminalGroups);
         this.externalOutputGroups = source.externalOutputGroups;
         this.groups = Map.copyOf(groups);
+        this.labelGroups = source.labelGroups;
         this.activeComponents = List.copyOf(activeComponents);
         this.structuralComponents = source.structuralComponents;
         this.activeConnections = source.activeConnections;
@@ -431,6 +444,15 @@ public final class CircuitTopology {
     public Map<TerminalIdentity, Integer> terminalGroups() { return terminalGroups; }
     /** @return the immutable groups indexed by their identifiers */
     public Map<Integer, Group> groups() { return groups; }
+
+    /**
+     * Finds the group a label names on one sheet, as the desktop resolves signal names per sheet.
+     * @return the group, or null when the label is not used on that sheet
+     */
+    public Group labelGroup(String domain, long sheet, String label) {
+        Integer id = labelGroups.get(new Alias(domain, sheet, normalizeLabel(label)));
+        return id == null ? null : groups.get(id);
+    }
 
     /** @return terminal groups in saved wire order, before unwired terminal groups */
     public List<Group> connectionGroupOrder() {

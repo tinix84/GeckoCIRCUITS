@@ -81,6 +81,43 @@ class CircuitTopologyTest {
     }
 
     @Test
+    void anUnlabelledExternalInputAbuttingAnUnlabelledOutputSharesItsNet() throws Exception {
+        String text = block(3, "source", 1, 0, "", "/NIX_NIX_NIX")
+                + block(22, "toExternal", 2, 0, "/NIX_NIX_NIX/other", "");
+        var model = new CircuitFileParser().parse(new BufferedReader(new StringReader(text)), "abutting-external.ipes");
+        var source = model.getControlComponents().get(0);
+        var toExternal = model.getControlComponents().get(1);
+        source.getTerminalData().add(
+                new CircuitModel.TerminalData("CONTROL", 0, CircuitTopology.Side.OUTPUT, 0, 40, 10, true));
+        toExternal.getTerminalData().add(
+                new CircuitModel.TerminalData("CONTROL", 0, CircuitTopology.Side.INPUT, 0, 40, 10, true));
+
+        var topology = CircuitTopology.resolve(model);
+
+        var group = topology.group(toExternal, CircuitTopology.Side.INPUT, 0);
+        assertEquals(topology.group(source, CircuitTopology.Side.OUTPUT, 0), group,
+                "Abutting terminals share one potential, like desktop geometricOnSamePotential");
+        assertFalse(group.producerTerminals().isEmpty());
+    }
+
+    @Test
+    void aLabelNamesItsGroupOnlyOnItsOwnSheet() throws Exception {
+        String text = subcircuit(101, 0, 1)
+                + block(3, "parent", 1, 0, "", "/v")
+                + block(3, "child", 2, 101, "", "/v");
+        var model = new CircuitFileParser().parse(new BufferedReader(new StringReader(text)), "sheet-labels.ipes");
+        var parent = model.getControlComponents().get(0);
+        var child = model.getControlComponents().get(1);
+
+        var topology = CircuitTopology.resolve(model);
+
+        assertEquals(topology.group(parent, CircuitTopology.Side.OUTPUT, 0), topology.labelGroup("CONTROL", 0, "v"));
+        assertEquals(topology.group(child, CircuitTopology.Side.OUTPUT, 0), topology.labelGroup("CONTROL", 101, "v"));
+        assertNotEquals(topology.labelGroup("CONTROL", 0, "v"), topology.labelGroup("CONTROL", 101, "v"));
+        assertNull(topology.labelGroup("CONTROL", 0, "absent"));
+    }
+
+    @Test
     void globalMarkersJoinByTheirComponentNameAcrossDifferentLocalLabels() throws Exception {
         String text = subcircuit(101, 0, 1) + subcircuit(202, 0, 1)
                 + block(3, "source", 1, 101, "", "/localLeft")
