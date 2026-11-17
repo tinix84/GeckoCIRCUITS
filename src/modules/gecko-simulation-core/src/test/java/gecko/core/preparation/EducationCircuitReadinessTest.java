@@ -5,7 +5,6 @@ import gecko.core.simulation.SimulationSession;
 import java.io.File;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -37,13 +36,6 @@ class EducationCircuitReadinessTest {
             "thyristor_lossOfCommutation",
             "thyristor_Jakopovic");
 
-    private record KnownGap(String circuit, Set<String> diagnosticCodes) {}
-
-    // These circuits remain preparation probes but are excluded from completion checks.
-    // Exact outcomes and diagnostic codes keep new failures and stale exclusions visible.
-    private static final Set<KnownGap> KNOWN_GAPS = Set.of(
-            new KnownGap("singlePhase_PWM_converter", Set.of("UNSUPPORTED_SOURCE_MODE", "MISSING_CONTROL_INPUT")));
-
     static Stream<String> circuitFiles() {
         return CIRCUITS.stream();
     }
@@ -52,8 +44,6 @@ class EducationCircuitReadinessTest {
     void corpusContainsExactlyTwentyOneDistinctCircuits() {
         assertEquals(21, CIRCUITS.size());
         assertEquals(21, CIRCUITS.stream().distinct().count());
-        assertTrue(KNOWN_GAPS.stream().allMatch(gap -> CIRCUITS.contains(gap.circuit())));
-        assertEquals(KNOWN_GAPS.size(), KNOWN_GAPS.stream().map(KnownGap::circuit).distinct().count());
     }
 
     @ParameterizedTest(name = "{0}")
@@ -66,17 +56,6 @@ class EducationCircuitReadinessTest {
         String diagnostics = result.report().diagnostics().stream()
                 .map(item -> item.code() + "[" + item.component() + "]: " + item.message())
                 .collect(Collectors.joining("; "));
-        KnownGap gap = KNOWN_GAPS.stream().filter(item -> item.circuit().equals(circuitName)).findFirst().orElse(null);
-        if (gap != null) {
-            assertInstanceOf(PreparationResult.Inspectable.class, result,
-                    circuitName + " changed preparation result; review its known gap");
-            assertEquals(ReadinessReport.Outcome.UNSUPPORTED, result.report().outcome(), circuitName);
-            assertEquals(gap.diagnosticCodes(), result.report().diagnostics().stream()
-                    .map(Diagnostic::code).collect(Collectors.toSet()), circuitName + " changed diagnostics");
-            System.out.printf("EDUCATION | %s | %s | %s | KNOWN_GAP, NOT_RUN%n",
-                    circuitName, result.report().outcome(), diagnostics);
-            return;
-        }
         if (!(result instanceof PreparationResult.Ready ready)) {
             System.out.printf("EDUCATION | %s | %s | %s | NOT_RUN%n",
                     circuitName, result.report().outcome(), diagnostics);

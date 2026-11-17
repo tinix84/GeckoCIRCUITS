@@ -22,8 +22,8 @@ import javax.swing.SwingUtilities;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BackendPropertyProbeTest {
-    private static final Map<String, Set<String>> CAPTURE_FALLBACKS = Map.ofEntries(
-            Map.entry("singlePhase_PWM_converter", Set.of("UNSUPPORTED_SOURCE_MODE", "MISSING_CONTROL_INPUT")));
+    /** Editor-capture fallbacks expected under AUTO: none, every education circuit routes to core. */
+    private static final Map<String, Set<String>> CAPTURE_FALLBACKS = Map.of();
 
     @Test
     void surefireReceivesBackendProperty() {
@@ -65,10 +65,11 @@ class BackendPropertyProbeTest {
             assertNull(GeckoSim._win._simRunner.simKern, "Core starts must not create a legacy numerical kernel");
             assertTrue(GeckoExternal.getSimulationTime() > 0);
             assertEquals(ContainerStatus.PAUSED, NetzlisteCONTROL.globalData.getContainerStatus());
-            GeckoExternal.openFile(java.nio.file.Path.of("src/test/resources/ipes/education/singlePhase_PWM_converter.ipes")
+            GeckoExternal.openFile(java.nio.file.Path.of(
+                    "src/modules/gecko-simulation-core/src/test/resources/ipes/coupled_rectifier.ipes")
                     .toAbsolutePath().toString());
             RuntimeException failure = assertThrows(RuntimeException.class, GeckoExternal::runSimulation);
-            assertTrue(failure.toString().contains("UNSUPPORTED_SOURCE_MODE"), failure::toString);
+            assertTrue(failure.toString().contains("UNSUPPORTED_CONTROL_COMPONENT"), failure::toString);
         } finally {
             restore("gecko.backend", previous);
             SwingUtilities.invokeAndWait(() -> {

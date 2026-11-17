@@ -40,6 +40,7 @@ final class ControlRuntime implements AutoCloseable {
     private long stateVersion;
     private Runnable pendingInitialization;
     private boolean initialized;
+    private boolean sourcesStarted;
     private boolean activeSegment;
     private boolean closed;
 
@@ -169,6 +170,11 @@ final class ControlRuntime implements AutoCloseable {
 
     void applyPendingGates(CircuitNetlist circuitNetlist) {
         requireOpen();
+        // The desktop sets signal-controlled sources once from the initialized CONTROL outputs before its first step.
+        if (!sourcesStarted) {
+            sourcesStarted = true;
+            domainCoupler.transferControlToSources(circuitNetlist);
+        }
         domainCoupler.applyGateSignals(circuitNetlist);
     }
 
@@ -178,6 +184,8 @@ final class ControlRuntime implements AutoCloseable {
         activeSegment = true;
         try {
             domainCoupler.transferLkToControlProbes(circuitNetlist);
+            // Desktop order: sources take the previous CONTROL outputs before CONTROL advances.
+            domainCoupler.transferControlToSources(circuitNetlist);
             if (controlNetlist.hasCalculators()) controlNetlist.executeTimeStep(dt, time);
             domainCoupler.transferGateSignalsToLk(circuitNetlist);
         } catch (RuntimeException | Error failure) {
