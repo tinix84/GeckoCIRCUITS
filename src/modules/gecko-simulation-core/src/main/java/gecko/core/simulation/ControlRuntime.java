@@ -40,7 +40,6 @@ final class ControlRuntime implements AutoCloseable {
     private long stateVersion;
     private Runnable pendingInitialization;
     private boolean initialized;
-    private boolean sourcesStarted;
     private boolean activeSegment;
     private boolean closed;
 
@@ -168,13 +167,17 @@ final class ControlRuntime implements AutoCloseable {
         return hasScope() ? scopeExtractor.getChannels() : List.of();
     }
 
+    /**
+     * Sets signal-controlled sources from the current CONTROL outputs.
+     * The desktop does this once before CONTROL initialization and before the initial-condition solve.
+     */
+    void seedSources(CircuitNetlist circuitNetlist) {
+        requireOpen();
+        domainCoupler.transferControlToSources(circuitNetlist);
+    }
+
     void applyPendingGates(CircuitNetlist circuitNetlist) {
         requireOpen();
-        // The desktop sets signal-controlled sources once from the initialized CONTROL outputs before its first step.
-        if (!sourcesStarted) {
-            sourcesStarted = true;
-            domainCoupler.transferControlToSources(circuitNetlist);
-        }
         domainCoupler.applyGateSignals(circuitNetlist);
     }
 
@@ -183,9 +186,10 @@ final class ControlRuntime implements AutoCloseable {
         stateVersion++;
         activeSegment = true;
         try {
-            domainCoupler.transferLkToControlProbes(circuitNetlist);
-            // Desktop order: sources take the previous CONTROL outputs before CONTROL advances.
+            // Desktop dataTransferLK_Control order: sources take the previous CONTROL outputs,
+            // including probe outputs, before the probes publish this step's measurements.
             domainCoupler.transferControlToSources(circuitNetlist);
+            domainCoupler.transferLkToControlProbes(circuitNetlist);
             if (controlNetlist.hasCalculators()) controlNetlist.executeTimeStep(dt, time);
             domainCoupler.transferGateSignalsToLk(circuitNetlist);
         } catch (RuntimeException | Error failure) {

@@ -51,10 +51,13 @@ Decision date: 2026-11-17.
 
 An LK voltage or current source in raw mode 400 (or 2) takes its value from the CONTROL signal named by its first parameter string.
 The backend keeps the desktop order from `SimulationsKern`.
-Before the first step, the source takes the initialized CONTROL output.
-After each electrical solve, the source takes the CONTROL output before CONTROL advances.
-The electrical solve at step k+1 therefore uses the CONTROL output of step k-1.
-A source without a matching signal holds zero, as in the desktop.
+When the session is built, the source takes the CONTROL output as constructed, before CONTROL initialization
+and before the initial-condition solve.
+After each electrical solve, the source takes the previous CONTROL outputs before VOLT and AMP probes publish
+the new measurements and before CONTROL advances.
+The electrical solve at step k+1 therefore uses the CONTROL output of step k-1, including a probe measurement.
+The signal name resolves on the source's own sheet.
+A source without a matching signal, or in a circuit without CONTROL, holds zero, as in the desktop.
 
 Reading the output computed in the same step would remove one step of delay and differ from desktop timing.
 With the desktop order, `singlePhase_PWM_converter` matches its unchanged golden reference within 1% on the core backend.
