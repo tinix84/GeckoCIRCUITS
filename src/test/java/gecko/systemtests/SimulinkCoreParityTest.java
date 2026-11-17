@@ -144,7 +144,8 @@ class SimulinkCoreParityTest {
     private static void openFixture() throws Exception {
         Timer dismissCompatibilityNotice = new Timer(100, event -> {
             for (Window window : Window.getWindows()) {
-                if (window instanceof JDialog dialog
+                // A throwing listener stalls the coalescing Timer, so skip dialogs without a root pane.
+                if (window instanceof JDialog dialog && dialog.getRootPane() != null
                         && findOptionPane(dialog.getContentPane()) instanceof JOptionPane pane) {
                     String message = String.valueOf(pane.getMessage());
                     if (("Info".equals(dialog.getTitle()) && message.startsWith(
