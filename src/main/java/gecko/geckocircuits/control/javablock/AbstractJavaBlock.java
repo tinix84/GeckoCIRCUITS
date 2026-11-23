@@ -50,7 +50,12 @@ public abstract class AbstractJavaBlock {
         SchematicEditor2.setZustandGeaendert(true);
 
         String className = CompileObject.findUniqueClassName();
-        String sourceString = SourceFileGenerator.createSourceCode(_javaBlockSource, className, _reglerJavaBlock.YOUT.size(), _reglerJavaBlock._variableBusWidth);
+        String sourceString =
+                SourceFileGenerator.createSourceCode(
+                        _javaBlockSource,
+                        className,
+                        _reglerJavaBlock.YOUT.size(),
+                        _reglerJavaBlock._variableBusWidth);
 
         _compileObject = new CompileObject(sourceString, className, _additionalSourceFiles);
 
@@ -190,7 +195,11 @@ public abstract class AbstractJavaBlock {
             final Map<String, CompiledClassContainer> classMap = (Map<String, CompiledClassContainer>) oInStream.readObject();
             _classNameFileMap = classMap;
         } catch (IOException ex) {
-            Logger.getLogger(ReglerJavaFunction.class.getName()).log(Level.SEVERE, "IOException while deserializing class map: " + ex.getMessage(), ex);
+            Logger.getLogger(ReglerJavaFunction.class.getName())
+                    .log(
+                            Level.SEVERE,
+                            "IOException while deserializing class map: " + ex.getMessage(),
+                            ex);
         } catch (Exception ex) {
             ex.printStackTrace();
         }

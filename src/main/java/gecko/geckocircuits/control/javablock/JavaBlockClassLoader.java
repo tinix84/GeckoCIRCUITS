@@ -78,7 +78,7 @@ public final class JavaBlockClassLoader extends URLClassLoader {
     @SuppressFBWarnings(value = "DP_CREATE_CLASSLOADER_INSIDE_DO_PRIVILEGED",
             justification = "ClassLoader creation is intentional for dynamic class loading in scripting code")
     private static URLClassLoader createUrlClassLoader(URL url) {
-        return new URLClassLoader(new URL[] { url });
+        return new URLClassLoader(new URL[] {url});
     }
 
 }

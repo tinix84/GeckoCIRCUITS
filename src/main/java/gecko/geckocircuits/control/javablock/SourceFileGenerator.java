@@ -111,9 +111,9 @@ public final class SourceFileGenerator {
             } else {
                 sourceStringBuilder.append("\tprivate final double[][] yOUT = new double[][]");
                 sourceStringBuilder.append("{ ");
-                for(int i = 0; i < outTerminalNumber; i++) {
+                for (int i = 0; i < outTerminalNumber; i++) {
                     sourceStringBuilder.append("new double[" + variableBusWidth.getBusWidth(i) + "]");
-                    if(i < outTerminalNumber-1) {
+                    if (i < outTerminalNumber - 1) {
                         sourceStringBuilder.append(", ");
                     }
                 }

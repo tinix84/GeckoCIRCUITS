@@ -84,8 +84,7 @@ public final class CompileObject extends AbstractCompileObject {
                     if (fileName.startsWith(_className)) {
                         _classMap.put(fileName, new CompiledClassContainer(entry.getValue().getByteArray(),
                                 _sourceString));
-                    }
-                    else {
+                    } else {
                         for (GeckoFile externalSource : additionalSourceFiles) {
                             if (externalSource.getName().equals(fileName + ".java")) {
                                 _classMap.put(fileName, new CompiledClassContainer(entry.getValue().getByteArray(),
@@ -175,7 +174,11 @@ public final class CompileObject extends AbstractCompileObject {
             try {
                 try {
                     compiler = (JavaCompiler) Class.forName("com.sun.tools.javac.api.JavacTool").newInstance();
-                    Logger.getLogger(CompileObject.class.getName()).log(Level.INFO, "Java Compiler found via fallback: " + compiler.getClass().getName());
+                    Logger.getLogger(CompileObject.class.getName())
+                            .log(
+                                    Level.INFO,
+                                    "Java Compiler found via fallback: "
+                                            + compiler.getClass().getName());
                 } catch (InstantiationException ex) {
                     Logger.getLogger(ReglerJavaFunction.class.getName()).log(Level.SEVERE, "InstantiationException in fallback compiler", ex);
                 } catch (IllegalAccessException ex) {
