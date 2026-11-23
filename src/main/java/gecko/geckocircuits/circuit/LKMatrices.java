@@ -256,8 +256,8 @@ public class LKMatrices {
                 case TH_TEMP:  //  +1
                     a[x][z] += (+1.0);
                     a[y][z] += (-1.0);
-                    if (!((int) netzliste.parameter[i1][0] == SourceType.QUELLE_VOLTAGECONTROLLED_TRANSFORMER_NEW)
-                            && !((int) netzliste.parameter[i1][0] == SourceType.QUELLE_VOLTAGECONTROLLED_TRANSFORMER)) {
+                    if (((int) netzliste.parameter[i1][0] != SourceType.QUELLE_VOLTAGECONTROLLED_TRANSFORMER_NEW)
+                            && ((int) netzliste.parameter[i1][0] != SourceType.QUELLE_VOLTAGECONTROLLED_TRANSFORMER)) {
                         a[z][x] += (+1.0);
                         a[z][y] += (-1.0);
                     }

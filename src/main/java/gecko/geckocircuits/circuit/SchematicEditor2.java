@@ -941,7 +941,7 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
             return;
         }
 
-        if (!(me.getModifiersEx() == MouseEvent.BUTTON3_DOWN_MASK)) {
+        if ((me.getModifiersEx() != MouseEvent.BUTTON3_DOWN_MASK)) {
             _lastMouseClickTime = System.currentTimeMillis();
         }
 
