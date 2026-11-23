@@ -132,7 +132,13 @@ class FourierDiagramm extends GraferV3 implements MouseListener, MouseMotionList
                 }
             }
             double[] empf = auto_Achsenbegrenzung_Wertempfehlung(ymin, ymax);
-            this.setzeAchsenBegrenzungen(new double[]{xNeu[0]}, new double[]{xNeu[xNeu.length - 1]}, new boolean[]{true}, new double[]{ymin}, new double[]{empf[1]}, new boolean[]{true});
+            this.setzeAchsenBegrenzungen(
+                    new double[] {xNeu[0]},
+                    new double[] {xNeu[xNeu.length - 1]},
+                    new boolean[] {true},
+                    new double[] {ymin},
+                    new double[] {empf[1]},
+                    new boolean[] {true});
             this.setzeTickSpacing(new double[]{(cnSG.length / 10.0)}, new double[]{empf[4]});
             repaint();
         } else if (mausModus == GraferImplementation.MAUSMODUS_WERTANZEIGE_SCHIEBER) {
@@ -194,9 +200,10 @@ class FourierDiagramm extends GraferV3 implements MouseListener, MouseMotionList
         this.setzeTickLabelAnzeige(new boolean[]{true}, new boolean[]{true}, new boolean[]{false}, new boolean[]{false});
         this.setzeTickLabelPosition(new int[]{20}, new int[]{16});
         this.setzeTickLabelFont(new Font[]{new Font("Arial", Font.PLAIN, 12)}, new Font[]{new Font("Arial", Font.PLAIN, 12)});
-        //=========================================
-//        this.setzeAchsenBegrenzungen(new double[]{0.02}, new double[]{0.06}, new boolean[]{true}, new double[]{-4}, new double[]{4}, new boolean[]{true});
-//        this.setzeTickSpacing(new double[]{0.01}, new double[]{2});
+        // =========================================
+        //        this.setzeAchsenBegrenzungen(new double[]{0.02}, new double[]{0.06}, new
+        // boolean[]{true}, new double[]{-4}, new double[]{4}, new boolean[]{true});
+        //        this.setzeTickSpacing(new double[]{0.01}, new double[]{2});
         double ymin = 0, ymax = -1;
         for (int n = nMin; n < nMin + cnSG.length; n++) {
             if (cnSG[n] > ymax) {
@@ -208,7 +215,13 @@ class FourierDiagramm extends GraferV3 implements MouseListener, MouseMotionList
             empf[4] *= 0.5;
         }
         //
-        this.setzeAchsenBegrenzungen(new double[]{xNeu[0]}, new double[]{xNeu[xNeu.length - 1]}, new boolean[]{true}, new double[]{ymin}, new double[]{empf[1]}, new boolean[]{true});
+        this.setzeAchsenBegrenzungen(
+                new double[] {xNeu[0]},
+                new double[] {xNeu[xNeu.length - 1]},
+                new boolean[] {true},
+                new double[] {ymin},
+                new double[] {empf[1]},
+                new boolean[] {true});
         this.setzeTickSpacing(new double[]{cnSG.length / 10.0}, new double[]{empf[4]});
         //-------------------------------------
     }

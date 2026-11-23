@@ -104,11 +104,11 @@ public class DialogFourierDiagramm extends JDialog implements ComponentListener 
 
     private void baueGUI() {
         tabbedPane = new JTabbedPane();
-        diagrams = new FourierDiagramm[_worksheet.getRowLength()+1];
-        sheet = new DisplayFourierWorksheet[_worksheet.getRowLength()+1];
-        reconstructions = new FourierKurvenRekonstruktion[_worksheet.getRowLength()+1];
+        diagrams = new FourierDiagramm[_worksheet.getRowLength() + 1];
+        sheet = new DisplayFourierWorksheet[_worksheet.getRowLength() + 1];
+        reconstructions = new FourierKurvenRekonstruktion[_worksheet.getRowLength() + 1];
         //
-        for (int i1 = 1; i1 < _worksheet.getRowLength()+1; i1++) {
+        for (int i1 = 1; i1 < _worksheet.getRowLength() + 1; i1++) {
             if (_signalFourierAnalysiert[i1]) {
                 JPanel jpSg = new JPanel();
                 jpSg.setLayout(new BorderLayout());
@@ -122,7 +122,7 @@ public class DialogFourierDiagramm extends JDialog implements ComponentListener 
                 localTabbedPane.addTab("Reconstruction", reconstructions[i1 - 1]);
                 //---------
                 jpSg.add(localTabbedPane, BorderLayout.CENTER);
-                tabbedPane.addTab(_worksheet.getSignalName(i1-1) + " ", jpSg);
+                tabbedPane.addTab(_worksheet.getSignalName(i1 - 1) + " ", jpSg);
             }
         }
         //------------------------
@@ -138,39 +138,49 @@ public class DialogFourierDiagramm extends JDialog implements ComponentListener 
         JMenu dataMenu = GuiFabric.getJMenu(I18nKeys.FILE);
         mItemF3 = GuiFabric.getJMenuItem(I18nKeys.WRITE_DATA_TO_FILE);
         mItemF3.setMnemonic(KeyEvent.VK_S);
-        mItemF3.addActionListener((ActionEvent ae) -> {
-            GeckoFileChooser fileChooser = GeckoFileChooser.createSimpleSaveFileChooser(".dat", this);
-            if (fileChooser.getUserResult() == GeckoFileChooser.FileChooserResult.CANCEL) {
-                return;
-            }
-
-            StringBuffer sb = new StringBuffer();
-            sb.append("N ");
-            for (int i1 = 1; i1 < _worksheet.getRowLength()+1; i1++) {
-                if (_signalFourierAnalysiert[i1]) {
-                    sb.append(_worksheet.getSignalName(i1-1) + "_cN " + _worksheet.getSignalName(i1-1) + "_phiN[rad] ");
-                }
-            }
-            sb.append("\n");
-            for (int i1 = 0; i1 < _cn[0].length; i1++) {
-                sb.append(i1 + " ");
-                for (int i2 = 1; i2 < _worksheet.getRowLength()+1; i2++) {
-                    if (_signalFourierAnalysiert[i2]) {
-                        sb.append(_cn[i2 - 1][i1] + " " + _jn[i2 - 1][i1] + " ");
+        mItemF3.addActionListener(
+                (ActionEvent ae) -> {
+                    GeckoFileChooser fileChooser =
+                            GeckoFileChooser.createSimpleSaveFileChooser(".dat", this);
+                    if (fileChooser.getUserResult() == GeckoFileChooser.FileChooserResult.CANCEL) {
+                        return;
                     }
 
-                }
-                sb.append("\n");
-            }
-            try {
-                BufferedWriter fkaku = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(fileChooser.getFileWithCheckedEnding()), StandardCharsets.UTF_8));
-                fkaku.write(sb.toString());
-                fkaku.flush();
-                fkaku.close();
-            } catch (Exception e) {
-                System.out.println(e + "   qe90r8gn03g8q");
-            }
-        });
+                    StringBuffer sb = new StringBuffer();
+                    sb.append("N ");
+                    for (int i1 = 1; i1 < _worksheet.getRowLength() + 1; i1++) {
+                        if (_signalFourierAnalysiert[i1]) {
+                            sb.append(
+                                    _worksheet.getSignalName(i1 - 1)
+                                            + "_cN "
+                                            + _worksheet.getSignalName(i1 - 1)
+                                            + "_phiN[rad] ");
+                        }
+                    }
+                    sb.append("\n");
+                    for (int i1 = 0; i1 < _cn[0].length; i1++) {
+                        sb.append(i1 + " ");
+                        for (int i2 = 1; i2 < _worksheet.getRowLength() + 1; i2++) {
+                            if (_signalFourierAnalysiert[i2]) {
+                                sb.append(_cn[i2 - 1][i1] + " " + _jn[i2 - 1][i1] + " ");
+                            }
+                        }
+                        sb.append("\n");
+                    }
+                    try {
+                        BufferedWriter fkaku =
+                                new BufferedWriter(
+                                        new OutputStreamWriter(
+                                                new FileOutputStream(
+                                                        fileChooser.getFileWithCheckedEnding()),
+                                                StandardCharsets.UTF_8));
+                        fkaku.write(sb.toString());
+                        fkaku.flush();
+                        fkaku.close();
+                    } catch (Exception e) {
+                        System.out.println(e + "   qe90r8gn03g8q");
+                    }
+                });
         JMenuItem mItemF5 = GuiFabric.getJMenuItem(I18nKeys.EXIT);
         mItemF5.setMnemonic(KeyEvent.VK_X);
         mItemF5.addActionListener((ActionEvent ae) -> this.dispose());
@@ -289,7 +299,7 @@ public class DialogFourierDiagramm extends JDialog implements ComponentListener 
                 mouseMode = GraferImplementation.MAUSMODUS_WERTANZEIGE_SCHIEBER;
                 break;
             case 4:
-                if(yAxisType == GraferV3.ACHSE_LIN) {
+                if (yAxisType == GraferV3.ACHSE_LIN) {
                    yAxisType = GraferV3.ACHSE_LOG;
                    mouseButtons[4].setIcon(iconON[4]);
                 } else {
@@ -311,7 +321,7 @@ public class DialogFourierDiagramm extends JDialog implements ComponentListener 
                 Logger.getLogger(DialogFourierDiagramm.class.getName()).log(Level.WARNING, "Error: 98n3gweggtq5t");
                 break;
         }
-        for (int i1 = 1; i1 < _worksheet.getRowLength()+1; i1++) {
+        for (int i1 = 1; i1 < _worksheet.getRowLength() + 1; i1++) {
             if (_signalFourierAnalysiert[i1]) {
                 diagrams[i1 - 1].setMausModus(mouseMode);
                 reconstructions[i1 - 1].setMausModus(mouseMode);
@@ -321,7 +331,7 @@ public class DialogFourierDiagramm extends JDialog implements ComponentListener 
             mouseMode = previousMouseMode;
             mouseButtons[1].setIcon(iconOFF[1]);
             mouseButtons[previousActiveIconIndex].setIcon(iconON[previousActiveIconIndex]);
-            for (int i1 = 1; i1 < _worksheet.getRowLength()+1; i1++) {
+            for (int i1 = 1; i1 < _worksheet.getRowLength() + 1; i1++) {
                 if (_signalFourierAnalysiert[i1]) {
                     diagrams[i1 - 1].setMausModus(mouseMode);
                     reconstructions[i1 - 1].setMausModus(mouseMode);
@@ -334,7 +344,7 @@ public class DialogFourierDiagramm extends JDialog implements ComponentListener 
 
     @Override
     public void componentResized(final ComponentEvent compEvent) {
-        for (int i1 = 1; i1 < _worksheet.getRowLength()+1; i1++) {
+        for (int i1 = 1; i1 < _worksheet.getRowLength() + 1; i1++) {
             if (_signalFourierAnalysiert[i1]) {
                 diagrams[i1 - 1].resize();
                 diagrams[i1 - 1].repaint();
