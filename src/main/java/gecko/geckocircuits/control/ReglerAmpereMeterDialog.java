@@ -38,7 +38,7 @@ class ReglerAmpereMeterDialog extends DialogElementCONTROL<AbstractCurrentMeasur
                 //extra panel for flow measurement
                 final JPanel psw2 = new JPanel();
                 psw2.setLayout(new BorderLayout());
-                _comboLossType = new JComboBox<>() ;
+                _comboLossType = new JComboBox<>();
                 final LossComponent[] components = LossComponent.values();
                 for (LossComponent component : components) {
                     _comboLossType.addItem(component);

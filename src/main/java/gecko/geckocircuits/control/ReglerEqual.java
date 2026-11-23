@@ -37,7 +37,7 @@ public final class ReglerEqual extends SimpleRegelBlock {
 
     @Override
     public AbstractControlCalculatable getInternalControlCalculatableForSimulationStart() {
-        if(XIN.size() == 2) {
+        if (XIN.size() == 2) {
             return new EqualCalculatorTwoInputs();
         } else {
             return new EqualCalculatorMultiInput(XIN.size());

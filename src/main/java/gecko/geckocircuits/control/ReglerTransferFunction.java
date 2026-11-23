@@ -30,7 +30,12 @@ public final class ReglerTransferFunction extends AbstractReglerSingleInputSingl
         implements Operationable {
     private static final long serialVersionUID = 1L;
 
-    public static final ControlTypeInfo tinfo = new ControlTypeInfo(ReglerTransferFunction.class, "TF", I18nKeys.TRANSFER_FUNKTION_H_S, I18nKeys.DEFINES_A_TRANSFER_FUNCTION);
+    public static final ControlTypeInfo tinfo =
+            new ControlTypeInfo(
+                    ReglerTransferFunction.class,
+                    "TF",
+                    I18nKeys.TRANSFER_FUNKTION_H_S,
+                    I18nKeys.DEFINES_A_TRANSFER_FUNCTION);
     private double[] _zeros = new double[MAX_ARRAY_SIZE];
     private double[] _poles = new double[MAX_ARRAY_SIZE];
     private double[] _numeratorPolynom = new double[MAX_ARRAY_SIZE];
@@ -280,33 +285,35 @@ public final class ReglerTransferFunction extends AbstractReglerSingleInputSingl
             }
         });
 
-        returnValue.add(new OperationInterface("setPoles", I18nKeys.SET_POLE_COEFF) {
-            @Override
-            public Object doOperation(final Object parameterValue) {
-                Double[] parameters = checkParameterType(parameterValue);
-                for(int i = 0; i < parameters.length; i++) {
-                    setPole(parameters[i], i);
-                }
-                for(int i = parameters.length; i < MAX_ARRAY_SIZE; i++) {
-                    _poles[i] = 0;
-                }
-                return null;
-            }
-        });
+        returnValue.add(
+                new OperationInterface("setPoles", I18nKeys.SET_POLE_COEFF) {
+                    @Override
+                    public Object doOperation(final Object parameterValue) {
+                        Double[] parameters = checkParameterType(parameterValue);
+                        for (int i = 0; i < parameters.length; i++) {
+                            setPole(parameters[i], i);
+                        }
+                        for (int i = parameters.length; i < MAX_ARRAY_SIZE; i++) {
+                            _poles[i] = 0;
+                        }
+                        return null;
+                    }
+                });
 
-        returnValue.add(new OperationInterface("setZeros", I18nKeys.SET_ZERO_COEFF) {
-            @Override
-            public Object doOperation(final Object parameterValue) {
-                Double[] parameters = checkParameterType(parameterValue);
-                for(int i = 0; i < parameters.length; i++) {
-                    setZero(parameters[i], i);
-                }
-                for(int i = parameters.length; i < MAX_ARRAY_SIZE; i++) {
-                    _zeros[i] = 0;
-                }
-                return null;            }
-        });
-
+        returnValue.add(
+                new OperationInterface("setZeros", I18nKeys.SET_ZERO_COEFF) {
+                    @Override
+                    public Object doOperation(final Object parameterValue) {
+                        Double[] parameters = checkParameterType(parameterValue);
+                        for (int i = 0; i < parameters.length; i++) {
+                            setZero(parameters[i], i);
+                        }
+                        for (int i = parameters.length; i < MAX_ARRAY_SIZE; i++) {
+                            _zeros[i] = 0;
+                        }
+                        return null;
+                    }
+                });
 
         return Collections.unmodifiableList(returnValue);
     }

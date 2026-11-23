@@ -21,7 +21,7 @@ import javax.swing.JPanel;
  *
  * @author andy
  */
-class ReglerRandomDialog extends DialogElementCONTROL<ReglerSignalSource>{
+class ReglerRandomDialog extends DialogElementCONTROL<ReglerSignalSource> {
 
     public ReglerRandomDialog(ReglerSignalSource element) {
         super(element);

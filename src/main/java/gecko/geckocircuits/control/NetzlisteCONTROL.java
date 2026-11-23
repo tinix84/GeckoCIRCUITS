@@ -200,7 +200,12 @@ public final class NetzlisteCONTROL {
         for (RegelBlock reg : elementsControl) {
             for (int i = 0; i < reg.XIN.size(); i++) {
                 if (reg.checkInputWithoutConnectionAndFillInput(i)) {
-                    _inPortsStringWithoutConnection.add(reg.getStringID() + " Port no. " + i + " label: " + reg.XIN.get(i).getLabelObject().getLabelString());
+                    _inPortsStringWithoutConnection.add(
+                            reg.getStringID()
+                                    + " Port no. "
+                                    + i
+                                    + " label: "
+                                    + reg.XIN.get(i).getLabelObject().getLabelString());
                     _inPortsWithoutConnection.add(reg.XIN.get(i));
                 }
             }

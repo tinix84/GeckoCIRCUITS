@@ -58,7 +58,7 @@ import java.util.logging.Logger;
 
 
     final void moveNodeToListEnd(final ControlOrderNode node) {
-        if(_orderedList.contains(node)) {
+        if (_orderedList.contains(node)) {
             _orderedList.remove(node);
         }
         _orderedList.addLast(node);
@@ -67,7 +67,7 @@ import java.util.logging.Logger;
 
     final void moveNodeToListStart(final ControlOrderNode node) {
 
-        if(_orderedList.contains(node)) {
+        if (_orderedList.contains(node)) {
             _orderedList.remove(node);
         }
         _orderedList.addFirst(node);
@@ -75,8 +75,8 @@ import java.util.logging.Logger;
     }
 
     private void sortNodesIntoSourceTransferSinks(final Collection<ControlOrderNode> allNodes) {
-        for(ControlOrderNode node : allNodes) {
-            switch(node.getControlType()) {
+        for (ControlOrderNode node : allNodes) {
+            switch (node.getControlType()) {
                 case SOURCE:
                     _sourceList.add(node);
                     break;
@@ -101,7 +101,7 @@ import java.util.logging.Logger;
     }
 
     void printWarningsForNodesWithNoEffect() {
-        if(_availableBlocks.isEmpty()) {
+        if (_availableBlocks.isEmpty()) {
             return;
         }
         final StringBuffer warningsString = new StringBuffer(getRemainingWarningString());
@@ -118,7 +118,7 @@ import java.util.logging.Logger;
 
     void addNodesToNextList(final ControlOrderNode node) {
         for (ControlOrderNode directNeighbour : getNextNeighbourNodes(node)) {
-            if(_availableBlocks.contains(directNeighbour)) {
+            if (_availableBlocks.contains(directNeighbour)) {
                 _nextInsertBlocks.add(directNeighbour);
             }
         }
@@ -135,7 +135,7 @@ import java.util.logging.Logger;
                 moveNodeToEndDirectionInList(node);
                 addNodesToNextList(node);
 
-                if(node.getElementControl().getStringID().equals("OR.1")) {
+                if (node.getElementControl().getStringID().equals("OR.1")) {
                     System.out.println("next: " + _nextInsertBlocks.size());
                 }
 

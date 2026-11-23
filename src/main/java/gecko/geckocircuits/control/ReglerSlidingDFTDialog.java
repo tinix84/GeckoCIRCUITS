@@ -179,16 +179,16 @@ final class ReglerSlidingDFTDialog extends DialogElementCONTROL<ReglerSlidingDFT
         super.processInputIndividual(); //To change body of generated methods, choose Tools | Templates.
         element.setOutputTerminalNumber(_freqFields.size());
 
-        for(JComboBox combo : _frequencySelectionList) {
+        for (JComboBox combo : _frequencySelectionList) {
             int index = _frequencySelectionList.indexOf(combo);
             _originalData.get(index)._outputData = (OutputData) combo.getSelectedItem();
         }
         int makeSmaller = 0;
-        if(_originalData.size() > _freqFields.size()) {
+        if (_originalData.size() > _freqFields.size()) {
             makeSmaller = _originalData.size() - _freqFields.size();
         }
 
-        for(int i = 0; i < makeSmaller; i++) {
+        for (int i = 0; i < makeSmaller; i++) {
             element.removeLastFrequencyData();
         }
     }

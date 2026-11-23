@@ -71,20 +71,23 @@ public final class ReglerLimit extends RegelBlock implements ControlInputTwoTerm
     public ReglerLimit() {
         super(1, 1);
 
-        final ActionListener minMaxAction = new ActionListener() {
+        final ActionListener minMaxAction =
+                new ActionListener() {
 
-            @Override
-            public void actionPerformed(final ActionEvent event) {
-                if (_calculator instanceof LimitCalculatorInternal) {
-                    final double min = _minLimit.getValue();
-                    final double max = _maxLimit.getValue();
-                    final LimitCalculatorInternal internal = (LimitCalculatorInternal) _calculator;
-                    internal.setMinMaxValues(min, max);
-                    return;
-                }
-                assert _calculator == null || _calculator instanceof LimitCalculatorExternal: "Calculator not known!";
-            }
-        };
+                    @Override
+                    public void actionPerformed(final ActionEvent event) {
+                        if (_calculator instanceof LimitCalculatorInternal) {
+                            final double min = _minLimit.getValue();
+                            final double max = _maxLimit.getValue();
+                            final LimitCalculatorInternal internal =
+                                    (LimitCalculatorInternal) _calculator;
+                            internal.setMinMaxValues(min, max);
+                            return;
+                        }
+                        assert _calculator == null || _calculator instanceof LimitCalculatorExternal
+                                : "Calculator not known!";
+                    }
+                };
 
         _minLimit.addActionListener(minMaxAction);
         _maxLimit.addActionListener(minMaxAction);
@@ -127,10 +130,17 @@ public final class ReglerLimit extends RegelBlock implements ControlInputTwoTerm
         super.drawBlockRectangle(graphics);
 
         if (_isExternalSet.getValue()) {
-            graphics.drawLine(xPos * dpix, (int) ((yPos + 1/2.0) * dpix), xPos * dpix, (yPos + Y_DRAW_OFFSET) * dpix);
+            graphics.drawLine(
+                    xPos * dpix,
+                    (int) ((yPos + 1 / 2.0) * dpix),
+                    xPos * dpix,
+                    (yPos + Y_DRAW_OFFSET) * dpix);
             graphics.setColor(GlobalColors.farbeInBearbeitungCONTROL);
             graphics.drawString(MIN, (int) (dpix * xPos) + X_DRAW_OFFSET, (int) (dpix * (yPos + Y_STRING_DRAW_OFFSET)));
-            graphics.drawString(MAX, (int) (dpix * xPos) + X_DRAW_OFFSET, (int) (dpix * (yPos + Y_STRING_DRAW_OFFSET+1)));
+            graphics.drawString(
+                    MAX,
+                    (int) (dpix * xPos) + X_DRAW_OFFSET,
+                    (int) (dpix * (yPos + Y_STRING_DRAW_OFFSET + 1)));
             graphics.setColor(origColor);
         }
     }
@@ -157,7 +167,7 @@ public final class ReglerLimit extends RegelBlock implements ControlInputTwoTerm
 
     @Override
     public void setExpanded() {
-        for(int i = 0, popSize = _stashedTerminals.size(); i < popSize; i++) {
+        for (int i = 0, popSize = _stashedTerminals.size(); i < popSize; i++) {
             XIN.add(_stashedTerminals.pop());
         }
         while (XIN.size() < IN_TERMS_WITH_EXT) {

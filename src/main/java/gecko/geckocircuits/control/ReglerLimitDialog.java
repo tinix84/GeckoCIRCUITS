@@ -47,7 +47,7 @@ class ReglerLimitDialog extends AbstractDialogWithExternalOption<ReglerLimit> {
         JPanel pLIMIT = createParameterPanel(element._minLimit, element._maxLimit);
         jpM.add(pLIMIT, BorderLayout.SOUTH);
 
-        for(JComponent comp : getComponentsDisabledExternal()) {
+        for (JComponent comp : getComponentsDisabledExternal()) {
             comp.setEnabled(!element.isExternalSet());
         }
 

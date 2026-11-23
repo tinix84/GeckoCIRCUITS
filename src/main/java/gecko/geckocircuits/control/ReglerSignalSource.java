@@ -489,22 +489,28 @@ public class ReglerSignalSource extends RegelBlock implements ControlInputTwoTer
     public List<OperationInterface> getOperationEnumInterfaces() {
         final List<OperationInterface> returnValue = new ArrayList<OperationInterface>();
 
-        returnValue.add(new OperationInterface("setFileName", I18nKeys.FILENAME) {
-            @Override
-            public Object doOperation(final Object parameterValue) {
+        returnValue.add(
+                new OperationInterface("setFileName", I18nKeys.FILENAME) {
+                    @Override
+                    public Object doOperation(final Object parameterValue) {
 
-                try {
-                    _externalDataFile = new GeckoFile(new File((String) parameterValue), GeckoFile.StorageType.EXTERNAL, MainWindow.getOpenFileName());
-                    _externalDataFile.setUser(getUniqueObjectIdentifier());
-                    _datnamXY = (String) parameterValue;
-                    MainWindow._fileManager.addFile(_externalDataFile);
-                    return true;
-                } catch (FileNotFoundException ex) {
-                    Logger.getLogger(ReglerSignalSource.class.getName()).log(Level.SEVERE, null, ex);
-                    throw new RuntimeException("File not found! " + ex, ex);
-                }
-            }
-        });
+                        try {
+                            _externalDataFile =
+                                    new GeckoFile(
+                                            new File((String) parameterValue),
+                                            GeckoFile.StorageType.EXTERNAL,
+                                            MainWindow.getOpenFileName());
+                            _externalDataFile.setUser(getUniqueObjectIdentifier());
+                            _datnamXY = (String) parameterValue;
+                            MainWindow._fileManager.addFile(_externalDataFile);
+                            return true;
+                        } catch (FileNotFoundException ex) {
+                            Logger.getLogger(ReglerSignalSource.class.getName())
+                                    .log(Level.SEVERE, null, ex);
+                            throw new RuntimeException("File not found! " + ex, ex);
+                        }
+                    }
+                });
         return Collections.unmodifiableList(returnValue);
     }
 }

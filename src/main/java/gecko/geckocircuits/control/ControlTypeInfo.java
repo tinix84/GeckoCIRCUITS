@@ -23,7 +23,11 @@ import java.util.logging.Logger;
 
 public final class ControlTypeInfo extends AbstractTypeInfo {
 
-    public ControlTypeInfo(final Class<? extends AbstractBlockInterface> typeClass, final String idString, final I18nKeys typeDescription, final I18nKeys typeDescriptionVerbose) {
+    public ControlTypeInfo(
+            final Class<? extends AbstractBlockInterface> typeClass,
+            final String idString,
+            final I18nKeys typeDescription,
+            final I18nKeys typeDescriptionVerbose) {
         super(typeClass, idString, typeDescription);
     }
 

@@ -234,7 +234,7 @@ public final class BlockOrderOptimizer3 {
             if (nextNode.getLoopCrack()) {
                 continue;
             }
-            if (level < - _stopIteration) {
+            if (level < -_stopIteration) {
                 List<ControlOrderNode> loopList = new ArrayList<ControlOrderNode>();
                 loopList.add(nextNode);
                 throw new LoopDetectionException(nextNode, loopList);

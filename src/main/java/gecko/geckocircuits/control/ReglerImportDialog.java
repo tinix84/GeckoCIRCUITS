@@ -33,7 +33,7 @@ import javax.swing.border.TitledBorder;
  *
  * @author andy
  */
-class ReglerImportDialog extends DialogElementCONTROL<ReglerSignalSource>{
+class ReglerImportDialog extends DialogElementCONTROL<ReglerSignalSource> {
 
     private FormatJTextField jtfImportStatus;  // fuer das Importieren externer Zeitverlaeufe, die dann vom SIGNAL-Block ausgegeben werden
 
@@ -51,7 +51,12 @@ class ReglerImportDialog extends DialogElementCONTROL<ReglerSignalSource>{
         jtx.setBackground(Color.white);
         jtx.setEditable(false);
         JPanel jpIMPORT = new JPanel();
-        jpIMPORT.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), "Import ASCII File", TitledBorder.LEFT, TitledBorder.TOP));
+        jpIMPORT.setBorder(
+                BorderFactory.createTitledBorder(
+                        BorderFactory.createEtchedBorder(),
+                        "Import ASCII File",
+                        TitledBorder.LEFT,
+                        TitledBorder.TOP));
         jpIMPORT.setLayout(new BorderLayout());
 
         //
