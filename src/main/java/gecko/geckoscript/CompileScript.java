@@ -79,7 +79,7 @@ public class CompileScript {
     }
 
     static void compile(final ScriptWindow sw) {
-        if(GeckoSim.compiler_toolsjar_missing) {
+        if (GeckoSim.compiler_toolsjar_missing) {
               JOptionPane.showMessageDialog(null, "No tools.jar library found!", "Error", JOptionPane.ERROR_MESSAGE);
             sw._compMessagesTextArea.setText("Compilar library tools.jar is missing in the ./lib directory!");
             return;
@@ -125,7 +125,10 @@ public class CompileScript {
             }
             sw.addSourceLine("");
             if (sw._advancedOption) {
-                sw.addSourceLine("    public " + sw._className + "(SimulationAccess simaccess, JTextArea outputArea, HashMap<String, Object> element_map) {");
+                sw.addSourceLine(
+                        "    public "
+                                + sw._className
+                                + "(SimulationAccess simaccess, JTextArea outputArea, HashMap<String, Object> element_map) {");
             } else {
                 sw.addSourceLine("    public " + sw._className + "(SimulationAccess simaccess, JTextArea outputArea) {");
             }
@@ -155,7 +158,9 @@ public class CompileScript {
             sw.addSourceLine("  }");
             sw.addSourceLine("}");
             //
-            //System.out.println("createSourceCode() --> \n\n_compilerMessage= \n"+_compilerMessage+"\n\n===========\n_sourceString= \n"+_sourceString+"\n\n===========\n");
+            // System.out.println("createSourceCode() --> \n\n_compilerMessage=
+            // \n"+_compilerMessage+"\n\n===========\n_sourceString=
+            // \n"+_sourceString+"\n\n===========\n");
         } catch (IOException ex) {
             Logger.getLogger(ScriptWindow.class.getName()).log(Level.SEVERE, null, ex);
         }

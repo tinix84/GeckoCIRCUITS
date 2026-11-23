@@ -29,7 +29,10 @@ import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
-@SuppressFBWarnings(value = {"EI_EXPOSE_REP2", "EI_EXPOSE_REP"}, justification = "Simulation access stores main window reference for GUI interaction; returns file list for external access")
+@SuppressFBWarnings(
+        value = {"EI_EXPOSE_REP2", "EI_EXPOSE_REP"},
+        justification =
+                "Simulation access stores main window reference for GUI interaction; returns file list for external access")
 public final class SimulationAccess implements GeckoFileable {
 
     final static long DUMMY_BLOCK_ID = -1231231987;
@@ -328,13 +331,25 @@ public final class SimulationAccess implements GeckoFileable {
         int worksheetSizeX = MainWindow._se._circuitSheet._worksheetSize.getSizeX();
         int worksheetSizeY = MainWindow._se._circuitSheet._worksheetSize.getSizeY();
         if (x >= worksheetSizeX || y >= worksheetSizeY) {
-            throw new Exception("Given position is outside defined drawing area! Sheet size is " + worksheetSizeX + "x" + worksheetSizeY + " and given new position is " + x + "x" + y + ".");
+            throw new Exception(
+                    "Given position is outside defined drawing area! Sheet size is "
+                            + worksheetSizeX
+                            + "x"
+                            + worksheetSizeY
+                            + " and given new position is "
+                            + x
+                            + "x"
+                            + y
+                            + ".");
         } else {
-            //here ideally we should check full size of component
-            //this we can to by calling the component's getAnfangsKnoten() and getEndKnoten() methods
-            //BUT - to update this, we first have to set the new coordinates and then re-paint the component
-            //this is too complicated for now, so just give a "buffer zone" around the component and check if position is far enough away from the sides
-            //of the sheet
+            // here ideally we should check full size of component
+            // this we can to by calling the component's getAnfangsKnoten() and getEndKnoten()
+            // methods
+            // BUT - to update this, we first have to set the new coordinates and then re-paint the
+            // component
+            // this is too complicated for now, so just give a "buffer zone" around the component
+            // and check if position is far enough away from the sides
+            // of the sheet
             valid = true;
         }
         return valid;
