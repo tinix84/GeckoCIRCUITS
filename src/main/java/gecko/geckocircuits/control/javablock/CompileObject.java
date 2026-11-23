@@ -205,7 +205,7 @@ public final class CompileObject extends AbstractCompileObject {
         options.add("-classpath");
 
         String javaSeparator = ":";
-        if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+        if (System.getProperty("os.name").toLowerCase(Locale.getDefault()).contains("windows")) {
             javaSeparator = ";";
         }
 

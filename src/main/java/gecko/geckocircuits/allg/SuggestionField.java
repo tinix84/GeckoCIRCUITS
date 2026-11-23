@@ -17,6 +17,8 @@
  */
 package gecko.geckocircuits.allg;
 
+import java.util.Locale;
+
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Frame;
@@ -269,7 +271,7 @@ public final class SuggestionField extends JTextField {
     }
 
     public void showSuggest() {
-        if (!getText().toLowerCase().contains(this._lastWord.toLowerCase())) {
+        if (!getText().toLowerCase(Locale.getDefault()).contains(this._lastWord.toLowerCase(Locale.getDefault()))) {
             this._suggestions.clear();
         }
         if (this._suggestions.isEmpty()) {
@@ -367,7 +369,7 @@ public final class SuggestionField extends JTextField {
                             it.remove();
                         }
                     } else if (!SuggestionField.this._suggestMatcher.matches(
-                            ((String) it.next()).toLowerCase(), word.toLowerCase())) {
+                            ((String) it.next()).toLowerCase(Locale.getDefault()), word.toLowerCase(Locale.getDefault()))) {
                         it.remove();
                     }
                 }
