@@ -18,8 +18,10 @@ import java.awt.event.ActionListener;
 import javax.swing.JTextField;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
-@SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "MVC delegate stores model reference for view-model binding")
-public class DelegateNumericTextField <M extends ModelMVC<Double>> extends JTextField
+@SuppressFBWarnings(
+        value = "EI_EXPOSE_REP2",
+        justification = "MVC delegate stores model reference for view-model binding")
+public class DelegateNumericTextField<M extends ModelMVC<Double>> extends JTextField
         implements IGenericMVCView<M>, ActionListener {
         private static final long serialVersionUID = 759956473825447L;
         private transient ActionListener _listener;
@@ -54,7 +56,7 @@ public class DelegateNumericTextField <M extends ModelMVC<Double>> extends JText
     @Override
     public void unregisterModel() {
         removeActionListener(_listener);
-        if(_model != null) {
+        if (_model != null) {
             _model.removeModelListener(this);
             _model = null;
         }

@@ -21,30 +21,29 @@ import java.io.Serializable;
  * @param <T>
  * @author andy
  */
-public class ModelMVC<T> extends AbstractUndoGenericModel<T>
-        implements Serializable{
+public class ModelMVC<T> extends AbstractUndoGenericModel<T> implements Serializable {
   private static final long serialVersionUID = 784635241326447L;
   private Object _descriptionObject = null;
 
-  public ModelMVC(T initValue){
+    public ModelMVC(T initValue) {
     super(initValue);
   }
 
-  /**
-   *
-   * @param initValue initial Float value of model
-   * @param description a string which tells what kind of object the object
-   * represents. This is used, e.g. for an undo-event: "Undo dielectric
-   * constant".
-   */
-  public ModelMVC(T initValue, Object descriptionObject){
+    /**
+     *
+     * @param initValue initial Float value of model
+     * @param description a string which tells what kind of object the object
+     * represents. This is used, e.g. for an undo-event: "Undo dielectric
+     * constant".
+     */
+    public ModelMVC(T initValue, Object descriptionObject) {
     super(initValue);
     _descriptionObject = descriptionObject;
   }
 
-  @Override
-  public String toString(){
-      if(_descriptionObject != null) {
+    @Override
+    public String toString() {
+        if (_descriptionObject != null) {
           return _descriptionObject.toString();
       } else {
           return getClass().getName() + "_" + hashCode();
