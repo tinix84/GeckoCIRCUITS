@@ -160,7 +160,7 @@ final class SliderContainer{
 
   }
 
-  protected void goToZeroOrEqual(final IterationDirection direction, final boolean isZeroTransition,
+  void goToZeroOrEqual(final IterationDirection direction, final boolean isZeroTransition,
                                  final GraferV4 grafer) throws NoCurveSelectedException{
 
     final AbstractDataContainer data = grafer.getDataContainer();
@@ -196,7 +196,7 @@ final class SliderContainer{
     }
   }
 
-  protected void goToExtrema(final IterationDirection direction, final ExtremumType maxMin, final GraferV4 grafer)
+  void goToExtrema(final IterationDirection direction, final ExtremumType maxMin, final GraferV4 grafer)
           throws NoCurveSelectedException{
 
     final AbstractDataContainer data = grafer.getDataContainer();
@@ -211,7 +211,7 @@ final class SliderContainer{
     grafer.repaint();
   }
 
-  protected void goToSignalFlank(final IterationDirection direction, final FlankType flankType,
+  void goToSignalFlank(final IterationDirection direction, final FlankType flankType,
                                  final GraferV4 grafer) throws NoCurveSelectedException{
 
     final AbstractDataContainer data = grafer.getDataContainer();
@@ -227,7 +227,7 @@ final class SliderContainer{
     grafer.repaint();
   }
 
-  protected String getLabelString(final AbstractCurve curve){
+  String getLabelString(final AbstractCurve curve){
     String returnValue = "";
 
     if(curve.getAxisConnection() == AxisConnection.ZUORDNUNG_SIGNAL){
@@ -255,7 +255,7 @@ final class SliderContainer{
 
   }
 
-  protected void doMouseAction(final MouseEvent mouseEvent, final AbstractDiagram diag){
+  void doMouseAction(final MouseEvent mouseEvent, final AbstractDiagram diag){
     if(_grafer._mausModus != GraferV4.MausModus.SLIDER){
       return;
     }

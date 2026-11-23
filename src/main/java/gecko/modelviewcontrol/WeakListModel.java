@@ -143,7 +143,7 @@ public final class WeakListModel implements ListModel, Serializable{
     return set.toArray(new EventListener[0]);
   }
 
-  protected void fireContentsChanged(final Object source, final int index0, final int index1){
+  void fireContentsChanged(final Object source, final int index0, final int index1){
     synchronized(this){
       ListDataEvent event = null;
 
@@ -162,7 +162,7 @@ public final class WeakListModel implements ListModel, Serializable{
     }
   }
 
-  protected void fireIntervalAdded(final Object source, final int index0, final int index1){
+  void fireIntervalAdded(final Object source, final int index0, final int index1){
     synchronized(this){
       ListDataEvent event = null;
 
@@ -182,7 +182,7 @@ public final class WeakListModel implements ListModel, Serializable{
     }
   }
 
-  protected void fireIntervalRemoved(final Object source, final int index0, final int index1){
+  void fireIntervalRemoved(final Object source, final int index0, final int index1){
     synchronized(this){
       ListDataEvent event = null;
 

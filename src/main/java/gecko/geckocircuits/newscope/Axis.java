@@ -363,11 +363,11 @@ public final class Axis {
         }
     }
 
-    protected double getPixelFromValue(final double value) {
+    double getPixelFromValue(final double value) {
         return _axisScale.getPixelFromValue(value);
     }
 
-    protected double getValueFromPixel(final int xPix) {
+    double getValueFromPixel(final int xPix) {
         return _axisScale.getValueFromPixel(xPix);
     }
 
