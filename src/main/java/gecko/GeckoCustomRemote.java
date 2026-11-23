@@ -40,7 +40,9 @@ public final class GeckoCustomRemote extends AbstractGeckoCustom implements Geck
     public static final Map<Long,CallbackClientInterface> clients = new ConcurrentHashMap<>();
 
     private boolean _acceptsExtraConnections = false; //denotes if this instance of GeckoCIRCUITS allows more than one client to connect
-    private int _numberOfExtraConnectionsAccepted = 0; //denotes how many additional clients (besides the first one) this instance of GeckoCIRCUITS will accept
+    private int _numberOfExtraConnectionsAccepted =
+            0; // denotes how many additional clients (besides the first one) this instance of
+               // GeckoCIRCUITS will accept
 
     public GeckoCustomRemote(final SimulationAccess access) {
         super(access, null);
@@ -103,7 +105,9 @@ public final class GeckoCustomRemote extends AbstractGeckoCustom implements Geck
         final long connectionID = System.currentTimeMillis();
         //add session ID to clients map with null value - method registerClientForCallback will place an object there
         clients.put(connectionID,null);
-        _free = (_acceptsExtraConnections && clients.size() < (_numberOfExtraConnectionsAccepted+1));
+        _free =
+                (_acceptsExtraConnections
+                        && clients.size() < (_numberOfExtraConnectionsAccepted + 1));
         _lastSessionIDActive = connectionID;
         return connectionID;
     }
@@ -114,14 +118,17 @@ public final class GeckoCustomRemote extends AbstractGeckoCustom implements Geck
         if (clients != null && !clients.isEmpty() && clients.containsKey(remoteSessionID)) {
             try {
                 final CallbackClientInterface disconnectingClient = clients.get(remoteSessionID);
-                if(disconnectingClient != null) {
+                if (disconnectingClient != null) {
                     disconnectingClient.printSystemMessage("GeckoREMOTE session closed.");
                 }
             } catch (RemoteException ex) {
                 Logger.getLogger(GeckoCustomRemote.class.getName()).log(Level.SEVERE, null, ex);
             }
             clients.remove(remoteSessionID);
-            _free = (clients.isEmpty() || (_acceptsExtraConnections && clients.size() < (_numberOfExtraConnectionsAccepted+1)));
+            _free =
+                    (clients.isEmpty()
+                            || (_acceptsExtraConnections
+                                    && clients.size() < (_numberOfExtraConnectionsAccepted + 1)));
         }
     }
 
@@ -149,7 +156,10 @@ public final class GeckoCustomRemote extends AbstractGeckoCustom implements Geck
     public void acceptExtraConnections(int numberOfExtraConnections) {
         _acceptsExtraConnections = (numberOfExtraConnections > 0);
         _numberOfExtraConnectionsAccepted = numberOfExtraConnections;
-        _free = (clients.isEmpty() || (_acceptsExtraConnections && clients.size() < (_numberOfExtraConnectionsAccepted+1)));
+        _free =
+                (clients.isEmpty()
+                        || (_acceptsExtraConnections
+                                && clients.size() < (_numberOfExtraConnectionsAccepted + 1)));
     }
 
     @Override
@@ -165,7 +175,7 @@ public final class GeckoCustomRemote extends AbstractGeckoCustom implements Geck
     }
 
     public static String pingRemoteClient() {
-        if(clients == null || clients.isEmpty()) {
+        if (clients == null || clients.isEmpty()) {
             return null;
         }
         String pongs = null;

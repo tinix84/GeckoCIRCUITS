@@ -53,8 +53,10 @@ import javax.swing.UIManager;
  * - System property: java -Doperatingmode=HEADLESS -jar gecko.jar
  * - Command line flag: java -jar gecko.jar -headless
  */
-@SuppressFBWarnings(value = {"MS_CANNOT_BE_FINAL", "MS_SHOULD_BE_FINAL", "PA_PUBLIC_PRIMITIVE_ATTRIBUTE"},
-        justification = "Static fields are intentionally mutable for runtime configuration across different operating modes; public fields used across the application")
+@SuppressFBWarnings(
+        value = {"MS_CANNOT_BE_FINAL", "MS_SHOULD_BE_FINAL", "PA_PUBLIC_PRIMITIVE_ATTRIBUTE"},
+        justification =
+                "Static fields are intentionally mutable for runtime configuration across different operating modes; public fields used across the application")
 public class GeckoSim {
 
     static long startTime;  // MS_PKGPROTECT: only used within package
@@ -165,9 +167,9 @@ public class GeckoSim {
 
         if (operatingmode == OperatingMode.REMOTE) {
             String javaCommand = applicationProps.getProperty("JAVACOMMAND");
-            for(int i = 0; i < args.length; i++) {
-                if("-j".equals(args[i])) {
-                    javaCommand = args[i+1];
+            for (int i = 0; i < args.length; i++) {
+                if ("-j".equals(args[i])) {
+                    javaCommand = args[i + 1];
                 }
             }
 
@@ -185,14 +187,18 @@ public class GeckoSim {
 
         } else if (operatingmode == OperatingMode.MMF) {
             String javaCommand = applicationProps.getProperty("JAVACOMMAND");
-            for(int i = 0; i < args.length; i++) {
-                if("-j".equals(args[i])) {
-                    javaCommand = args[i+1];
+            for (int i = 0; i < args.length; i++) {
+                if ("-j".equals(args[i])) {
+                    javaCommand = args[i + 1];
                 }
             }
 
             if (JavaMemoryRestart.startNewGeckoCIRCUITSJVM(reqMem, args, javaCommand)) {
-                System.out.println("GeckoCIRCUITS should now be running outside of MATLAB and accessible via file " + args[1] + " of size " + args[2]);
+                System.out.println(
+                        "GeckoCIRCUITS should now be running outside of MATLAB and accessible via file "
+                                + args[1]
+                                + " of size "
+                                + args[2]);
                 mmfLoaded = true;
                 mmfLoading = false;
                 return;//System.exit(12);
@@ -269,13 +275,14 @@ public class GeckoSim {
                             break;
                         } else if (args[i].equals("-mm")) { //memory mapped file access
                             try {
-                                //there must be one additional argument - the file name
-                                //there should also be a second one - the file size - but if this one is missing we can set the default size
-                                if (i != (args.length -1)) {
-                                    final String fileName = args[i+1];
+                                // there must be one additional argument - the file name
+                                // there should also be a second one - the file size - but if this
+                                // one is missing we can set the default size
+                                if (i != (args.length - 1)) {
+                                    final String fileName = args[i + 1];
                                     final long fileSize;
-                                    if ((i+1) != (args.length - 1)) {
-                                        fileSize = Long.parseLong(args[i+2]);
+                                    if ((i + 1) != (args.length - 1)) {
+                                        fileSize = Long.parseLong(args[i + 2]);
                                     } else {
                                         fileSize = GeckoMemoryMappedFile._defaultBufferSize;
                                     }
@@ -551,7 +558,11 @@ public class GeckoSim {
                 applicationProps.store(out, "--- GeckoCIRCUITS Property File ---");
             }
         } catch (FileNotFoundException fnfe) {
-            Logger.getLogger(GeckoSim.class.getName()).log(Level.WARNING, "Could not write property file. Perhaps we do not have file write permissions.", "");
+            Logger.getLogger(GeckoSim.class.getName())
+                    .log(
+                            Level.WARNING,
+                            "Could not write property file. Perhaps we do not have file write permissions.",
+                            "");
         } catch (IOException ex) {
             ex.printStackTrace();
             Logger.getLogger(GeckoSim.class.getName()).log(Level.SEVERE, null, ex);
