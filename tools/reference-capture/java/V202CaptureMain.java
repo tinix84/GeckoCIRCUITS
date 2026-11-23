@@ -8,6 +8,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.Locale;
+import java.lang.management.ManagementFactory;
 import java.util.zip.GZIPOutputStream;
 
 /** Starts a normal release run and reads its completed SCOPE recording. */
@@ -20,6 +21,11 @@ public final class V202CaptureMain {
             Path home = output.toAbsolutePath().resolve("home");
             Files.createDirectory(home);
             System.setProperty("user.home", home.toString());
+            String processName = ManagementFactory.getRuntimeMXBean().getName();
+            long processStart = ManagementFactory.getRuntimeMXBean().getStartTime();
+            String runtime = "{\"jvm_identity\":\"" + processName + "\",\"start_time_ms\":" + processStart
+                    + ",\"java_version\":\"" + System.getProperty("java.version") + "\"}\n";
+            Files.write(output.resolve("runtime.json"), runtime.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW);
             GeckoSim._isTestingMode = true;
             GeckoExternal.startGui();
             GeckoExternal.openFile(Paths.get(args[0]).toAbsolutePath().toString());

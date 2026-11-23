@@ -4,6 +4,7 @@ import argparse
 import csv
 import gzip
 import hashlib
+from functools import lru_cache
 import json
 import os
 from pathlib import Path
@@ -30,20 +31,53 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def release_input_sha(circuit):
-    data = subprocess.check_output(['git', '-C', str(ROOT), 'show',
+@lru_cache(maxsize=10)
+def release_input_bytes(circuit):
+    return subprocess.check_output(['git', '-C', str(ROOT), 'show',
                                     f'{RELEASE}:resources/education_www.ipes.ethz.ch/{circuit}.ipes'])
-    return hashlib.sha256(data).hexdigest()
+
+
+def release_input_sha(circuit):
+    return hashlib.sha256(release_input_bytes(circuit)).hexdigest()
 
 
 def git(tree, *args):
     return subprocess.check_output(['git', '-C', str(tree), *args], text=True).strip()
 
 
+def pinned_files(tree, prefix, suffix=None):
+    entries = git(tree, 'ls-tree', '-r', RELEASE, '--', prefix).splitlines()
+    paths = []
+    for entry in entries:
+        description, relative = entry.split('\t', 1)
+        mode, kind, expected = description.split()
+        if kind != 'blob' or mode not in ('100644', '100755'):
+            raise ValueError('Unsupported release source entry.')
+        path = tree / relative
+        if suffix is not None and path.suffix != suffix:
+            continue
+        data = path.read_bytes()
+        actual = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+        if actual != expected:
+            raise ValueError(f'Source differs from pinned release blob: {path}')
+        paths.append(path)
+    return paths
+
+
 def save(path, data):
     with path.open('x', encoding='utf-8') as stream:
         json.dump(data, stream, indent=2, sort_keys=True, allow_nan=False)
         stream.write('\n')
+
+
+def check_receipt(directory):
+    receipt = json.loads((directory / 'process.json').read_text())
+    if receipt['exit_code'] != 0:
+        raise ValueError('Unsuccessful process receipt.')
+    for file, expected in receipt['artifacts'].items():
+        if sha(directory / file) != expected:
+            raise ValueError(f'Artifact integrity mismatch: {directory / file}')
+    return receipt
 
 
 def execute(command, cwd, log, timeout=180):
@@ -62,6 +96,7 @@ def execute(command, cwd, log, timeout=180):
                 process.wait()
             raise RuntimeError(f'Capture timed out. Inspect {log}')
     result = {'command': command, 'cwd': str(cwd), 'exit_code': code,
+              'launcher_pid': process.pid,
               'started_epoch': started, 'elapsed_seconds': time.time() - started,
               'log_sha256': sha(log)}
     if code:
@@ -76,7 +111,7 @@ def prepare(args):
     if git(stock, 'diff', 'HEAD', '--'):
         raise ValueError('Stock release sources are modified.')
     patch = (HERE / 'v202-observer.patch').read_text()
-    actual_patch = git(observer, 'diff', '--', str(KERNEL))
+    actual_patch = git(observer, 'diff', RELEASE, '--', str(KERNEL))
     if actual_patch != patch.strip():
         raise ValueError('Observer source does not match the recorded observation patch.')
     for circuit in CIRCUITS:
@@ -85,6 +120,8 @@ def prepare(args):
         if sha(current) != sha(original):
             raise ValueError(f'Input differs from release: {circuit}')
     print('Pinned source, observation patch, and ten input hashes verified.', flush=True)
+    sources = pinned_files(stock, 'src/main/java', '.java')
+    resources = pinned_files(stock, 'src/main/resources')
     if not args.execute:
         print('PREVIEW: compile stock source, capture helper, and two-hook observer with Java 8.')
         return
@@ -98,17 +135,14 @@ def prepare(args):
     for directory in (stock_classes, helpers, observer_classes):
         directory.mkdir()
     source_list = build / 'stock-sources.txt'
-    sources = sorted((stock / 'src/main/java').rglob('*.java'))
     source_list.write_text('\n'.join(str(p) for p in sources) + '\n')
     command = [str(jdk / 'bin/javac'), '-encoding', 'UTF-8', '-cp', deps,
                '-d', str(stock_classes), '@' + str(source_list)]
     build_runs = [execute(command, stock, build / 'stock-compile.log')]
-    # Copy resources only. Every stock class comes from the Java 8 compilation above.
-    for resource in (stock / 'target/classes').rglob('*'):
-        if resource.is_file() and resource.suffix != '.class':
-            target = stock_classes / resource.relative_to(stock / 'target/classes')
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(resource, target)
+    for resource in resources:
+        target = stock_classes / resource.relative_to(stock / 'src/main/resources')
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(resource, target)
     helper_sources = sorted((HERE / 'java').rglob('*.java'))
     build_runs.append(execute([str(jdk / 'bin/javac'), '-encoding', 'UTF-8',
                               '-cp', str(stock_classes) + os.pathsep + deps, '-d', str(helpers),
@@ -132,6 +166,7 @@ def prepare(args):
         'patch_sha256': sha(HERE / 'v202-observer.patch'), 'artifacts': artifacts,
         'dependencies': {p: sha(p) for p in deps.split(os.pathsep)},
         'source_hashes': {str(p.relative_to(stock)): sha(p) for p in sources},
+        'resource_hashes': {str(p.relative_to(stock)): sha(p) for p in resources},
         'capture_sources': {str(p.relative_to(HERE)): sha(p) for p in helper_sources},
         'classpath': deps, 'core_comparison_executed': False,
     })
@@ -169,12 +204,11 @@ def run(args):
         output = args.evidence / args.run_group / circuit / f'{mode}-{repeat}'
         done = output / 'process.json'
         if done.exists():
-            prior = json.loads(done.read_text())
+            prior = check_receipt(output)
             if prior['build_receipt_sha256'] != sha(build / 'build.json'):
                 raise ValueError('Existing capture has a different build.')
-            for relative, expected in prior['artifacts'].items():
-                if sha(output / relative) != expected:
-                    raise ValueError('Existing capture artifact changed.')
+            if prior['circuit'] != circuit or prior['mode'] != mode:
+                raise ValueError('Existing capture has a different process role.')
             print(f'RETAIN_VALID {circuit} {mode}-{repeat}', flush=True)
             continue
         if output.exists():

@@ -8,7 +8,7 @@ reference:
   release: "v2.02"
   source_commit: "b34b9b9d8110374097a1fc5839491e66cff5a39a"
   provenance: "observation-only instrumented v2.02 source capture"
-  evidence_file: "../traces/v202/reference-evidence.json"
+  evidence_file: "../traces/v202/reference-acceptance.json"
   required_fresh_process_captures: 3
   stock_scope_witness_required: true
   signal_identity: "component and terminal connectivity, physical unit, reference, and direction"

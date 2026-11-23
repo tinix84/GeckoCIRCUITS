@@ -65,6 +65,9 @@ cd ../..
 Each circuit has one stock witness and three fresh observer processes.
 Validation requires identical full-precision repeats and matching stock SCOPE witnesses.
 Native timestamps, complete endpoints, physical units, binary states, and artifact hashes receive separate checks.
+The pinned input file supplies an independent inventory of components, commands, device states, and auxiliary currents.
+Every decimal value must satisfy its normalized twelve-place rounding interval before it contributes to tolerance evidence.
+Each process records its JVM identity, start time, and Java version.
 
 The decimal trace uses twelve decimal places in scientific notation.
 The companion hexadecimal trace preserves the binary values for serialization-error measurements.
@@ -81,6 +84,11 @@ These proposals describe capture resolution, not physical uncertainty or a prove
 This operation creates a new `traces/v202` namespace.
 It preserves the existing development baseline files.
 The evidence bundle records source and build hashes, physical schemas, process receipts, and tolerance proposals.
+
+Use a new build group and run group after capture implementation changes.
+Pass the same groups to the analysis and publication commands.
+To preserve existing fixtures, use `--supplement --evidence-name reference-acceptance.json`.
+Supplement mode requires exact decoded trace equality and matching physical schemas before it appends evidence.
 
 Stop for the user's absolute-tolerance review before any Core comparison.
 The manifest keeps comparison disabled until that review.
