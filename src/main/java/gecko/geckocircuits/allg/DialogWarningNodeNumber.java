@@ -36,9 +36,7 @@ import java.net.URL;
 
 public class DialogWarningNodeNumber extends JDialog implements WindowListener, ActionListener {
 
-
-
-    public DialogWarningNodeNumber () {
+    public DialogWarningNodeNumber() {
         super.setModal(true);
         try {
             @SuppressWarnings("deprecation")
@@ -56,24 +54,22 @@ public class DialogWarningNodeNumber extends JDialog implements WindowListener, 
         this.setVisible(true);
     }
 
-
-
-    private void baueGUI () {
-        Container con= this.getContentPane();
+    private void baueGUI() {
+        Container con = this.getContentPane();
         con.setLayout(new BorderLayout());
-        //------------------
-        JButton knOK= GuiFabric.getJButton(I18nKeys.OK);
+        // ------------------
+        JButton knOK = GuiFabric.getJButton(I18nKeys.OK);
         knOK.setActionCommand("OK");
         knOK.addActionListener(this);
         //
-        JPanel px= new JPanel();
+        JPanel px = new JPanel();
         px.add(knOK);
-        //------------------
-        JPanel jpM= new JPanel();
+        // ------------------
+        JPanel jpM = new JPanel();
         jpM.setLayout(new BorderLayout());
         jpM.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), "", TitledBorder.LEFT, TitledBorder.TOP));
         //
-        JTextArea jtx= new JTextArea();
+        JTextArea jtx = new JTextArea();
         jtx.setForeground(GlobalColors.LAB_COLOR_DIALOG_1);
         jtx.setText("\n*** WARNING ***\n\nThe node number of the model has been changed."
             + "Proceeding with the simulation might give incorrect results.\n\n");
@@ -88,34 +84,48 @@ public class DialogWarningNodeNumber extends JDialog implements WindowListener, 
         con.add(px, BorderLayout.SOUTH);
     }
 
-
-
-
-
     @Override
-    public void actionPerformed (ActionEvent ae) {
+    public void actionPerformed(ActionEvent ae) {
         if (ae.getActionCommand().equals("OK")) {
             this.dispose();
         }
     }
 
+    // ------------------------------------------------
+    @Override
+    public void windowDeactivated(WindowEvent we) {
+        /* no-op */
+    }
 
+    @Override
+    public void windowActivated(WindowEvent we) {
+        /* no-op */
+    }
 
-    //------------------------------------------------
     @Override
-    public void windowDeactivated (WindowEvent we) { /* no-op */ }
+    public void windowDeiconified(WindowEvent we) {
+        /* no-op */
+    }
+
     @Override
-    public void windowActivated (WindowEvent we) { /* no-op */ }
+    public void windowIconified(WindowEvent we) {
+        /* no-op */
+    }
+
     @Override
-    public void windowDeiconified (WindowEvent we) { /* no-op */ }
+    public void windowClosed(WindowEvent we) {
+        /* no-op */
+    }
+
     @Override
-    public void windowIconified (WindowEvent we) { /* no-op */ }
+    public void windowClosing(WindowEvent we) {
+        this.dispose();
+    }
+
     @Override
-    public void windowClosed (WindowEvent we) { /* no-op */ }
-    @Override
-    public void windowClosing (WindowEvent we) { this.dispose(); }
-    @Override
-    public void windowOpened (WindowEvent we) { /* no-op */ }
+    public void windowOpened(WindowEvent we) {
+        /* no-op */
+    }
     //------------------------------------------------
 
 }

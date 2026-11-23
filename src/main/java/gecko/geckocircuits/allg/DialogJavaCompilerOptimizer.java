@@ -53,45 +53,49 @@ public class DialogJavaCompilerOptimizer extends JFrame {
     private javax.swing.JTextArea jTextAreaImports;
     private javax.swing.JTextArea jTextAreaStaticInit;
     private javax.swing.JTextArea jTextAreaVariables;
-    //--------------
-    private String info= ""
-        +"\nSet the parameter values in the GeckoCIRCUITS model: \n\n"
-        +"public void setOptimizerParameterData (String[] optName, double[] optValue);\n"
-        +"\nControl the Simulation with the following methods:\n\n"
-        +"public void setSimParameter (double dt, double tDURATION, double tPAUSE);\n"
-        +"public void startCalculation ();\n"
-        +"public void stopCalculation ();\n"
-        +"public void continueCalculation ();\n"
-        +"public boolean isSimulationRunning ();\n"
-        +"\nGet the simulation results for postprocessing:\n"
-        +"(RAM-data might be reduced ,e.g. just every 2nd simulation point recorded,\n"
-        +"hard disk data is complete but will slow down the simulation)\n\n"
-        +"public double[][] getZV (String stringID_scope);\n"
-        +"public boolean activateWriteToFile (String stringID_scope);\n"
-        +"public boolean saveZVData (String stringID_scope, String fileName);\n"
-        +"public boolean deactivateWriteToFile (String stringID_scope);\n"
-        +"";
-    private String example1= ""
-        +"// Define parameter names in the GeckoCIRCUITS model by using the '$'-character in the input dialog, "
-        + "\n// e.g. set resistor value to '$b' instead of '1000' in the dialog window of the resistor. "+"\n"
-        +"String[] nameOpt= new String[]{\"$a\",\"$b\",\"$c\",\"$d\",\"$fre\"}; \n"
-        +"double[] valueOpt= new double[]{1,1000,3,4, 1600};  \n"
-        +"\n// Now set the values of the according parameter names as defined. \n// GeckoCIRCUITS must be referenced as 'GECKO': \n"
-        +"GECKO.setOptimizerParameterData(nameOpt,valueOpt); \n"
-        +"\n// With these settings the simulation will run with dt=1us, and will make a stop at 4ms: \n"
-        +"GECKO.setSimParameter(1e-6,10e-3,4e-3);  \n"
-        +"GECKO.startCalculation(); \n"
-        +"\n// We have to stop the simulation at t=4ms to set new parameter values before proceeding. "
-        +"\n// This is done with the following code: \n"
-        +"while (GECKO.isSimulationRunning()) { try { Thread.sleep(500); } catch (InterruptedException ie) {} } \n"
-        +"\n// New values can be set. $b is from now on 350 instead of 1000.\n"
-        +"valueOpt[0]= 5;  \n"
-        +"valueOpt[1]= 350;  \n"
-        +"valueOpt[4]= 350;  \n"
-        +"\n// Now we can proceed with the simulation:\n"
-        +"GECKO.continueCalculation(); \n"
-        +"";
-    //--------------
+    // --------------
+    private String info =
+            ""
+                    + "\nSet the parameter values in the GeckoCIRCUITS model: \n\n"
+                    + "public void setOptimizerParameterData (String[] optName, double[] optValue);\n"
+                    + "\nControl the Simulation with the following methods:\n\n"
+                    + "public void setSimParameter (double dt, double tDURATION, double tPAUSE);\n"
+                    + "public void startCalculation ();\n"
+                    + "public void stopCalculation ();\n"
+                    + "public void continueCalculation ();\n"
+                    + "public boolean isSimulationRunning ();\n"
+                    + "\nGet the simulation results for postprocessing:\n"
+                    + "(RAM-data might be reduced ,e.g. just every 2nd simulation point recorded,\n"
+                    + "hard disk data is complete but will slow down the simulation)\n\n"
+                    + "public double[][] getZV (String stringID_scope);\n"
+                    + "public boolean activateWriteToFile (String stringID_scope);\n"
+                    + "public boolean saveZVData (String stringID_scope, String fileName);\n"
+                    + "public boolean deactivateWriteToFile (String stringID_scope);\n"
+                    + "";
+    private String example1 =
+            ""
+                    + "// Define parameter names in the GeckoCIRCUITS model by using the '$'-character in the input dialog, "
+                    + "\n// e.g. set resistor value to '$b' instead of '1000' in the dialog window of the resistor. "
+                    + "\n"
+                    + "String[] nameOpt= new String[]{\"$a\",\"$b\",\"$c\",\"$d\",\"$fre\"}; \n"
+                    + "double[] valueOpt= new double[]{1,1000,3,4, 1600};  \n"
+                    + "\n// Now set the values of the according parameter names as defined. \n// GeckoCIRCUITS must be referenced as 'GECKO': \n"
+                    + "GECKO.setOptimizerParameterData(nameOpt,valueOpt); \n"
+                    + "\n// With these settings the simulation will run with dt=1us, and will make a stop at 4ms: \n"
+                    + "GECKO.setSimParameter(1e-6,10e-3,4e-3);  \n"
+                    + "GECKO.startCalculation(); \n"
+                    + "\n// We have to stop the simulation at t=4ms to set new parameter values before proceeding. "
+                    + "\n// This is done with the following code: \n"
+                    + "while (GECKO.isSimulationRunning()) { try { Thread.sleep(500); } catch (InterruptedException ie) {} } \n"
+                    + "\n// New values can be set. $b is from now on 350 instead of 1000.\n"
+                    + "valueOpt[0]= 5;  \n"
+                    + "valueOpt[1]= 350;  \n"
+                    + "valueOpt[4]= 350;  \n"
+                    + "\n// Now we can proceed with the simulation:\n"
+                    + "GECKO.continueCalculation(); \n"
+                    + "";
+
+    // --------------
     /*
     --------------
     public void opt_setOptimizerParameterData (String[] optName, double[] optValue) { win.setOptimizerParameterData(optName,optValue); }
@@ -107,10 +111,7 @@ public class DialogJavaCompilerOptimizer extends JFrame {
     --------------
     */
 
-
-
-
-    public DialogJavaCompilerOptimizer (GeckoJavaCompiler geckoJavaCompiler) {
+    public DialogJavaCompilerOptimizer(GeckoJavaCompiler geckoJavaCompiler) {
         try {
             @SuppressWarnings("deprecation")
             URL url = new URL(GlobalFilePathes.PFAD_PICS_URL, "gecko.gif");
@@ -119,17 +120,16 @@ public class DialogJavaCompilerOptimizer extends JFrame {
             // ignored: icon loading is optional
         }
         this.initComponents();
-        //-------
-        this.geckoJavaCompiler= geckoJavaCompiler;
+        // -------
+        this.geckoJavaCompiler = geckoJavaCompiler;
         this.setCodeText();
     }
 
-    private void doRun () {
+    private void doRun() {
         // no-op
     }
 
-
-    public void setCodeText () {
+    public void setCodeText() {
         jTextAreaCode.setText(geckoJavaCompiler.getSourceCode());
         jTextAreaCompilerMessage.setText(geckoJavaCompiler.getCompilerMessage());
         jTextAreaImports.setText(geckoJavaCompiler.getImportCode());
@@ -259,30 +259,107 @@ public class DialogJavaCompilerOptimizer extends JFrame {
         javax.swing.GroupLayout jPanel3Layout = new javax.swing.GroupLayout(jPanel3);
         jPanel3.setLayout(jPanel3Layout);
         jPanel3Layout.setHorizontalGroup(
-            jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel3Layout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jScrollPane1, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 853, Short.MAX_VALUE)
-                    .addComponent(jScrollPane7, javax.swing.GroupLayout.DEFAULT_SIZE, 853, Short.MAX_VALUE)
-                    .addGroup(jPanel3Layout.createSequentialGroup()
-                        .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(jLabel2)
-                            .addComponent(jScrollPane5, javax.swing.GroupLayout.DEFAULT_SIZE, 442, Short.MAX_VALUE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(jLabel3)
-                            .addComponent(jScrollPane6, javax.swing.GroupLayout.PREFERRED_SIZE, 405, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                    .addComponent(jLabel6)
-                    .addGroup(jPanel3Layout.createSequentialGroup()
-                        .addComponent(jLabel4)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jButtonExample1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jButtonExample2)
-                        .addGap(9, 9, 9)))
-                .addContainerGap())
-        );
+                jPanel3Layout
+                        .createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(
+                                jPanel3Layout
+                                        .createSequentialGroup()
+                                        .addContainerGap()
+                                        .addGroup(
+                                                jPanel3Layout
+                                                        .createParallelGroup(
+                                                                javax.swing.GroupLayout.Alignment
+                                                                        .LEADING)
+                                                        .addComponent(
+                                                                jScrollPane1,
+                                                                javax.swing.GroupLayout.Alignment
+                                                                        .TRAILING,
+                                                                javax.swing.GroupLayout
+                                                                        .DEFAULT_SIZE,
+                                                                853,
+                                                                Short.MAX_VALUE)
+                                                        .addComponent(
+                                                                jScrollPane7,
+                                                                javax.swing.GroupLayout
+                                                                        .DEFAULT_SIZE,
+                                                                853,
+                                                                Short.MAX_VALUE)
+                                                        .addGroup(
+                                                                jPanel3Layout
+                                                                        .createSequentialGroup()
+                                                                        .addGroup(
+                                                                                jPanel3Layout
+                                                                                        .createParallelGroup(
+                                                                                                javax
+                                                                                                        .swing
+                                                                                                        .GroupLayout
+                                                                                                        .Alignment
+                                                                                                        .LEADING)
+                                                                                        .addComponent(
+                                                                                                jLabel2)
+                                                                                        .addComponent(
+                                                                                                jScrollPane5,
+                                                                                                javax
+                                                                                                        .swing
+                                                                                                        .GroupLayout
+                                                                                                        .DEFAULT_SIZE,
+                                                                                                442,
+                                                                                                Short
+                                                                                                        .MAX_VALUE))
+                                                                        .addPreferredGap(
+                                                                                javax.swing
+                                                                                        .LayoutStyle
+                                                                                        .ComponentPlacement
+                                                                                        .RELATED)
+                                                                        .addGroup(
+                                                                                jPanel3Layout
+                                                                                        .createParallelGroup(
+                                                                                                javax
+                                                                                                        .swing
+                                                                                                        .GroupLayout
+                                                                                                        .Alignment
+                                                                                                        .LEADING)
+                                                                                        .addComponent(
+                                                                                                jLabel3)
+                                                                                        .addComponent(
+                                                                                                jScrollPane6,
+                                                                                                javax
+                                                                                                        .swing
+                                                                                                        .GroupLayout
+                                                                                                        .PREFERRED_SIZE,
+                                                                                                405,
+                                                                                                javax
+                                                                                                        .swing
+                                                                                                        .GroupLayout
+                                                                                                        .PREFERRED_SIZE)))
+                                                        .addComponent(jLabel6)
+                                                        .addGroup(
+                                                                jPanel3Layout
+                                                                        .createSequentialGroup()
+                                                                        .addComponent(jLabel4)
+                                                                        .addPreferredGap(
+                                                                                javax.swing
+                                                                                        .LayoutStyle
+                                                                                        .ComponentPlacement
+                                                                                        .RELATED)
+                                                                        .addComponent(
+                                                                                jButtonExample1,
+                                                                                javax.swing
+                                                                                        .GroupLayout
+                                                                                        .DEFAULT_SIZE,
+                                                                                javax.swing
+                                                                                        .GroupLayout
+                                                                                        .DEFAULT_SIZE,
+                                                                                Short.MAX_VALUE)
+                                                                        .addPreferredGap(
+                                                                                javax.swing
+                                                                                        .LayoutStyle
+                                                                                        .ComponentPlacement
+                                                                                        .RELATED)
+                                                                        .addComponent(
+                                                                                jButtonExample2)
+                                                                        .addGap(9, 9, 9)))
+                                        .addContainerGap()));
         jPanel3Layout.setVerticalGroup(
             jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel3Layout.createSequentialGroup()
@@ -339,7 +416,8 @@ public class DialogJavaCompilerOptimizer extends JFrame {
         jTextArea1.setEditable(false);
         jTextArea1.setLineWrap(true);
         jTextArea1.setRows(5);
-        jTextArea1.setText("Use the following Interface-methods to control GeckoCIRCUITS:\n\n" +info+ "\n");
+        jTextArea1.setText(
+                "Use the following Interface-methods to control GeckoCIRCUITS:\n\n" + info + "\n");
         jScrollPane2.setViewportView(jTextArea1);
 
         javax.swing.GroupLayout jPanel4Layout = new javax.swing.GroupLayout(jPanel4);
@@ -388,24 +466,29 @@ public class DialogJavaCompilerOptimizer extends JFrame {
         );
 
         pack();
-    }// </editor-fold>//GEN-END:initComponents
+    } // </editor-fold>//GEN-END:initComponents
 
-private void jButtonCloseWindowActionPerformed(java.awt.event.ActionEvent evt) {//NOPMD//GEN-FIRST:event_jButtonCloseWindowActionPerformed
+    private void jButtonCloseWindowActionPerformed(
+            java.awt.event.ActionEvent
+                    evt) { // NOPMD//GEN-FIRST:event_jButtonCloseWindowActionPerformed
 
-    if((geckoJavaCompiler.getCompileStatus() != GeckoJavaCompiler.COMPILESTATUS.COMPILED_SUCCESSFULL)) {
+        if ((geckoJavaCompiler.getCompileStatus()
+                != GeckoJavaCompiler.COMPILESTATUS.COMPILED_SUCCESSFULL)) {
         loadCode();
     }
     this.dispose();
-}//GEN-LAST:event_jButtonCloseWindowActionPerformed
+    } // GEN-LAST:event_jButtonCloseWindowActionPerformed
 
-private void jButtonCompileActionPerformed(java.awt.event.ActionEvent evt) {//NOPMD//GEN-FIRST:event_jButtonCompileActionPerformed
+    private void jButtonCompileActionPerformed(
+            java.awt.event.ActionEvent
+                    evt) { // NOPMD//GEN-FIRST:event_jButtonCompileActionPerformed
 
         jTabbedPane.setSelectedIndex(1);
         loadCode();
         this.doRun();//GEN-LAST:event_jButtonCompileActionPerformed
 }
 
-    private void jButtonExecuteActionPerformed (java.awt.event.ActionEvent evt) {
+    private void jButtonExecuteActionPerformed(java.awt.event.ActionEvent evt) {
         try {
             geckoJavaCompiler.startCalculation();
         } catch (Exception e) {
@@ -413,7 +496,9 @@ private void jButtonCompileActionPerformed(java.awt.event.ActionEvent evt) {//NO
         }
     }
 
-private void jButtonExample2ActionPerformed(java.awt.event.ActionEvent evt) {//NOPMD//GEN-FIRST:event_jButtonExample2ActionPerformed
+    private void jButtonExample2ActionPerformed(
+            java.awt.event.ActionEvent
+                    evt) { // NOPMD//GEN-FIRST:event_jButtonExample2ActionPerformed
     jTextAreaCode.setText(
             "\n//out.println(xIN[0] + \" \" + xIN[1] + \" \" + xIN[2] + \" \" + xIN.length );" +
             "\n\nfor(int i = 0; i < yOUT.length; i++) { " +
@@ -438,19 +523,18 @@ private void jButtonExample2ActionPerformed(java.awt.event.ActionEvent evt) {//N
             "\n\tsetLocationRelativeTo(null);" +
             "\n}}" +
             "\nprivate static HelloWorld helloWindow;");
+    } // GEN-LAST:event_jButtonExample2ActionPerformed
 
-}//GEN-LAST:event_jButtonExample2ActionPerformed
-
-private void jButtonExample1ActionPerformed(java.awt.event.ActionEvent evt) {//NOPMD//GEN-FIRST:event_jButtonExample1ActionPerformed
+    private void jButtonExample1ActionPerformed(
+            java.awt.event.ActionEvent
+                    evt) { // NOPMD//GEN-FIRST:event_jButtonExample1ActionPerformed
     jTextAreaCode.setText(example1);
     jTextAreaImports.setText("import gecko.geckocircuits.allg.MainWindow;\n");
     jTextAreaStaticInit.setText("");
     jTextAreaVariables.setText("");
-}//GEN-LAST:event_jButtonExample1ActionPerformed
+    } // GEN-LAST:event_jButtonExample1ActionPerformed
 
-
-
-private void loadCode () {
+    private void loadCode() {
         try {
             geckoJavaCompiler.setSourceCode(jTextAreaCode.getText());
             geckoJavaCompiler.setImportCode(jTextAreaImports.getText());

@@ -69,10 +69,18 @@ import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import gecko.modelviewcontrol.AbstractUndoGenericModel;
 
-@SuppressFBWarnings(value = {"ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD", "MS_CANNOT_BE_FINAL", "PA_PUBLIC_PRIMITIVE_ATTRIBUTE", "SE_BAD_FIELD", "SF_SWITCH_FALLTHROUGH"},
-        justification = "MainWindow is effectively a singleton - static fields hold application-wide state; public fields for menu item access across UI components; JFrame is not serialized in this application; switch fallthrough in schliesseProgramm is intentional for save-then-exit flow")
-public final class MainWindow extends JFrame implements WindowListener, ActionListener, ComponentListener {
-
+@SuppressFBWarnings(
+        value = {
+            "ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD",
+            "MS_CANNOT_BE_FINAL",
+            "PA_PUBLIC_PRIMITIVE_ATTRIBUTE",
+            "SE_BAD_FIELD",
+            "SF_SWITCH_FALLTHROUGH"
+        },
+        justification =
+                "MainWindow is effectively a singleton - static fields hold application-wide state; public fields for menu item access across UI components; JFrame is not serialized in this application; switch fallthrough in schliesseProgramm is intentional for save-then-exit flow")
+public final class MainWindow extends JFrame
+        implements WindowListener, ActionListener, ComponentListener {
 
     int _simMenuIndex = 2; // simulation menu is third in bar.
     JMenuBar _menuBar; // to provide dynamic changing of the menu bar, need to make this a member.
@@ -764,7 +772,10 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
      * menu accelerators --> (Java bug??)
      */
     private void processKeyEvents(KeyEvent ke) {
-        if ((ke.getKeyChar() == KeyEvent.VK_DELETE) || (ke.getKeyCode() == KeyEvent.VK_DELETE) || (ke.getKeyChar() == KeyEvent.VK_BACK_SPACE) || (ke.getKeyChar() == 4)) // '4' corresponds to CONTROL_D
+        if ((ke.getKeyChar() == KeyEvent.VK_DELETE)
+                || (ke.getKeyCode() == KeyEvent.VK_DELETE)
+                || (ke.getKeyChar() == KeyEvent.VK_BACK_SPACE)
+                || (ke.getKeyChar() == 4)) // '4' corresponds to CONTROL_D
         {
             _se.deleteSelectedComponentsWithUndo();
             return;
@@ -841,7 +852,12 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
         speicherVorgangLaeuft = true;
         //
 
-        GeckoFileChooser dialog = GeckoFileChooser.createSaveFileChooser(".ipes", "Circuit Simulation Files (*.ipes)", this, new File(GlobalFilePathes.DATNAM));
+        GeckoFileChooser dialog =
+                GeckoFileChooser.createSaveFileChooser(
+                        ".ipes",
+                        "Circuit Simulation Files (*.ipes)",
+                        this,
+                        new File(GlobalFilePathes.DATNAM));
 
         if (dialog.getUserResult() == GeckoFileChooser.FileChooserResult.CANCEL) {
             speicherVorgangLaeuft = false;
@@ -918,8 +934,13 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
             aktuellerDateiName = GlobalFilePathes.DATNAM;
             generateNewFileId();
             if (aktuellerDateiName.contains("autoBackup")) {
-                int response = JOptionPane.showConfirmDialog(null, "Caution: you try to overwrite your auto-backup file. \nYou should rename your filename to prevent data-loss!\n Do you want to continue anyway?", "Warning!",
-                        JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+                int response =
+                        JOptionPane.showConfirmDialog(
+                                null,
+                                "Caution: you try to overwrite your auto-backup file. \nYou should rename your filename to prevent data-loss!\n Do you want to continue anyway?",
+                                "Warning!",
+                                JOptionPane.YES_NO_OPTION,
+                                JOptionPane.WARNING_MESSAGE);
                 if (response == JOptionPane.NO_OPTION) {
                     speicherVorgangLaeuft = false;
                     return;
@@ -1328,19 +1349,24 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
                         currentDirectory = null;
                     }
                 }
-                GeckoFileChooser fileChooser = GeckoFileChooser.createOpenFileChooser(".ipes", "Circuit Simulation Files (*.ipes)", this, currentDirectory);
+                GeckoFileChooser fileChooser =
+                        GeckoFileChooser.createOpenFileChooser(
+                                ".ipes",
+                                "Circuit Simulation Files (*.ipes)",
+                                this,
+                                currentDirectory);
                 if (fileChooser.getUserResult() == GeckoFileChooser.FileChooserResult.CANCEL) {
                     return;
                 }
                     final String fileName = fileChooser.getFileWithCheckedEnding().getAbsolutePath();
                     try {
-                        if(new File(fileName).exists()) {
+                    if (new File(fileName).exists()) {
                             String[] fileLines = getLinesArrayFromIpesFile(fileName);
                             _se.readSelectedElementsFromASCIIString(fileLines);
                         } else {
                             throw new FileNotFoundException("File not found " + fileName);
                         }
-                    } catch(Throwable error) {
+                } catch (Throwable error) {
                         JOptionPane.showMessageDialog(this,
                             "Error during file import : " + fileName + "\n" + error.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
                     }
@@ -1955,7 +1981,9 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
         _se.updateAllComponentReferences();
     }
 
-    public static ProjectData loadProjectDataFromFile(String dateiName, boolean isAutoBackupFile, OptimizerParameterData optimizer) throws FileNotFoundException {
+    public static ProjectData loadProjectDataFromFile(
+            String dateiName, boolean isAutoBackupFile, OptimizerParameterData optimizer)
+            throws FileNotFoundException {
         if (!new File(dateiName).exists()) {
             throw new FileNotFoundException("File: " + GlobalFilePathes.DATNAM + " not found!");
         }

@@ -20,8 +20,10 @@ import java.net.URL;
  *
  * @author andy
  */
-@SuppressFBWarnings(value = "MS_CANNOT_BE_FINAL",
-        justification = "Static fields are intentionally mutable - they store runtime file paths and recent circuits loaded during application lifecycle")
+@SuppressFBWarnings(
+        value = "MS_CANNOT_BE_FINAL",
+        justification =
+                "Static fields are intentionally mutable - they store runtime file paths and recent circuits loaded during application lifecycle")
 public class GlobalFilePathes {
     // die zuletzt geoeffneten Dateien, RECENT_1 ist der juengste Eintrag
     // die Pfade werden in den Properties gespeichert, und beim Programmstart geladen -->

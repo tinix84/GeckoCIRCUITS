@@ -300,7 +300,7 @@ public final class SuggestionField extends JTextField {
             Point tmpLocation = getLocationOnScreen();
             _list.revalidate();
             final int listHeight = _scrollPane.getHeight();
-            tmpLocation.y += - listHeight;
+            tmpLocation.y += -listHeight;
             this._dialog.setLocation(tmpLocation);
         } catch (IllegalComponentStateException exc) {
             // ignored: component not yet displayable
