@@ -372,6 +372,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
         // no-op
     }
 
+    @Override
     public final String getStringID() {
         return getIDStringDialog().toString();
     }
