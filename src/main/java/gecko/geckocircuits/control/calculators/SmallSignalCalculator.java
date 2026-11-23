@@ -19,11 +19,25 @@ import static gecko.geckocircuits.control.calculators.AbstractSignalCalculator.T
 import gecko.geckocircuits.newscope.FFTLibrary;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
-@SuppressWarnings({"PMD.ArrayIsStoredDirectly", "PMD.StaticNonFinal", "PMD.PublicAttribute", "PMD.ThrowExceptionInFinally"})
-@SuppressFBWarnings(value = {"ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD", "CT_CONSTRUCTOR_THROW", "PA_PUBLIC_PRIMITIVE_ATTRIBUTE", "PA_PUBLIC_ARRAY_ATTRIBUTE"},
-        justification = "Writes to inherited static _time field for simulation coordination; constructor exceptions for invalid shapes; public fields for analysis data sharing")
-// Public fields and static array required by simulator API; Constructor validation required for safety
-public final class SmallSignalCalculator extends AbstractControlCalculatable implements InitializableAtSimulationStart, IsDtChangeSensitive {
+@SuppressWarnings({
+    "PMD.ArrayIsStoredDirectly",
+    "PMD.StaticNonFinal",
+    "PMD.PublicAttribute",
+    "PMD.ThrowExceptionInFinally"
+})
+@SuppressFBWarnings(
+        value = {
+            "ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD",
+            "CT_CONSTRUCTOR_THROW",
+            "PA_PUBLIC_PRIMITIVE_ATTRIBUTE",
+            "PA_PUBLIC_ARRAY_ATTRIBUTE"
+        },
+        justification =
+                "Writes to inherited static _time field for simulation coordination; constructor exceptions for invalid shapes; public fields for analysis data sharing")
+// Public fields and static array required by simulator API; Constructor validation required for
+// safety
+public final class SmallSignalCalculator extends AbstractControlCalculatable
+        implements InitializableAtSimulationStart, IsDtChangeSensitive {
 
     //static boolean isSimulationDC;
     private static final int THREE = 3;
@@ -97,9 +111,8 @@ public final class SmallSignalCalculator extends AbstractControlCalculatable imp
     public void berechneYOUT(final double deltaT) {
         double smallSignal = calculateSmallSignal(deltaT);
 
-
-        if(_calculationDeltaT == deltaT) {
-            _numberSamples ++;
+        if (_calculationDeltaT == deltaT) {
+            _numberSamples++;
         } else {
             _numberSamples = 1;
             circularIndex = 0;
@@ -216,21 +229,19 @@ public final class SmallSignalCalculator extends AbstractControlCalculatable imp
 
         int cIndex = circularIndex;
 
-        for(int i = 0; i < _N; i++) {
+        for (int i = 0; i < _N; i++) {
             ddata[i] = _measuredValues[cIndex];
             dsmallSignalData[i] = this._smallSignalValues[cIndex];
             cIndex++;
-            if(cIndex == _N) {
+            if (cIndex == _N) {
                 cIndex = 0;
             }
         }
 
+        // printResults(data, smallSignalData);
 
-
-        //printResults(data, smallSignalData);
-
-        FFTLibrary.calculateForwardFFT (ddata);
-        FFTLibrary.calculateForwardFFT (dsmallSignalData);
+        FFTLibrary.calculateForwardFFT(ddata);
+        FFTLibrary.calculateForwardFFT(dsmallSignalData);
 
         int maxHarmonic = getUsableHarmonicUpperBound();
         for (int n = 0; n <= maxHarmonic; n++) {

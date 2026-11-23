@@ -25,7 +25,7 @@ public final class SignalCalculatorImport extends AbstractSignalCalculator imple
         super(0);
         assert dataTable != null;
         _xy = new double[dataTable.length][dataTable[0].length];
-        for(int i = 0; i < dataTable.length; i++) {
+        for (int i = 0; i < dataTable.length; i++) {
             System.arraycopy(dataTable[i], 0, _xy[i], 0, dataTable[0].length);
         }
 
@@ -71,14 +71,14 @@ public final class SignalCalculatorImport extends AbstractSignalCalculator imple
     }
 
     private void doDataTests() {
-        if(_signalDuration <= 0) {
+        if (_signalDuration <= 0) {
             throw new IllegalArgumentException("The data table in the signal data file is invalid.");
         }
 
-        for(int i = 1; i < _xy[0].length; i++) {
+        for (int i = 1; i < _xy[0].length; i++) {
             final double newTime = _xy[0][i];
-            final double previousTime = _xy[0][i-1];
-            if(newTime <= previousTime) {
+            final double previousTime = _xy[0][i - 1];
+            if (newTime <= previousTime) {
                 throw new IllegalArgumentException("The data table in the signal data file has an error:\n"
                                          + "The time values are not strictly monotonicaly increasing!\n"
                                          + "Error values: " + previousTime + " " + newTime);
