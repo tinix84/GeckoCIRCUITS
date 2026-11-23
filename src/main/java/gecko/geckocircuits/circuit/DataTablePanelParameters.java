@@ -305,7 +305,7 @@ public class DataTablePanelParameters extends JPanel {
                 fireTableCellUpdated(row, col);
                 fireTableCellUpdated(row, 2);
             } else {
-                if (value != null && value instanceof String && ((String) value).isEmpty()) {
+                if (value instanceof String && ((String) value).isEmpty()) {
                     return;
                 }
                 if (value != null) {

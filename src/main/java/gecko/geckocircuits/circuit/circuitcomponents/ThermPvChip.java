@@ -262,7 +262,7 @@ public final class ThermPvChip extends AbstractCircuitBlockInterface implements 
     }
 
     public boolean isSplittableLossCalculation() {
-        return _lossCalculator != null && _lossCalculator instanceof LossCalculationSplittable;
+        return _lossCalculator instanceof LossCalculationSplittable;
     }
 
     public double getTotalLosses() {

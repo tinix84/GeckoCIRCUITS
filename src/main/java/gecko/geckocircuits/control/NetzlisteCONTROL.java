@@ -480,7 +480,7 @@ public final class NetzlisteCONTROL {
         ((DataContainerGlobal) globalData).init(potIndex.size(), dataNames, "t");
 
         for (RegelBlock reg : elementsControl) {
-            if (reg != null && reg instanceof ReglerCISPR16) {
+            if (reg instanceof ReglerCISPR16) {
                 ((ReglerCISPR16) reg).loescheZVDatenImRAM();
             }
         }

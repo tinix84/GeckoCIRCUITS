@@ -315,7 +315,7 @@ public abstract class AbstractCircuitSheetComponent {
     public abstract String getExportImportCharacters();
 
     public boolean allParentSubcircuitsEnabled() {
-        if(_parentCircuitSheet != null && _parentCircuitSheet instanceof SubCircuitSheet) {
+        if(_parentCircuitSheet instanceof SubCircuitSheet) {
             SubCircuitSheet subSheet = (SubCircuitSheet) _parentCircuitSheet;
             final SubcircuitBlock subBlock = subSheet._subBlock;
             if(subBlock._isEnabled.getValue() != Enabled.ENABLED) {
