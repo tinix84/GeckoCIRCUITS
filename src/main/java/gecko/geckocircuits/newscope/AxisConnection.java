@@ -13,7 +13,7 @@
  */
 package gecko.geckocircuits.newscope;
 
-public enum AxisConnection{
+public enum AxisConnection {
   ZUORDNUNG_X(51, "X"),
   ZUORDNUNG_Y(52, "Y"),
   ZUORDNUNG_Y2(53, "Y2"),
@@ -22,33 +22,33 @@ public enum AxisConnection{
   private String _displayString;
   private int _code;
 
-  AxisConnection(final int code, final String displayString){
+    AxisConnection(final int code, final String displayString) {
     _code = code;
     _displayString = displayString;
   }
 
-  static AxisConnection getFromCode(final int code){
-    for(AxisConnection val : values()){
-      if(val.getCode() == code){
+    static AxisConnection getFromCode(final int code) {
+        for (AxisConnection val : values()) {
+            if (val.getCode() == code) {
         return val;
       }
     }
     return ZUORDNUNG_NIX;
   }
 
-  int getCode(){
+    int getCode() {
     return _code;
   }
 
-  @Override
-  public String toString(){
+    @Override
+    public String toString() {
     return _displayString;
   }
 
-  public AxisConnection iterateNext(final boolean signal){
+    public AxisConnection iterateNext(final boolean signal) {
 
-    if(signal){
-      switch(this){
+        if (signal) {
+            switch (this) {
         case ZUORDNUNG_SIGNAL:
           return ZUORDNUNG_NIX;
         case ZUORDNUNG_NIX:
@@ -59,8 +59,7 @@ public enum AxisConnection{
       }
     }
 
-
-    switch(this){
+        switch (this) {
       case ZUORDNUNG_NIX:
         return ZUORDNUNG_Y;
       case ZUORDNUNG_Y:

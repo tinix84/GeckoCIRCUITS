@@ -69,7 +69,7 @@ public final class JPanelDialogRange extends JPanel {
     }
 
     private void notifyActionListener() {
-        if(_listener != null) {
+        if (_listener != null) {
             _listener.actionPerformed(null);
         }
     }

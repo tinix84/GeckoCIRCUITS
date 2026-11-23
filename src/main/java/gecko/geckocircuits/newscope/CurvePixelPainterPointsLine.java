@@ -20,37 +20,40 @@ import java.awt.geom.Line2D;
  *
  * @author andy
  */
-final class CurvePixelPainterPointsLine extends AbstractCurvePixelPainter{
-  CurvePixelPainterPointsLine(final float xPixel, final float value, final Axis yAxis,
-                              final AbstractCurvePixelPainter previousValue){
+final class CurvePixelPainterPointsLine extends AbstractCurvePixelPainter {
+    CurvePixelPainterPointsLine(
+            final float xPixel,
+            final float value,
+            final Axis yAxis,
+            final AbstractCurvePixelPainter previousValue) {
     super(xPixel, yAxis, previousValue);
-    if(_previousPixelPainter != null && _previousPixelPainter._lastValue != null){
+        if (_previousPixelPainter != null && _previousPixelPainter._lastValue != null) {
       _paintShape = new Line2D.Float(_xPixel - 1, _previousPixelPainter._lastValue, _xPixel, value);
     }
     _lastValue = value;
     findPath();
   }
 
-  @Override
-  public void paintComponent(final Graphics2D g2d){
+    @Override
+    public void paintComponent(final Graphics2D g2d) {
     super.paintComponent(g2d);
-    if(_paintShape != null && _drawShape){
+        if (_paintShape != null && _drawShape) {
       g2d.draw(_paintShape);
     }
   }
 
-  @Override
-  void findPath(){
+    @Override
+    void findPath() {
     _drawShape = false;
 
-    if(_previousPixelPainter == null){
+        if (_previousPixelPainter == null) {
       _generalPath = new GeneralPathWrapper();
       _generalPath.moveTo(_xPixel, _lastValue);
       return;
     }
 
-    // start new generalPath!
-    if(_previousPixelPainter._generalPath == null){
+        // start new generalPath!
+        if (_previousPixelPainter._generalPath == null) {
       _previousPixelPainter._generalPath = new GeneralPathWrapper();
       _previousPixelPainter._generalPath.moveTo(_xPixel, _previousPixelPainter._lastValue);
     }

@@ -44,10 +44,10 @@ abstract class AbstractCurvePixelPainter {
     static AbstractCurvePixelPainter barPixelPainter(final int xPixel, Object value, Axis yAxis) {
         if (value instanceof HiLoData) {
             final HiLoData hiLow = (HiLoData) value;
-            if(hiLow._yLo > 0 && hiLow._yHi > 0) {
+            if (hiLow._yLo > 0 && hiLow._yHi > 0) {
                 HiLoData barPixelRepresentation = HiLoData.hiLoDataFabric(hiLow._yHi * 1e-3f, hiLow._yHi);
                 return new CurvePixelPainterHiLow(xPixel, barPixelRepresentation, yAxis, (AbstractCurvePixelPainter) null);
-            } else if(hiLow._yLo < 0 && hiLow._yHi < 0) {
+            } else if (hiLow._yLo < 0 && hiLow._yHi < 0) {
                 HiLoData barPixelRepresentation = HiLoData.hiLoDataFabric(hiLow._yLo, hiLow._yLo * 1e-3f);
                 return new CurvePixelPainterHiLow(xPixel, barPixelRepresentation, yAxis, (AbstractCurvePixelPainter) null);
             } else {

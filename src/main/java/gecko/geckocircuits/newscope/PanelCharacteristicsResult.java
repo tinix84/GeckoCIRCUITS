@@ -90,21 +90,21 @@ public final class PanelCharacteristicsResult extends JPanel {
         setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(),
                 "Characteristics", TitledBorder.LEFT, TitledBorder.TOP));
         _pClcq = new JPanel();
-        _pClcq.setLayout(new GridLayout(dataContainer.getRowLength()+1, 1));
+        _pClcq.setLayout(new GridLayout(dataContainer.getRowLength() + 1, 1));
         //
         final JLabel jlH1 = new JLabel("");
         jlH1.setFont(GlobalFonts.LAB_FONT_DIALOG_1);
         jlH1.setForeground(GlobalColors.LAB_COLOR_DIALOG_1);
         _pClcq.add(jlH1);
-        for (int i1 = 1; i1 < dataContainer.getRowLength()+1; i1++) {
-            final JLabel jlH = new JLabel(dataContainer.getSignalName(i1-1) + "   ");
+        for (int i1 = 1; i1 < dataContainer.getRowLength() + 1; i1++) {
+            final JLabel jlH = new JLabel(dataContainer.getSignalName(i1 - 1) + "   ");
             jlH.setFont(GlobalFonts.LAB_FONT_DIALOG_1);
             jlH.setForeground(GlobalColors.LAB_COLOR_DIALOG_1);
             _pClcq.add(jlH);
         }
 
         _pClc = new JPanel();
-        _pClc.setLayout(new GridLayout(dataContainer.getRowLength()+1, NO_VIEW_COLS));
+        _pClc.setLayout(new GridLayout(dataContainer.getRowLength() + 1, NO_VIEW_COLS));
 
         setCharTitleLabels();
 
@@ -160,7 +160,7 @@ public final class PanelCharacteristicsResult extends JPanel {
         titleLabels.add(new JLabel("klirr"));
         titleLabels.add(new JLabel("shape"));
 
-        for(JLabel tmp : titleLabels) {
+        for (JLabel tmp : titleLabels) {
             tmp.setFont(GlobalFonts.LAB_FONT_DIALOG_1);
             tmp.setForeground(GlobalColors.LAB_COLOR_DIALOG_1);
             _pClc.add(tmp);

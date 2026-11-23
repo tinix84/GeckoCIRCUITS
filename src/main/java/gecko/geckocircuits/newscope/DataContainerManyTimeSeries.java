@@ -98,7 +98,7 @@ public class DataContainerManyTimeSeries extends AbstractDataContainer implement
     public void insertValuesAtEnd(final float[] values, final double timeValue) {
 
         for (int j = 0; j < _timeSerieArray.length; j++) {
-            int index = _timeSerieArray[j].getMaximumIndex()+1;
+            int index = _timeSerieArray[j].getMaximumIndex() + 1;
             _timeSerieArray[j].setValue(index, timeValue);
             for (int i = 0; i < values.length; i++) {
                 _data[i][index] = values[i];
@@ -230,7 +230,7 @@ public class DataContainerManyTimeSeries extends AbstractDataContainer implement
 
     public double getNiceMaximumXValue() {
         double maxXValue = 0;
-        for(AbstractTimeSerie ts : _timeSerieArray) {
+        for (AbstractTimeSerie ts : _timeSerieArray) {
             maxXValue = Math.max(maxXValue, ts.getValue(ts.getMaximumIndex()));
         }
 

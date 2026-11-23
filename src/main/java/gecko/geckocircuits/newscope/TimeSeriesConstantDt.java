@@ -37,7 +37,9 @@ public final class TimeSeriesConstantDt extends AbstractTimeSerie {
             _minTimeValue = value;
         } else {
             assert _minTimeValue < Double.MAX_VALUE : "setting value: " + _minTimeValue;
-            if(_maxDefinedIndex < ADAPT_THRESHOLD) { // adapt dt only for the first steps, otherwise the table view will show
+            if (_maxDefinedIndex
+                    < ADAPT_THRESHOLD) { // adapt dt only for the first steps, otherwise the table
+                                         // view will show
                 // varying results of the time column during the simulation!
                 _dt = (value - _minTimeValue) / _maxDefinedIndex;
             }

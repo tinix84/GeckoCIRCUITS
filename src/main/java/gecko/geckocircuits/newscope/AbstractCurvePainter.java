@@ -49,52 +49,49 @@ abstract class AbstractCurvePainter {
 
     abstract List<Axis> getSensitiveAxis();
 
-  public AbstractCurvePainter(final AbstractCurve curve){
+    public AbstractCurvePainter(final AbstractCurve curve) {
     _curve = curve;
     _xAxis = curve._xAxis;
 
   }
 
-
-  public AbstractDataContainer getRamData(){
+    public AbstractDataContainer getRamData() {
     return _ramData;
   }
 
-
-  public void setRamData(final AbstractDataContainer newData){
+    public void setRamData(final AbstractDataContainer newData) {
     _ramData = newData;
   }
 
-
-  public Axis getXAxis(){
+    public Axis getXAxis() {
     return _xAxis;
   }
 
-  public void loadRequiredData(final AbstractDataContainer newData, final boolean forceLoad){
-    if(newData == null){
+    public void loadRequiredData(final AbstractDataContainer newData, final boolean forceLoad) {
+        if (newData == null) {
       return;
     }
     _dataLoader.loadRequiredData(newData, forceLoad);
   }
 
-  GeckoSymbol getPointSymbol(){
-    if(_curve.isSymbolEnabled()){
+    GeckoSymbol getPointSymbol() {
+        if (_curve.isSymbolEnabled()) {
       return _curve.getSymbol();
-    }else{
+        } else {
       return null;
     }
   }
 
-  void addValueToAllPoints(final Object value, final float xPixel){
-    if(value instanceof HiLoData){
+    void addValueToAllPoints(final Object value, final float xPixel) {
+        if (value instanceof HiLoData) {
       final HiLoData hiLoData = (HiLoData)value;
       _allPoints.add(new Point2D.Float(xPixel, hiLoData._yLo));
       _allPoints.add(new Point2D.Float(xPixel, hiLoData._yHi));
-    }else if(value instanceof Float){
+        } else if (value instanceof Float) {
       _allPoints.add(new Point2D.Float(xPixel, (Float)value));
-    }else if(value instanceof Double){
+        } else if (value instanceof Double) {
       _allPoints.add(new Point2D.Float(xPixel, ((Double)value).floatValue()));
-    }else{
+        } else {
       assert false;
     }
   }

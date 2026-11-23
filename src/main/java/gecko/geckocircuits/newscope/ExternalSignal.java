@@ -20,7 +20,7 @@ import java.awt.geom.Point2D;
  * Provides basic functions to facilitate access to external signals.
  * @author JF
  */
-public class ExternalSignal extends AbstractScopeSignal{
+public class ExternalSignal extends AbstractScopeSignal {
   private String _signalName = ""; // The name of the external signal.
   private double[] _signalTimes = {}; // The array holding the time values for the external signal.
   private double[] _signalValues = {}; // the array holding the data values for the external signal.
@@ -30,111 +30,112 @@ public class ExternalSignal extends AbstractScopeSignal{
   private double _offsetY = 0;
     private String _subCircuitPath;
 
-  /**
-   * Empty standard constructor
-   */
-  public ExternalSignal(){
-      // no-op
-  }
+    /**
+     * Empty standard constructor
+     */
+    public ExternalSignal() {
+        // no-op
+    }
 
-  /**
-   * Constructor to initialize a signal with its time values and its data
-   * values.
-   * @param times An array holding the time values matching the data values.
-   * @param values An array holding the data values of the external signal.
-   */
-  public ExternalSignal(final double[] times, final double[] values){
+    /**
+     * Constructor to initialize a signal with its time values and its data
+     * values.
+     * @param times An array holding the time values matching the data values.
+     * @param values An array holding the data values of the external signal.
+     */
+    public ExternalSignal(final double[] times, final double[] values) {
     this.setData(times, values);
     _subCircuitPath = "";
   }
 
-  /**
-   * Constructor to initialize a signal with its name, its time values and its
-   * data values.
-   * @param name The name for the external signal.
-   * @param times An array holding the time values matching the data values.
-   * @param values An array holding the data values of the external signal.
-   */
-  public ExternalSignal(final String name, final double[] times, final double[] values, String subCircuitPath){
+    /**
+     * Constructor to initialize a signal with its name, its time values and its
+     * data values.
+     * @param name The name for the external signal.
+     * @param times An array holding the time values matching the data values.
+     * @param values An array holding the data values of the external signal.
+     */
+    public ExternalSignal(
+            final String name, final double[] times, final double[] values, String subCircuitPath) {
     this.setName(name);
     this.setData(times, values);
     _subCircuitPath = subCircuitPath;
   }
 
-  /**
-   * Sets the offset of the signal to [x, y]
-   * @param x The x-axis offset.
-   * @param y The y-axis offset.
-   */
-  public final void moveTo(final double x, final double y){
+    /**
+     * Sets the offset of the signal to [x, y]
+     * @param x The x-axis offset.
+     * @param y The y-axis offset.
+     */
+    public final void moveTo(final double x, final double y) {
     this._offsetX = x;
     this._offsetY = y;
   }
 
-  /**
-   * Moves the offset of the signal by [x, y]
-   * @param x Amount the x-axis offset is moved by.
-   * @param y Amount the y-axis offset is moved by.
-   */
-  public final void moveBy(final double x, final double y){
+    /**
+     * Moves the offset of the signal by [x, y]
+     * @param x Amount the x-axis offset is moved by.
+     * @param y Amount the y-axis offset is moved by.
+     */
+    public final void moveBy(final double x, final double y) {
     this._offsetX += x;
     this._offsetY += y;
   }
 
-  // <editor-fold defaultstate="collapsed" desc="get, set, state">
-  /**
-   * Getter for the name of the external signal.
-   * @return Returns the name of the external signal.
-   */
-  public final String getName(){
+    // <editor-fold defaultstate="collapsed" desc="get, set, state">
+    /**
+     * Getter for the name of the external signal.
+     * @return Returns the name of the external signal.
+     */
+    public final String getName() {
     return this._signalName;
   }
 
-  /**
-   * Getter for the offset of the signal as a Point2D object.
-   * @return Returns the offset of the signal.
-   */
-  public final Point2D getPos(){
+    /**
+     * Getter for the offset of the signal as a Point2D object.
+     * @return Returns the offset of the signal.
+     */
+    public final Point2D getPos() {
     return new Point2D.Double(this._offsetX, this._offsetY);
   }
 
-  /**
-   * Setter for the name of the external signal.
-   * @param name The name for the external signal.
-   */
-  public final void setName(final String name){
-    if(name != null){
+    /**
+     * Setter for the name of the external signal.
+     * @param name The name for the external signal.
+     */
+    public final void setName(final String name) {
+        if (name != null) {
       this._signalName = name;
     }
   }
 
-  /**
-   * Returns the number of data values of the external signal.
-   * @return The number of data values of the external signal.
-   */
-  public final int size(){
+    /**
+     * Returns the number of data values of the external signal.
+     * @return The number of data values of the external signal.
+     */
+    public final int size() {
     return this._signalTimes.length;
   }
 
-  /**
-   * Sets the time values and the data values for an external signal. Sets the
-   * values _min and _max of this signal.
-   * @param times
-   * @param values
-   */
-  public final void setData(final double[] times, final double[] values){
-    if(times == null || values == null || times.length != values.length){
+    /**
+     * Sets the time values and the data values for an external signal. Sets the
+     * values _min and _max of this signal.
+     * @param times
+     * @param values
+     */
+    public final void setData(final double[] times, final double[] values) {
+        if (times == null || values == null || times.length != values.length) {
       System.err.println("Error: Invalid params provided to setData in " + this.toString() + "!");
-    }else{
+        } else {
       this._signalTimes = times.clone();
       this._signalValues = values.clone();
       double min = Double.POSITIVE_INFINITY;
       double max = Double.NEGATIVE_INFINITY;
-      for(double value : values){
-        if(value < min){
+            for (double value : values) {
+                if (value < min) {
           min = value;
         }
-        if(value > max){
+                if (value > max) {
           max = value;
         }
       }
@@ -143,63 +144,65 @@ public class ExternalSignal extends AbstractScopeSignal{
     }
   }
 
-  /**
-   * Returns the data value of the external signal at index.
-   * @param index The index of the data value to be returned.
-   * @return The data value of the external signal at index.
-   */
-  public final double getValue(final int index){
+    /**
+     * Returns the data value of the external signal at index.
+     * @param index The index of the data value to be returned.
+     * @return The data value of the external signal at index.
+     */
+    public final double getValue(final int index) {
     assert index < this.size() && index >= 0 : "Error: Index out of bounds!";
     return this._signalValues[index] + this._offsetY;
   }
 
-  /**
-   * Returns the value of the external signal within the interval
-   * [startTime,stopTime]
-   * @param startTime The start time of the interval.
-   * @param stopTime The stop time of the interval.
-   * @return The value of the externalSignal within the interval as a float or
-   * HiLoData Object
-   */
-  public final Object getValueInInterval(final double startTime, final double stopTime){
+    /**
+     * Returns the value of the external signal within the interval
+     * [startTime,stopTime]
+     * @param startTime The start time of the interval.
+     * @param stopTime The stop time of the interval.
+     * @return The value of the externalSignal within the interval as a float or
+     * HiLoData Object
+     */
+    public final Object getValueInInterval(final double startTime, final double stopTime) {
     Object returnValue = null;
     int nrOfValues = 0, firstIndex;
     double start, stop, step;
     float ret1;
     HiLoData ret2;
-    if(this.size() > 0){
-      if(startTime > stopTime){
+        if (this.size() > 0) {
+            if (startTime > stopTime) {
         start = stopTime;
         stop = startTime;
-      }else{
+            } else {
         start = startTime;
         stop = stopTime;
       }
       step = ((double)(this.getTime(this.size() - 1) - this.getTime(0))) / this.size();
       firstIndex = (int)((start - this.getTime(0)) / step);
-      if(firstIndex < 0){
+            if (firstIndex < 0) {
         firstIndex = 0;
       }
-      if(firstIndex >= this.size()){
+            if (firstIndex >= this.size()) {
         firstIndex = this.size() - 1;
       }
-      while(firstIndex < (this.size() - 1) && this.getTime(firstIndex) < start){
+            while (firstIndex < (this.size() - 1) && this.getTime(firstIndex) < start) {
         firstIndex++;
       }
-      while(firstIndex > 0 && this.getTime(firstIndex - 1) > start){
+            while (firstIndex > 0 && this.getTime(firstIndex - 1) > start) {
         firstIndex--;
       }
-      for(int i = firstIndex; start <= this.getTime(i) && this.getTime(i) <= stop && i < (this.size() - 1); i++){
+            for (int i = firstIndex;
+                    start <= this.getTime(i) && this.getTime(i) <= stop && i < (this.size() - 1);
+                    i++) {
         nrOfValues++;
       }
-      if(nrOfValues == 0){
+            if (nrOfValues == 0) {
         returnValue = null;
-      }else if(nrOfValues == 1){
+            } else if (nrOfValues == 1) {
         ret1 = (float)this.getValue(firstIndex);
         returnValue = ret1;
-      }else{
+            } else {
         ret2 = HiLoData.hiLoDataFabric((float)this.getValue(firstIndex), (float)this.getValue(firstIndex));
-        for(int i = firstIndex + 1; (i - firstIndex) < nrOfValues; i++){
+                for (int i = firstIndex + 1; (i - firstIndex) < nrOfValues; i++) {
           ret2 = HiLoData.mergeFromValue(ret2, (float)this.getValue(i));
         }
         returnValue = ret2;
@@ -208,32 +211,33 @@ public class ExternalSignal extends AbstractScopeSignal{
     return returnValue;
   }
 
-  /**
-   * Returns the minimum value and the maximum value of the external signal.
-   * @return The maximum value of the external signal as a HiLoData object
-   */
-  public final HiLoData getMinMax(){
+    /**
+     * Returns the minimum value and the maximum value of the external signal.
+     * @return The maximum value of the external signal as a HiLoData object
+     */
+    public final HiLoData getMinMax() {
     return HiLoData.hiLoDataFabric((float)(this._min + this._offsetY), (float)(_max + this._offsetY));
   }
 
-  /**
-   * Returns the time value of the external signal at index.
-   * @param index The index of the time value to be returned.
-   * @return The time value of the external signal at index.
-   */
-  public final double getTime(final int index){
+    /**
+     * Returns the time value of the external signal at index.
+     * @param index The index of the time value to be returned.
+     * @return The time value of the external signal at index.
+     */
+    public final double getTime(final int index) {
     assert index < this.size() && index >= 0 : "Error: Index out of bounds!";
     return this._signalTimes[index] + this._offsetX;
   }
-  // </editor-fold>
 
-  /**
-   * Implementation of getSignalName in AbstractScopeSignal returning the name
-   * of the signal.
-   * @return Returns the name of the external signal.
-   */
-  @Override
-  public final String getSignalName(){
+    // </editor-fold>
+
+    /**
+     * Implementation of getSignalName in AbstractScopeSignal returning the name
+     * of the signal.
+     * @return Returns the name of the external signal.
+     */
+    @Override
+    public final String getSignalName() {
     return this.getName();
   }
 

@@ -154,7 +154,7 @@ public abstract class AbstractDiagram extends JPanel {
     }
 
     public void setAllCurvesWithBars(final int[] indices) {
-        for(int index : indices) {
+        for (int index : indices) {
             AbstractCurve curve = _curves.get(index);
             curve._curveSettings._lineType = GeckoLineType.BAR;
         }
@@ -202,8 +202,14 @@ public abstract class AbstractDiagram extends JPanel {
 
             graphics.setFont(GlobalFonts.foGRAFER);
             graphics.setColor(_xAxis._axisSettings.getColor().getJavaColor());
-            if(_grafer._manager.getDiagrams().get(_grafer._manager.getDiagrams().size()-1).equals(AbstractDiagram.this)) {
-                graphics.drawString(_grafer.xAxisLabel, 0, this.getHeight() - graphics.getFontMetrics().getHeight()/2+1);
+            if (_grafer._manager
+                    .getDiagrams()
+                    .get(_grafer._manager.getDiagrams().size() - 1)
+                    .equals(AbstractDiagram.this)) {
+                graphics.drawString(
+                        _grafer.xAxisLabel,
+                        0,
+                        this.getHeight() - graphics.getFontMetrics().getHeight() / 2 + 1);
             }
 
         }

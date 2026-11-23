@@ -33,7 +33,7 @@ public final class FourierGUIless {
             final double endTime, final int harmonics) {
         this._worksheet = worksheet;
         _header = new String[_worksheet.getRowLength()];
-        for(int i = 0; i < _worksheet.getRowLength(); i++) {
+        for (int i = 0; i < _worksheet.getRowLength(); i++) {
             _header[i] = _worksheet.getSignalName(i);
         }
         _nMin = 0;
@@ -109,7 +109,7 @@ public final class FourierGUIless {
                 Cispr16Fft.realft(data, 1);
                 for (int n = _nMin; n <= _nMax; n++) {
                     anVals[i2][n - _nMin] = 2 * data[2 * n] / _nValues;
-                    bnVals[i2][n - _nMin] = 2 * data[2 * n + 1] / _nValues ;
+                bnVals[i2][n - _nMin] = 2 * data[2 * n + 1] / _nValues;
                 }
 
         }

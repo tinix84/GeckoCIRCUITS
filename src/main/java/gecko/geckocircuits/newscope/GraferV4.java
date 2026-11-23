@@ -153,7 +153,7 @@ public final class GraferV4 extends JPanel {
     }
 
     public void setInitalCurveConnection(final int terminalNumber) {
-        if(_manager.getDiagram(0) instanceof DiagramSignal) {
+        if (_manager.getDiagram(0) instanceof DiagramSignal) {
             _manager.getDiagram(0).getCurve(terminalNumber - 1).setAxisConnection(AxisConnection.ZUORDNUNG_SIGNAL);
         } else {
             _manager.getDiagram(0).getCurve(terminalNumber - 1).setAxisConnection(AxisConnection.ZUORDNUNG_Y);

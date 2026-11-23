@@ -24,69 +24,72 @@ import java.util.Stack;
  *
  * @author andy
  */
-final class CurvePainterSignal extends AbstractCurvePainter{
+final class CurvePainterSignal extends AbstractCurvePainter {
   public static final double SGN_THRESHOLD = 0.5;
   private final Stack<SignalStateDrawer> _allDrawables = new Stack<SignalStateDrawer>();
 
-  public CurvePainterSignal(final AbstractCurve curve){
+    public CurvePainterSignal(final AbstractCurve curve) {
     super(curve);
   }
 
-  /*
-   * get all data from the dataContainer (expensive operation!);
-   */
-  @Override
-  public void reLoadData(final int minimumPixel, final int maximumPixel){
-    synchronized(this){ // if we don't do this synchronized, we will get concurrent modifications of the curve painters.
+    /*
+     * get all data from the dataContainer (expensive operation!);
+     */
+    @Override
+    public void reLoadData(final int minimumPixel, final int maximumPixel) {
+        synchronized (
+                this) { // if we don't do this synchronized, we will get concurrent modifications of
+                        // the curve painters.
       _allDrawables.clear();
       _allPoints.clear();
       loadDataRange(minimumPixel, maximumPixel);
     }
   }
 
-  @Override
-  public void loadDataRange(final int startPixel, final int stopPixel){
-    for(int i = startPixel; i < stopPixel; i++){
+    @Override
+    public void loadDataRange(final int startPixel, final int stopPixel) {
+        for (int i = startPixel; i < stopPixel; i++) {
       final Object value = _ramData.getDataValueInInterval(_xAxis.getValueFromPixel(i),
                                                            _xAxis.getValueFromPixel(i + 1), _curve.getValueDataIndex());
-      if(value == null){
+            if (value == null) {
         continue;
       }
 
-      if(value instanceof HiLoData){
+            if (value instanceof HiLoData) {
         loadHiLoDataValue((HiLoData)value, i);
 
-      }else{
+            } else {
         loadFloatValue((Float)value, i);
       }
     }
   }
 
-  @Override
-  public void paintComponent(final Graphics2D g2d){
-    synchronized(this){
-      for(SignalStateDrawer drawable : _allDrawables){
+    @Override
+    public void paintComponent(final Graphics2D g2d) {
+        synchronized (this) {
+            for (SignalStateDrawer drawable : _allDrawables) {
         drawable.paintComponent(g2d, _curve);
       }
     }
 
-    if(_curve.isSymbolEnabled()){
+        if (_curve.isSymbolEnabled()) {
       final GeckoSymbol symbol = _curve.getSymbol();
-      for(Point2D.Float pt : _allPoints){
+            for (Point2D.Float pt : _allPoints) {
         symbol.drawSymbol(g2d, pt.x, pt.y);
       }
     }
 
   }
 
-  private void appendDataPixel(final boolean lowPixelValue, final boolean hiPixelValue, final int xPixelValue){
-    synchronized(this){
-      if(_allDrawables.empty()){
+    private void appendDataPixel(
+            final boolean lowPixelValue, final boolean hiPixelValue, final int xPixelValue) {
+        synchronized (this) {
+            if (_allDrawables.empty()) {
         _allDrawables.push(SignalStateDrawer.fabric(null, lowPixelValue, hiPixelValue, xPixelValue));
-      }else{
+            } else {
         final SignalStateDrawer lastValue = _allDrawables.pop();
         final SignalStateDrawer newValue = SignalStateDrawer.fabric(lastValue, lowPixelValue, hiPixelValue, xPixelValue);
-        if(!newValue.equals(lastValue)){
+                if (!newValue.equals(lastValue)) {
           _allDrawables.push(lastValue);
         }
         _allDrawables.push(newValue);
@@ -94,36 +97,36 @@ final class CurvePainterSignal extends AbstractCurvePainter{
     }
   }
 
-  @Override
-  public List<Axis> getSensitiveAxis(){
+    @Override
+    public List<Axis> getSensitiveAxis() {
     return Arrays.asList(_xAxis);
   }
 
-  private void loadHiLoDataValue(final HiLoData value, final int index){
+    private void loadHiLoDataValue(final HiLoData value, final int index) {
     final HiLoData hiLow = value;
     final boolean lowPixelValue = hiLow._yHi > SGN_THRESHOLD;
     final boolean hiPixelValue = hiLow._yLo > SGN_THRESHOLD;
     appendDataPixel(lowPixelValue, hiPixelValue, index);
 
-    if(_curve.isSymbolEnabled()){
-      if(lowPixelValue){
+        if (_curve.isSymbolEnabled()) {
+            if (lowPixelValue) {
         addValueToAllPoints(0f, index);
       }
-      if(!hiPixelValue){
+            if (!hiPixelValue) {
         addValueToAllPoints((float)CurveSignal.SGN_HEIGHT, index);
       }
     }
 
   }
 
-  private void loadFloatValue(final Float value, final int index){
+    private void loadFloatValue(final Float value, final int index) {
     final boolean signalValue = value > SGN_THRESHOLD;
     appendDataPixel(signalValue, signalValue, index);
 
-    if(_curve.isSymbolEnabled()){
-      if(signalValue){
+        if (_curve.isSymbolEnabled()) {
+            if (signalValue) {
         addValueToAllPoints((float)CurveSignal.SGN_HEIGHT, index);
-      }else{
+            } else {
         addValueToAllPoints(0f, index);
       }
     }
