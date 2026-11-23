@@ -16,6 +16,7 @@ package gecko.core.simulation;
 import gecko.core.allg.SolverSettingsCore;
 import gecko.core.allg.SolverType;
 import gecko.core.io.CircuitModel;
+import gecko.core.preparation.SolverFeatures;
 import gecko.core.preparation.SolverOverrides;
 
 import java.util.Collections;
@@ -61,7 +62,8 @@ public final class SimulationConfig {
     SolverOverrides explicitSolverOverrides() {
         return new SolverOverrides(solverTypeExplicit ? solverSettings.getSolverType() : null,
                 stepWidthExplicit ? solverSettings.getStepWidth() : null,
-                durationExplicit ? solverSettings.getSimulationDuration() : null);
+                durationExplicit ? solverSettings.getSimulationDuration() : null,
+                new SolverFeatures(solverSettings.getControlSamplePeriod()));
     }
     /** Uses file defaults only for settings the caller did not supply. */
     SolverSettingsCore resolveSolverSettings(CircuitModel model) {

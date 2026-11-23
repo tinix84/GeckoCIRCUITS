@@ -14,7 +14,6 @@
 package gecko.core.simulation;
 
 import gecko.core.circuit.netlist.CircuitNetlist;
-import gecko.core.control.IsDtChangeSensitive;
 import gecko.core.control.calculators.AbstractControlCalculatable;
 import gecko.core.control.calculators.FromExternalCalculator;
 import gecko.core.control.calculators.ToExternalCalculator;
@@ -42,7 +41,6 @@ final class ControlRuntime implements AutoCloseable {
     private double dt;
     private long nextSampleIndex;
     private boolean outputsPublishedLastStep = true;
-    private double lastSampleTime;
     private long stateVersion;
     private Runnable pendingInitialization;
     private boolean initialized;
@@ -53,9 +51,7 @@ final class ControlRuntime implements AutoCloseable {
         if (!Double.isFinite(dt) || dt <= 0) {
             throw new IllegalArgumentException("Time step must be finite and positive.");
         }
-        if (!Double.isFinite(samplePeriod) || samplePeriod < 0) {
-            throw new IllegalArgumentException("CONTROL sample period must be finite and non-negative.");
-        }
+        requireValidSamplePeriod(samplePeriod);
         this.dt = dt;
         this.samplePeriod = samplePeriod;
         controlNetlist = build.getControlNetlist();
@@ -70,27 +66,21 @@ final class ControlRuntime implements AutoCloseable {
         domainCoupler = new DomainCoupler();
         domainCoupler.configureFromMapping(build.getMapping());
         scopeExtractor = ScopeDataExtractor.fromScopes(build.getMapping().getScopeInfos());
-        requireUniformSampleGrid(dt);
-    }
-
-    /** The step that CONTROL calculators see: the sample period when sampled, else the electrical step. */
-    private double controlStep(double electricalStep) {
-        return samplePeriod > 0 ? samplePeriod : electricalStep;
     }
 
     /**
-     * Delay-like calculators size fixed buffers from their step. They need a constant
-     * elapsed time between samples, so the sample period must be a whole number of steps.
+     * The step that CONTROL calculators see. A sampled controller runs on its nominal period Ts, whatever
+     * electrical step quantizes the sample instants, so delays and integrators count controller ticks and
+     * the sample instants never accumulate error. CONTROL cannot tick faster than the electrical step,
+     * so a period at or below the step runs every step with the electrical step.
      */
-    private void requireUniformSampleGrid(double electricalStep) {
-        if (samplePeriod <= 0) return;
-        double ratio = samplePeriod / electricalStep;
-        if (Math.abs(ratio - Math.rint(ratio)) <= SAMPLE_TOLERANCE * Math.max(1, ratio)) return;
-        for (var owner : owners) {
-            if (owner instanceof IsDtChangeSensitive) {
-                throw new IllegalArgumentException(
-                        "CONTROL sample period must be a whole multiple of the time step for delay-type blocks.");
-            }
+    private double controlStep(double electricalStep) {
+        return Math.max(samplePeriod, electricalStep);
+    }
+
+    private static void requireValidSamplePeriod(double samplePeriod) {
+        if (!Double.isFinite(samplePeriod) || samplePeriod < 0) {
+            throw new IllegalArgumentException("CONTROL sample period must be finite and non-negative.");
         }
     }
 
@@ -109,10 +99,15 @@ final class ControlRuntime implements AutoCloseable {
         return fromDeferred(model, dt, electricalNetlist, 0);
     }
 
-    /** A positive sample period runs CONTROL at the first step at or after each multiple of it. */
+    /**
+     * A positive sample period runs CONTROL at the first electrical step at or after each multiple of it
+     * and holds gate, source, and calculator outputs between samples. Measurement probes stay live, so a scope
+     * that records a probe directly shows the physical signal, while every calculator output it feeds is held.
+     */
     static ControlRuntime fromDeferred(CircuitModel model, double dt, CircuitNetlist electricalNetlist,
             double samplePeriod) {
-        double planningStep = samplePeriod > 0 ? samplePeriod : dt;
+        requireValidSamplePeriod(samplePeriod);
+        double planningStep = Math.max(samplePeriod, dt);
         return new ControlRuntime(new ControlCalculatorFactory().buildCircuit(model, planningStep, electricalNetlist),
                 dt, samplePeriod);
     }
@@ -159,9 +154,9 @@ final class ControlRuntime implements AutoCloseable {
         if (!Double.isFinite(newDt) || newDt <= 0) {
             throw new IllegalArgumentException("Time step must be finite and positive.");
         }
-        requireUniformSampleGrid(newDt);
         Runnable staged = beforeStart ? controlNetlist.prepareInitialization(controlStep(newDt))
-                : samplePeriod > 0 ? () -> { } : controlNetlist.prepareTimeStepChange(newDt);
+                : samplePeriod > 0 && controlStep(newDt) == controlStep(dt) ? () -> { }
+                : controlNetlist.prepareTimeStepChange(controlStep(newDt));
         return new Runnable() {
             private boolean used;
 
@@ -245,18 +240,16 @@ final class ControlRuntime implements AutoCloseable {
         }
     }
 
-    /** Runs CONTROL every step, or only when a sample is due. Samples never drift: due times are k*Ts. */
+    /** Runs CONTROL every step, or only when a sample is due. Due times are exactly k*Ts, so they do not drift. */
     private boolean executeDueSample(double time) {
         if (samplePeriod <= 0) {
             controlNetlist.executeTimeStep(dt, time);
             return true;
         }
-        if (time < nextSampleIndex * samplePeriod - SAMPLE_TOLERANCE * Math.min(dt, samplePeriod)) return false;
-        double elapsed = nextSampleIndex == 0 ? samplePeriod : time - lastSampleTime;
-        if (Math.abs(elapsed - samplePeriod) <= SAMPLE_TOLERANCE * samplePeriod) elapsed = samplePeriod;
-        controlNetlist.executeTimeStep(elapsed, time);
-        lastSampleTime = time;
-        nextSampleIndex = (long) Math.floor(time / samplePeriod + SAMPLE_TOLERANCE * Math.min(dt, samplePeriod) / samplePeriod) + 1;
+        double slack = SAMPLE_TOLERANCE * Math.min(dt, samplePeriod);
+        if (time < nextSampleIndex * samplePeriod - slack) return false;
+        controlNetlist.executeTimeStep(controlStep(dt), time);
+        nextSampleIndex = (long) Math.floor((time + slack) / samplePeriod) + 1;
         return true;
     }
 

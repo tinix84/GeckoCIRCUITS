@@ -200,8 +200,7 @@ public class HeadlessSimulationEngine {
                 return SimulationResult.failed(findings);
             }
             circuitModel = ready.execution().newRunModel();
-            settings = ready.execution().solverSettings()
-                    .withControlSamplePeriod(settings.getControlSamplePeriod());
+            settings = ready.execution().solverSettings();
         }
         return executeSimulation(config, startTime, cancellationSignal, circuitModel, settings);
     }

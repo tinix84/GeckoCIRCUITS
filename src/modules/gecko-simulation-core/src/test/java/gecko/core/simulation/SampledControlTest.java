@@ -5,7 +5,13 @@ import gecko.core.allg.SolverType;
 import gecko.core.circuit.circuitcomponents.CircuitTypCore;
 import gecko.core.circuit.netlist.CircuitNetlist;
 import gecko.core.io.CircuitModel;
+import gecko.core.preparation.CircuitPreparation;
 import gecko.core.preparation.ExecutionOptions;
+import gecko.core.preparation.PreparationRequest;
+import gecko.core.preparation.PreparationResult;
+import gecko.core.preparation.PreparedCircuit;
+import gecko.core.preparation.SolverFeatures;
+import gecko.core.preparation.SolverOverrides;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -64,16 +70,17 @@ class SampledControlTest {
     void aNonIntegralRatioSamplesAtTheFirstStepAtOrAfterEachMultipleWithoutDrift() {
         // dt = 3 us, Ts = 10 us: whole-microsecond arithmetic gives an exact reference schedule.
         float[] ramp = run(rampModel(), settings(3e-6, 3e-4, 10e-6));
-        long lastSampleMicros = 0;
+        long ticks = -1;
         long next = 0;
         for (int step = 0; step < ramp.length; step++) {
             long micros = 3L * step;
             if (micros >= next * 10) {
-                lastSampleMicros = micros;
+                ticks++;
                 next = micros / 10 + 1;
             }
-            // Trapezoid: 0.5*Ts at the t=0 sample plus the elapsed time since then.
-            assertEquals(5e-6 + lastSampleMicros * 1e-6, ramp[step], 1e-9, "step " + step);
+            // The controller integrates its nominal Ts per tick, so the rounding of sample instants onto the
+            // 3 us grid never accumulates: after n ticks the output is exactly Ts*(n + 0.5).
+            assertEquals(10e-6 * (ticks + 0.5), ramp[step], 1e-9, "step " + step);
         }
     }
 
@@ -128,18 +135,82 @@ class SampledControlTest {
         }
     }
 
-    @Test
-    void delayBlocksNeedAWholeNumberOfStepsPerSample() {
+    private static CircuitModel delayModel(double delay) {
         var model = new CircuitModel();
         model.addControlComponent(component(58, "time", new double[0], new String[0], "clock"));
-        model.addControlComponent(component(25, "delay", new double[]{1e-5}, new String[]{"clock"}, "delayed"));
+        model.addControlComponent(component(25, "delay", new double[]{delay}, new String[]{"clock"}, "delayed"));
         model.addControlComponent(component(5, "scope", new double[0], new String[]{"clock", "delayed"}));
-        assertThrows(IllegalArgumentException.class,
-                () -> SimulationSession.fromModel(model, settings(3e-6, 1e-4, 10e-6), ExecutionOptions.defaults()));
-        try (var session = SimulationSession.fromModel(model, settings(1e-6, 1e-4, 10e-6),
+        return model;
+    }
+
+    @Test
+    void aDelayCountsSampledTicksWhenTheRatioIsNotIntegral() {
+        // dt = 3 us, Ts = 10 us, delay = 20 us = two ticks. Sample instants are 0, 12, 21, 30, 42 ... us.
+        try (var session = SimulationSession.fromModel(delayModel(20e-6), settings(3e-6, 3e-4, 10e-6),
                 ExecutionOptions.defaults())) {
             session.run();
-            assertEquals(1e-5f, session.observe(0, 100).values()[1][20], 1e-9f);
+            var observed = session.observe(0, 10000);
+            var sampleTimes = new ArrayList<Long>();
+            long next = 0;
+            for (int step = 0; step < observed.times().length; step++) {
+                long micros = 3L * step;
+                if (micros >= next * 10) {
+                    sampleTimes.add(micros);
+                    next = micros / 10 + 1;
+                }
+                int tick = sampleTimes.size() - 1;
+                assertEquals(sampleTimes.getLast() * 1e-6, observed.values()[0][step], 1e-9, "clock " + step);
+                assertEquals(tick < 2 ? 0 : sampleTimes.get(tick - 2) * 1e-6, observed.values()[1][step], 1e-9,
+                        "delayed " + step);
+            }
+            assertTrue(sampleTimes.size() > 20);
+        }
+    }
+
+    @Test
+    void aDelayKeepsItsHistoryWhenASessionContinuesOnAnotherElectricalStep() {
+        // Ts = 10 us stays the controller step while the electrical step changes from 4 us to 2 us and 3 us.
+        try (var session = SimulationSession.fromModel(delayModel(20e-6), settings(4e-6, 6e-5, 10e-6),
+                ExecutionOptions.defaults())) {
+            session.run();
+            session.extend(1.2e-4, 2e-6);
+            session.run();
+            session.extend(2.0e-4, 3e-6);
+            session.run();
+            var observed = session.observe(0, 10000);
+            var sampleTimes = new ArrayList<Long>();
+            long next = 0;
+            for (int index = 0; index < observed.times().length; index++) {
+                long nanos = Math.round(observed.times()[index] * 1e9);
+                if (nanos >= next * 10000) {
+                    sampleTimes.add(nanos);
+                    next = nanos / 10000 + 1;
+                }
+                int tick = sampleTimes.size() - 1;
+                assertEquals(sampleTimes.getLast() * 1e-9, observed.values()[0][index], 1e-9, "clock " + nanos);
+                assertEquals(tick < 2 ? 0 : sampleTimes.get(tick - 2) * 1e-9, observed.values()[1][index], 1e-9,
+                        "delayed " + nanos);
+            }
+            assertTrue(sampleTimes.size() > 15);
+        }
+    }
+
+    @Test
+    void aPeriodShorterThanTheStepBecomesAFullRateTickWhenTheStepShrinks() {
+        try (var session = SimulationSession.fromModel(rampModel(), settings(4e-6, 2.4e-5, 3e-6),
+                ExecutionOptions.defaults())) {
+            session.run();
+            session.extend(5.2e-5, 2e-6);
+            session.run();
+            float[] ramp = session.observe(0, 10000).values()[0];
+            double[] times = session.observe(0, 10000).times();
+            for (int index = 1; index < ramp.length; index++) {
+                double rise = ramp[index] - ramp[index - 1];
+                // At 4 us the period is below the step, so CONTROL ticks every step with 4 us. After
+                // the step shrinks to 2 us it ticks on the 3 us period at the first step at or after each multiple.
+                if (times[index] <= 2.4e-5) assertEquals(4e-6, rise, 1e-9, "t=" + times[index]);
+                else assertTrue(rise == 0 || Math.abs(rise - 3e-6) < 1e-9, "t=" + times[index] + " rise " + rise);
+            }
         }
     }
 
@@ -227,6 +298,174 @@ class SampledControlTest {
                 .controlSamplePeriod(50e-6).build());
         assertFalse(java.util.Arrays.deepEquals(unset.toArray(), sampled.toArray()),
                 "a positive period must reach the engine and change the PWM");
+    }
+
+    @Test
+    void aScopedProbeStaysLiveWhileEveryControllerOutputItFeedsIsHeld() {
+        var model = new CircuitModel();
+        var probe = component(1, "VOLT.1", new double[0], new String[0], "v");
+        probe.setParameterStrings(new String[]{"1", "0"});
+        model.addControlComponent(probe);
+        model.addControlComponent(component(7, "gain", new double[]{2}, new String[]{"v"}, "doubled"));
+        model.addControlComponent(component(5, "scope", new double[0], new String[]{"v", "doubled"}));
+        var netlist = new CircuitNetlist();
+        var live = new ArrayList<Float>();
+        var held = new ArrayList<Float>();
+        try (var runtime = ControlRuntime.fromDeferred(model, 1e-6, null, 3e-6)) {
+            for (int step = 0; step < 7; step++) {
+                netlist.storeResults(new double[]{0, 5 + 2 * step}, new double[]{0});
+                runtime.advanceAfterElectricalStep(netlist, step * 1e-6);
+                float[] scope = runtime.sampleScope();
+                live.add(scope[0]);
+                held.add(scope[1]);
+            }
+        }
+        // Measurement probes are the physical signal. The gain executes only at the samples 0, 3 and 6.
+        assertEquals(List.of(5f, 7f, 9f, 11f, 13f, 15f, 17f), live);
+        assertEquals(List.of(10f, 10f, 10f, 22f, 22f, 22f, 34f), held);
+    }
+
+    @Test
+    void aPeriodEqualToTheStepPublishesGatesAndSourcesExactlyLikeNoPeriod() {
+        var gateModel = new CircuitModel();
+        var probe = component(1, "VOLT.1", new double[0], new String[0], "gate");
+        probe.setParameterStrings(new String[]{"1", "0"});
+        gateModel.addControlComponent(probe);
+        var gate = component(6, "GATE.1", new double[0], new String[]{"gate"});
+        gate.setParameterStrings(new String[]{"S.1"});
+        gateModel.addControlComponent(gate);
+        var sourceModel = new CircuitModel();
+        var source = component(4, "U.2", new double[]{400, -0.02}, new String[]{"1"}, "0");
+        source.setParameterStrings(new String[]{"v"});
+        sourceModel.addCircuitComponent(source);
+        var sourceProbe = component(1, "VOLT.1", new double[0], new String[0], "v");
+        sourceProbe.setParameterStrings(new String[]{"1", "0"});
+        sourceModel.addControlComponent(sourceProbe);
+        for (double period : new double[]{0, 1e-6}) {
+            assertEquals(List.of(1.0, 0.0, 1.0, 0.0, 1.0), gateValues(gateModel, period), "gate, Ts=" + period);
+            assertEquals(List.of(0.0, 5.0, 7.0, 9.0, 11.0), sourceValues(sourceModel, period), "source, Ts=" + period);
+        }
+    }
+
+    private static List<Double> gateValues(CircuitModel model, double period) {
+        var netlist = electricalGate();
+        var seen = new ArrayList<Double>();
+        try (var runtime = ControlRuntime.fromDeferred(model, 1e-6, null, period)) {
+            for (int step = 0; step < 5; step++) {
+                netlist.storeResults(new double[]{0, step % 2 == 0 ? 1 : 0}, new double[]{0});
+                runtime.advanceAfterElectricalStep(netlist, step * 1e-6);
+                seen.add(netlist.getParameter(0)[8]);
+            }
+        }
+        return seen;
+    }
+
+    private static List<Double> sourceValues(CircuitModel model, double period) {
+        var netlist = new CircuitNetlist();
+        double[] parameters = new double[21];
+        parameters[0] = 400;
+        netlist.initNetlist(new CircuitTypCore[]{CircuitTypCore.LK_U}, new int[]{1}, new int[]{0}, new int[]{1},
+                new double[][]{parameters}, 1, 1, 1);
+        netlist.setComponentNameToIndex(Map.of("U.2", 0));
+        var seen = new ArrayList<Double>();
+        try (var runtime = ControlRuntime.fromDeferred(model, 1e-6, null, period)) {
+            runtime.seedSources(netlist);
+            for (int step = 0; step < 5; step++) {
+                netlist.storeResults(new double[]{0, 5 + 2 * step}, new double[]{0});
+                runtime.advanceAfterElectricalStep(netlist, step * 1e-6);
+                seen.add(netlist.getParameter(0)[1]);
+            }
+        }
+        return seen;
+    }
+
+    @Test
+    void aPeriodEqualToTheStepOnBuckSimpleIsBitIdenticalToNoPeriod() throws Exception {
+        String circuit = Path.of(Objects.requireNonNull(
+                getClass().getResource("/ipes/buck_simple.ipes")).toURI()).toString();
+        var none = trace(SimulationConfig.builder().circuitFile(circuit).simulationDuration(2e-4).build());
+        var everyStep = trace(SimulationConfig.builder().circuitFile(circuit).simulationDuration(2e-4)
+                .controlSamplePeriod(1e-6).build());
+        assertEquals(none.size(), everyStep.size());
+        for (int index = 0; index < none.size(); index++) assertArrayEquals(none.get(index), everyStep.get(index));
+    }
+
+    private static PreparedCircuit prepare(CircuitModel model, SolverOverrides overrides) {
+        var preparation = new CircuitPreparation();
+        var result = preparation.prepare(preparation.capture(model), new PreparationRequest(overrides, Map.of()));
+        return assertInstanceOf(PreparationResult.Ready.class, result).execution();
+    }
+
+    private static CircuitModel timedRamp() {
+        var model = rampModel();
+        model.setTimeStep(1e-6);
+        model.setSimulationDuration(3e-4);
+        return model;
+    }
+
+    @Test
+    void aPreparedCircuitCarriesTheFeatureIntoEveryIndependentSession() {
+        var prepared = prepare(timedRamp(), new SolverOverrides(null, null, null, new SolverFeatures(100e-6)));
+        assertEquals(100e-6, prepared.solverSettings().getControlSamplePeriod());
+        prepared.solverSettings().withControlSamplePeriod(5);
+        assertEquals(100e-6, prepared.solverSettings().getControlSamplePeriod(), "settings are detached");
+        for (int run = 0; run < 2; run++) {
+            try (var session = SimulationSession.open(prepared, ExecutionOptions.defaults())) {
+                session.run();
+                float[] ramp = session.observe(0, 10000).values()[0];
+                assertEquals(0.5e-4, ramp[99], 1e-9, "run " + run);
+                assertEquals(1.5e-4, ramp[100], 1e-9, "run " + run);
+            }
+        }
+    }
+
+    @Test
+    void aPreparedCircuitInheritsNoPeriodUnlessRequested() {
+        var inherited = prepare(timedRamp(), SolverOverrides.none());
+        assertEquals(0, inherited.solverSettings().getControlSamplePeriod());
+        var legacy = prepare(timedRamp(), new SolverOverrides(null, 2e-6, null));
+        assertEquals(0, legacy.solverSettings().getControlSamplePeriod());
+        assertEquals(2e-6, legacy.solverSettings().getStepWidth());
+        var overridden = prepare(timedRamp(), new SolverOverrides(null, 2e-6, 1e-4, new SolverFeatures(1e-5)));
+        assertEquals(1e-5, overridden.solverSettings().getControlSamplePeriod());
+        assertEquals(2e-6, overridden.solverSettings().getStepWidth());
+        try (var session = SimulationSession.open(inherited, ExecutionOptions.defaults())) {
+            session.run();
+            float[] ramp = session.observe(0, 10000).values()[0];
+            assertEquals(1e-6, ramp[5] - ramp[4], 1e-9, "no period runs every step");
+        }
+    }
+
+    @Test
+    void preparationRejectsAnInvalidPeriodBeforeAnySessionExists() {
+        for (double invalid : new double[]{-1, Double.NaN, Double.POSITIVE_INFINITY}) {
+            var preparation = new CircuitPreparation();
+            var result = preparation.prepare(preparation.capture(timedRamp()), new PreparationRequest(
+                    new SolverOverrides(null, null, null, new SolverFeatures(invalid)), Map.of()));
+            var rejected = assertInstanceOf(PreparationResult.Rejected.class, result);
+            assertTrue(rejected.report().diagnostics().stream()
+                    .anyMatch(item -> "controlSamplePeriod".equals(item.parameterPath())), "period " + invalid);
+        }
+    }
+
+    @Test
+    void anInvalidPeriodFailsBeforeCalculatorsAreBuilt() {
+        assertThrows(IllegalArgumentException.class,
+                () -> ControlRuntime.fromDeferred(null, 1e-6, null, -1));
+    }
+
+    @Test
+    void theEnginePassesTheConfiguredPeriodThroughPreparation() throws Exception {
+        String circuit = Path.of(Objects.requireNonNull(
+                getClass().getResource("/ipes/buck_simple.ipes")).toURI()).toString();
+        var config = SimulationConfig.builder().circuitFile(circuit).simulationDuration(2e-4)
+                .controlSamplePeriod(50e-6).build();
+        assertEquals(50e-6, config.explicitSolverOverrides().features().controlSamplePeriod());
+        assertEquals(0, SimulationConfig.builder().build().explicitSolverOverrides().features().controlSamplePeriod());
+        var first = trace(config);
+        var second = trace(config);
+        assertEquals(first.size(), second.size());
+        for (int index = 0; index < first.size(); index++) assertArrayEquals(first.get(index), second.get(index));
     }
 
     /** Raw IEEE-754 bits of every node voltage and current, so equality is exact rather than tolerant. */
