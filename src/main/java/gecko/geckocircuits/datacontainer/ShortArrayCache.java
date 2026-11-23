@@ -45,7 +45,7 @@ public final class ShortArrayCache {
             counter1++;
             return new short[mDim];
         } else {
-            for(int i = 0; i < isPresent.length; i++) {
+            for (int i = 0; i < isPresent.length; i++) {
                 isPresent[i] = 0;
             }
             counter2++;

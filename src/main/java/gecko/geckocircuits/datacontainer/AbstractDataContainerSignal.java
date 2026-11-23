@@ -19,28 +19,31 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
  *
  * @author andreas
  */
-@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "Signal must share data container reference for efficient data access")
-public abstract class AbstractDataContainerSignal{
+@SuppressFBWarnings(
+        value = "EI_EXPOSE_REP",
+        justification = "Signal must share data container reference for efficient data access")
+public abstract class AbstractDataContainerSignal {
   protected AbstractDataContainer _dataContainer;
   protected int _dataContainerIndex;
 
-  public AbstractDataContainerSignal(final AbstractDataContainer dataContainer, final int dataContainerIndex){
+    public AbstractDataContainerSignal(
+            final AbstractDataContainer dataContainer, final int dataContainerIndex) {
     _dataContainer = dataContainer;
     _dataContainerIndex = dataContainerIndex;
   }
 
   public abstract String getSignalName();
 
-  public final AbstractDataContainer getDataContainer(){
+    public final AbstractDataContainer getDataContainer() {
     return _dataContainer;
   }
 
-  public final int getContainerSignalIndex(){
+    public final int getContainerSignalIndex() {
     return _dataContainerIndex;
   }
 
-  @Override
-  public final String toString(){
+    @Override
+    public final String toString() {
     return _dataContainer.getSignalName(_dataContainerIndex) + " " + _dataContainerIndex;
   }
 }

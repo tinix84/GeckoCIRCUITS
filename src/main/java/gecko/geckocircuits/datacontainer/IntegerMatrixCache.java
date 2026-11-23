@@ -50,10 +50,10 @@ public final class IntegerMatrixCache {
     public static void recycleIntArray(final int[][] toRecycle) {
         int m = toRecycle.length;
         int n = 0;
-        if(m > 0) {
+        if (m > 0) {
             n = toRecycle[0].length;
         }
-        if(intMatrixCache.size() > 50) {
+        if (intMatrixCache.size() > 50) {
             intMatrixCache.clear();
         }
         intMatrixCache.put(new DimensionKey(m, n), toRecycle);
