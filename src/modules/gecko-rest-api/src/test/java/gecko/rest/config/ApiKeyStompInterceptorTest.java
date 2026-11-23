@@ -74,6 +74,14 @@ class ApiKeyStompInterceptorTest {
     }
 
     @Test
+    void authenticatedClientsCannotPublishBrokerProgress() {
+        StompHeaderAccessor headers = StompHeaderAccessor.create(StompCommand.SEND);
+        headers.setUser(ApiIdentity.forKey("valid-key"));
+        headers.setDestination("/topic/simulations/owned");
+        assertThrows(AccessDeniedException.class, () -> interceptor.preSend(message(headers), null));
+    }
+
+    @Test
     void explicitOpenModeStillAllowsConnections() {
         properties.setAuthEnabled(false);
         assertDoesNotThrow(() -> interceptor.preSend(message(StompHeaderAccessor.create(StompCommand.CONNECT)), null));
