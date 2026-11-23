@@ -14,6 +14,7 @@
 package gecko.core.simulation;
 
 import gecko.core.circuit.netlist.CircuitNetlist;
+import gecko.core.control.IsDtChangeSensitive;
 import gecko.core.control.calculators.AbstractControlCalculatable;
 import gecko.core.control.calculators.FromExternalCalculator;
 import gecko.core.control.calculators.ToExternalCalculator;
@@ -36,18 +37,27 @@ final class ControlRuntime implements AutoCloseable {
     private final List<AbstractControlCalculatable> owners;
     private final List<FromExternalCalculator> externalInputs;
     private final List<ToExternalCalculator> externalOutputs;
+    private static final double SAMPLE_TOLERANCE = 1e-9;
+    private final double samplePeriod;
     private double dt;
+    private long nextSampleIndex;
+    private boolean outputsPublishedLastStep = true;
+    private double lastSampleTime;
     private long stateVersion;
     private Runnable pendingInitialization;
     private boolean initialized;
     private boolean activeSegment;
     private boolean closed;
 
-    private ControlRuntime(ControlCalculatorFactory.BuildResult build, double dt) {
+    private ControlRuntime(ControlCalculatorFactory.BuildResult build, double dt, double samplePeriod) {
         if (!Double.isFinite(dt) || dt <= 0) {
             throw new IllegalArgumentException("Time step must be finite and positive.");
         }
+        if (!Double.isFinite(samplePeriod) || samplePeriod < 0) {
+            throw new IllegalArgumentException("CONTROL sample period must be finite and non-negative.");
+        }
         this.dt = dt;
+        this.samplePeriod = samplePeriod;
         controlNetlist = build.getControlNetlist();
         var unique = Collections.newSetFromMap(new IdentityHashMap<AbstractControlCalculatable, Boolean>());
         var collected = new ArrayList<AbstractControlCalculatable>();
@@ -60,6 +70,28 @@ final class ControlRuntime implements AutoCloseable {
         domainCoupler = new DomainCoupler();
         domainCoupler.configureFromMapping(build.getMapping());
         scopeExtractor = ScopeDataExtractor.fromScopes(build.getMapping().getScopeInfos());
+        requireUniformSampleGrid(dt);
+    }
+
+    /** The step that CONTROL calculators see: the sample period when sampled, else the electrical step. */
+    private double controlStep(double electricalStep) {
+        return samplePeriod > 0 ? samplePeriod : electricalStep;
+    }
+
+    /**
+     * Delay-like calculators size fixed buffers from their step. They need a constant
+     * elapsed time between samples, so the sample period must be a whole number of steps.
+     */
+    private void requireUniformSampleGrid(double electricalStep) {
+        if (samplePeriod <= 0) return;
+        double ratio = samplePeriod / electricalStep;
+        if (Math.abs(ratio - Math.rint(ratio)) <= SAMPLE_TOLERANCE * Math.max(1, ratio)) return;
+        for (var owner : owners) {
+            if (owner instanceof IsDtChangeSensitive) {
+                throw new IllegalArgumentException(
+                        "CONTROL sample period must be a whole multiple of the time step for delay-type blocks.");
+            }
+        }
     }
 
     static ControlRuntime from(CircuitModel model, double dt) {
@@ -74,12 +106,20 @@ final class ControlRuntime implements AutoCloseable {
     }
 
     static ControlRuntime fromDeferred(CircuitModel model, double dt, CircuitNetlist electricalNetlist) {
-        return fromDeferred(new ControlCalculatorFactory().buildCircuit(model, dt, electricalNetlist), dt);
+        return fromDeferred(model, dt, electricalNetlist, 0);
+    }
+
+    /** A positive sample period runs CONTROL at the first step at or after each multiple of it. */
+    static ControlRuntime fromDeferred(CircuitModel model, double dt, CircuitNetlist electricalNetlist,
+            double samplePeriod) {
+        double planningStep = samplePeriod > 0 ? samplePeriod : dt;
+        return new ControlRuntime(new ControlCalculatorFactory().buildCircuit(model, planningStep, electricalNetlist),
+                dt, samplePeriod);
     }
 
     /** Takes ownership of the supplied calculators and their closeable resources. */
     static ControlRuntime fromDeferred(ControlCalculatorFactory.BuildResult build, double dt) {
-        return new ControlRuntime(build, dt);
+        return new ControlRuntime(build, dt, 0);
     }
 
     /** Initializes once. A continuation preserves calculator histories and clocks. */
@@ -91,7 +131,7 @@ final class ControlRuntime implements AutoCloseable {
         try {
             Runnable initialization = pendingInitialization;
             pendingInitialization = null;
-            if (initialization == null) controlNetlist.initializeAtSimulationStart(dt);
+            if (initialization == null) controlNetlist.initializeAtSimulationStart(controlStep(dt));
             else initialization.run();
             initialized = true;
         } catch (RuntimeException | Error failure) {
@@ -116,8 +156,12 @@ final class ControlRuntime implements AutoCloseable {
         requireOpen();
         long expectedVersion = stateVersion;
         boolean beforeStart = !initialized;
-        Runnable staged = beforeStart ? controlNetlist.prepareInitialization(newDt)
-                : controlNetlist.prepareTimeStepChange(newDt);
+        if (!Double.isFinite(newDt) || newDt <= 0) {
+            throw new IllegalArgumentException("Time step must be finite and positive.");
+        }
+        requireUniformSampleGrid(newDt);
+        Runnable staged = beforeStart ? controlNetlist.prepareInitialization(controlStep(newDt))
+                : samplePeriod > 0 ? () -> { } : controlNetlist.prepareTimeStepChange(newDt);
         return new Runnable() {
             private boolean used;
 
@@ -188,14 +232,32 @@ final class ControlRuntime implements AutoCloseable {
         try {
             // Desktop dataTransferLK_Control order: sources take the previous CONTROL outputs,
             // including probe outputs, before the probes publish this step's measurements.
-            domainCoupler.transferControlToSources(circuitNetlist);
+            // A sampled CONTROL publishes to sources and gates only after a sample, so live probe
+            // outputs wired straight to them cannot leak between samples.
+            if (samplePeriod <= 0 || outputsPublishedLastStep) domainCoupler.transferControlToSources(circuitNetlist);
             domainCoupler.transferLkToControlProbes(circuitNetlist);
-            if (controlNetlist.hasCalculators()) controlNetlist.executeTimeStep(dt, time);
-            domainCoupler.transferGateSignalsToLk(circuitNetlist);
+            boolean sampled = !controlNetlist.hasCalculators() || executeDueSample(time);
+            outputsPublishedLastStep = sampled;
+            if (samplePeriod <= 0 || sampled) domainCoupler.transferGateSignalsToLk(circuitNetlist);
         } catch (RuntimeException | Error failure) {
             closeAfterFailure(failure);
             throw failure;
         }
+    }
+
+    /** Runs CONTROL every step, or only when a sample is due. Samples never drift: due times are k*Ts. */
+    private boolean executeDueSample(double time) {
+        if (samplePeriod <= 0) {
+            controlNetlist.executeTimeStep(dt, time);
+            return true;
+        }
+        if (time < nextSampleIndex * samplePeriod - SAMPLE_TOLERANCE * Math.min(dt, samplePeriod)) return false;
+        double elapsed = nextSampleIndex == 0 ? samplePeriod : time - lastSampleTime;
+        if (Math.abs(elapsed - samplePeriod) <= SAMPLE_TOLERANCE * samplePeriod) elapsed = samplePeriod;
+        controlNetlist.executeTimeStep(elapsed, time);
+        lastSampleTime = time;
+        nextSampleIndex = (long) Math.floor(time / samplePeriod + SAMPLE_TOLERANCE * Math.min(dt, samplePeriod) / samplePeriod) + 1;
+        return true;
     }
 
     float[] sampleScope() {

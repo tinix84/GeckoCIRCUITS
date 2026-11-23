@@ -184,6 +184,19 @@ public final class SimulationConfig {
         }
 
         /**
+         * Sets the CONTROL sample period. Zero, the default, runs CONTROL every step.
+         * A positive period runs CONTROL at the first step at or after each multiple of it
+         * and holds its outputs between samples.
+         *
+         * @param period sample period in seconds, finite and not negative
+         * @return this builder
+         */
+        public Builder controlSamplePeriod(double period) {
+            this.solverSettings.withControlSamplePeriod(period);
+            return this;
+        }
+
+        /**
          * Sets the total simulation duration.
          *
          * @param duration simulation time in seconds
