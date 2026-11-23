@@ -13,3 +13,4 @@
 | 2026-11-12 | [ADR-0010: Pull-based frontend and single-owner session](ADR-0010-pull-based-frontend-single-owner-session.md) |
 | 2026-11-13 | [ADR-0011: Numerical reference compatibility](ADR-0011-numerical-reference-compatibility.md) |
 | 2026-11-17 | [ADR-0012: Isolated electrical groups](ADR-0012-isolated-electrical-groups.md) |
+| 2026-11-23 | [ADR-0015: Independent release trace provenance](0015-independent-release-trace-provenance.md) |
