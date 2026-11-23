@@ -450,8 +450,58 @@ class SampledControlTest {
 
     @Test
     void anInvalidPeriodFailsBeforeCalculatorsAreBuilt() {
-        assertThrows(IllegalArgumentException.class,
-                () -> ControlRuntime.fromDeferred(null, 1e-6, null, -1));
+        for (double invalid : new double[]{-1e-6, Double.NEGATIVE_INFINITY, Double.NaN, Double.POSITIVE_INFINITY}) {
+            var failure = assertThrows(IllegalArgumentException.class,
+                    () -> ControlRuntime.fromDeferred(delayModel(2e-6), 1e-6, null, invalid), "period " + invalid);
+            assertTrue(failure.getMessage().contains("sample period"), failure.getMessage());
+        }
+    }
+
+    private static final double[] INVALID_STEPS = {Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, 0, -1e-6};
+
+    @Test
+    void aRejectedStepChangeBeforeStartKeepsTheStagedPlanCommittable() {
+        for (double period : new double[]{0, 4e-6}) {
+            try (var runtime = ControlRuntime.fromDeferred(delayModel(4e-6), 1e-6, null, period)) {
+                Runnable staged = runtime.prepareTimeStepChange(2e-6);
+                for (double invalid : INVALID_STEPS) {
+                    var failure = assertThrows(IllegalArgumentException.class,
+                            () -> runtime.prepareTimeStepChange(invalid), "step " + invalid);
+                    assertTrue(failure.getMessage().contains("Time step"), failure.getMessage());
+                }
+                assertDoesNotThrow(staged::run);
+                runtime.advanceAfterElectricalStep(new CircuitNetlist(), 0);
+                runtime.advanceAfterElectricalStep(new CircuitNetlist(), 2e-6);
+                // With a 4 us period the second electrical step is not a sample, so the clock holds its tick-zero value.
+                assertEquals(period == 0 ? 2e-6f : 0f, runtime.sampleScope()[0], 1e-12f);
+            }
+        }
+    }
+
+    @Test
+    void aRejectedStepChangeAfterStartLeavesHistoryAndLaterContinuationIntact() {
+        for (double period : new double[]{0, 4e-6}) {
+            try (var plain = ControlRuntime.fromDeferred(delayModel(4e-6), 1e-6, null, period);
+                    var rejected = ControlRuntime.fromDeferred(delayModel(4e-6), 1e-6, null, period)) {
+                var electrical = new CircuitNetlist();
+                for (int step = 0; step < 6; step++) {
+                    plain.advanceAfterElectricalStep(electrical, step * 1e-6);
+                    rejected.advanceAfterElectricalStep(electrical, step * 1e-6);
+                }
+                for (double invalid : INVALID_STEPS) {
+                    assertThrows(IllegalArgumentException.class, () -> rejected.prepareTimeStepChange(invalid));
+                }
+                // A legitimate continuation on a finer step still commits on both runtimes and agrees.
+                plain.prepareTimeStepChange(0.5e-6).run();
+                rejected.prepareTimeStepChange(0.5e-6).run();
+                for (int step = 0; step < 12; step++) {
+                    double time = 6e-6 + step * 0.5e-6;
+                    plain.advanceAfterElectricalStep(electrical, time);
+                    rejected.advanceAfterElectricalStep(electrical, time);
+                    assertArrayEquals(plain.sampleScope(), rejected.sampleScope(), "step " + step);
+                }
+            }
+        }
     }
 
     @Test
