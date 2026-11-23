@@ -125,45 +125,51 @@ public final class CapacitorCalculator extends CircuitComponent implements AStam
     @Override
     public void calculateCurrent(final double[] p, final double dt, final double t) {
 
-//        _updateMatrixFlag = false;
-//
-//        double fac = 1 - _lkCap.getParameter()[7] / _lkCap.getParameter()[6];
-//        double nonLinearCorrectionCurrent = -fac * _lkCap.getParameter()[10];
-//        if (capError) {
-//            i[_componentNumber] = _lkCap.getParameter()[6] / dt * ((p[matrixIndices[0]] - p[matrixIndices[1]]) - (pALT[matrixIndices[0]] - pALT[matrixIndices[1]]));
-//            _lkCap.getParameter()[10] = i[_componentNumber];
-//            i[_componentNumber] += nonLinearCorrectionCurrent;
-//        } else {
-//            i[_componentNumber] = _lkCap.getParameter()[6] / dt * ((p[matrixIndices[0]] - p[matrixIndices[1]]) - (pALT[matrixIndices[0]] - pALT[matrixIndices[1]]));
-//            boolean capCorrection = false;
-//            if (_lkCap.getParameter()[2] * (i[_componentNumber] + nonLinearCorrectionCurrent) < 0) {
-//                capCorrection = true;
-//            }
-//            if (Math.abs((_lkCap.getParameter()[6] - _lkCap.getParameter()[7]) / (_lkCap.getParameter()[6] + _lkCap.getParameter()[7])) > 0.1) {
-//                capCorrection = true;
-//            }
-//            //---------
-//            if (capCorrection) {
-//                stepBack = true;
-//                double facOld = (1 - _lkCap.getParameter()[7] / _lkCap.getParameter()[6]);
-//                bWOld = (_lkCap.getParameter()[6] / dt) * (pALT[matrixIndices[0]] - pALT[matrixIndices[1]]) + facOld * _lkCap.getParameter()[10];
-//                aWOld = _lkCap.getParameter()[6] / dt;  //  +C/dt
-//                _updateMatrixFlag = true;
-//
-//                //------
-//                // correction of the capacitance value
-//                _lkCap.getParameter()[6] = _lkCap.getParameter()[7];
-//                _lkCap.getParameter()[10] = i[_componentNumber];
-//                double facNew = (1 - _lkCap.getParameter()[7] / _lkCap.getParameter()[6]);
-//                bWNew = (_lkCap.getParameter()[6] / dt) * (pALT[matrixIndices[0]] - pALT[matrixIndices[1]]) + facNew * _lkCap.getParameter()[10];
-//
-//                aWNew = _lkCap.getParameter()[6] / dt;  //  +C/dt
-//
-//            }
-//            _lkCap.getParameter()[10] = i[_componentNumber];
-//            i[_componentNumber] += nonLinearCorrectionCurrent;
-//        }
-//        return stepBack;
+        //        _updateMatrixFlag = false;
+        //
+        //        double fac = 1 - _lkCap.getParameter()[7] / _lkCap.getParameter()[6];
+        //        double nonLinearCorrectionCurrent = -fac * _lkCap.getParameter()[10];
+        //        if (capError) {
+        //            i[_componentNumber] = _lkCap.getParameter()[6] / dt * ((p[matrixIndices[0]] -
+        // p[matrixIndices[1]]) - (pALT[matrixIndices[0]] - pALT[matrixIndices[1]]));
+        //            _lkCap.getParameter()[10] = i[_componentNumber];
+        //            i[_componentNumber] += nonLinearCorrectionCurrent;
+        //        } else {
+        //            i[_componentNumber] = _lkCap.getParameter()[6] / dt * ((p[matrixIndices[0]] -
+        // p[matrixIndices[1]]) - (pALT[matrixIndices[0]] - pALT[matrixIndices[1]]));
+        //            boolean capCorrection = false;
+        //            if (_lkCap.getParameter()[2] * (i[_componentNumber] +
+        // nonLinearCorrectionCurrent) < 0) {
+        //                capCorrection = true;
+        //            }
+        //            if (Math.abs((_lkCap.getParameter()[6] - _lkCap.getParameter()[7]) /
+        // (_lkCap.getParameter()[6] + _lkCap.getParameter()[7])) > 0.1) {
+        //                capCorrection = true;
+        //            }
+        //            //---------
+        //            if (capCorrection) {
+        //                stepBack = true;
+        //                double facOld = (1 - _lkCap.getParameter()[7] / _lkCap.getParameter()[6]);
+        //                bWOld = (_lkCap.getParameter()[6] / dt) * (pALT[matrixIndices[0]] -
+        // pALT[matrixIndices[1]]) + facOld * _lkCap.getParameter()[10];
+        //                aWOld = _lkCap.getParameter()[6] / dt;  //  +C/dt
+        //                _updateMatrixFlag = true;
+        //
+        //                //------
+        //                // correction of the capacitance value
+        //                _lkCap.getParameter()[6] = _lkCap.getParameter()[7];
+        //                _lkCap.getParameter()[10] = i[_componentNumber];
+        //                double facNew = (1 - _lkCap.getParameter()[7] / _lkCap.getParameter()[6]);
+        //                bWNew = (_lkCap.getParameter()[6] / dt) * (pALT[matrixIndices[0]] -
+        // pALT[matrixIndices[1]]) + facNew * _lkCap.getParameter()[10];
+        //
+        //                aWNew = _lkCap.getParameter()[6] / dt;  //  +C/dt
+        //
+        //            }
+        //            _lkCap.getParameter()[10] = i[_componentNumber];
+        //            i[_componentNumber] += nonLinearCorrectionCurrent;
+        //        }
+        //        return stepBack;
 
         if (initCapacitor && _initialValue != 0) {
             initVoltageSource.updateHistory(p);
@@ -174,20 +180,30 @@ public final class CapacitorCalculator extends CircuitComponent implements AStam
             } else if (_solverType == SolverType.SOLVER_TRZ) {
                 _current = 2 * (_capacitance / dt) * (p[matrixIndices[0]] - p[matrixIndices[1]] - (_potential1 - _potential2)) - _oldCurrent;
             } else if (_solverType == SolverType.SOLVER_GS) {
-                _current = _capacitance / dt * (1.5 * (p[matrixIndices[0]] - p[matrixIndices[1]]) - 2 * (_potential1 - _potential2) + 0.5 * (_potOld1 - _potOld2));
+                _current =
+                        _capacitance
+                                / dt
+                                * (1.5 * (p[matrixIndices[0]] - p[matrixIndices[1]])
+                                        - 2 * (_potential1 - _potential2)
+                                        + 0.5 * (_potOld1 - _potOld2));
             }
 
             if (_isNonLinear) {
                 if (!DiodeCalculator.inSwitchErrorMode) {
-                    if (((_current + _nonLinearCorrectionCurrent) * _oldCurrent) < 0) //wrong value of current calculated, capacitance must be changed!
+                    if (((_current + _nonLinearCorrectionCurrent) * _oldCurrent)
+                            < 0) // wrong value of current calculated, capacitance must be changed!
                     {
                         capError = true;
-                        _capacitance = (1 - _newOldCapRatio) * _capacitance; //set capacitance to new value (reconstructed from the ratio, see updateNonLinearCapacitance method
-                    } else if (!_capCorrected) //everything is fine, add correction current
+                        _capacitance =
+                                (1 - _newOldCapRatio)
+                                        * _capacitance; // set capacitance to new value
+                                                        // (reconstructed from the ratio, see
+                                                        // updateNonLinearCapacitance method
+                    } else if (!_capCorrected) // everything is fine, add correction current
                     {
                         _current += _nonLinearCorrectionCurrent;
                     }
-                } else //do not change capacitance if in diode error mode
+                } else // do not change capacitance if in diode error mode
                 {
                     _current += _nonLinearCorrectionCurrent;
                 }
@@ -274,8 +290,12 @@ public final class CapacitorCalculator extends CircuitComponent implements AStam
 
         if (initCapacitor) {
             _capacitance = new_capacitance;
-        } //if ((new_capacitance >= _capacitance*1.01) || (new_capacitance <= _capacitance*0.99))
-        else if (Math.abs((_capacitance - new_capacitance) / (_capacitance + new_capacitance)) > 0.1 && !DiodeCalculator.inSwitchErrorMode) //do not change capacitance unless this deviation is more than 10%, to save effort in recalculating A matrix
+        } // if ((new_capacitance >= _capacitance*1.01) || (new_capacitance <= _capacitance*0.99))
+        else if (Math.abs((_capacitance - new_capacitance) / (_capacitance + new_capacitance)) > 0.1
+                && !DiodeCalculator
+                        .inSwitchErrorMode) // do not change capacitance unless this deviation is
+                                            // more than 10%, to save effort in recalculating A
+                                            // matrix
         {
             _capacitance = new_capacitance;
             capError = true;

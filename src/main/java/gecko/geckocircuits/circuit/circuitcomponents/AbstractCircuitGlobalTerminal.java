@@ -51,7 +51,7 @@ public abstract class AbstractCircuitGlobalTerminal extends AbstractCircuitBlock
         // when loading from file. It will be replaced when the references are
         // set correctly.
         YOUT.add(new TerminalHiddenSubcircuit(this));
-        if(!ALL_GLOBALS_INTERNAL.containsKey(getCircuitTyp())) {
+        if (!ALL_GLOBALS_INTERNAL.containsKey(getCircuitTyp())) {
             ALL_GLOBALS_INTERNAL.put(getCircuitTyp(), new HashSet<AbstractCircuitGlobalTerminal>());
         }
 
@@ -76,7 +76,7 @@ public abstract class AbstractCircuitGlobalTerminal extends AbstractCircuitBlock
     public void deleteComponent() {
         super.deleteComponent();
         final Set<AbstractCircuitGlobalTerminal> possibleRemoval = ALL_GLOBALS_INTERNAL.get(getTypeEnum());
-        if(possibleRemoval != null && possibleRemoval.contains(this)) {
+        if (possibleRemoval != null && possibleRemoval.contains(this)) {
             possibleRemoval.remove(this);
         }
     }
@@ -96,7 +96,7 @@ public abstract class AbstractCircuitGlobalTerminal extends AbstractCircuitBlock
     @Override
     protected void drawBackground(final Graphics2D graphics) {
         final int diameter = dpix;
-        graphics.fillRect(-diameter / 2-1, -diameter / 2-1, diameter+1, diameter+1);
+        graphics.fillRect(-diameter / 2 - 1, -diameter / 2 - 1, diameter + 1, diameter + 1);
     }
 
 

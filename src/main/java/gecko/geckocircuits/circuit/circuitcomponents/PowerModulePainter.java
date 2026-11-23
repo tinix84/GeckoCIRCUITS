@@ -24,8 +24,11 @@ import java.awt.Graphics;
 public final class PowerModulePainter {
 
     private static int[] xKB1 = new int[]{168, 141, 141, 152, 832, 831, 815}, yKB1 = new int[]{421, 439, 550, 555, 366, 249, 242};
-    private static int[] xKB2 = new int[]{168, 129, 238, 164, 55, 26, 40, 664, 698, 591, 664, 774, 812}, yKB2 = new int[]{421, 366, 335, 232, 265, 218, 199, 29, 86, 117, 219, 185, 245};
-    private static int[] xKB3 = new int[]{168, 142, 142, 11, 11, 24, 56, 34, 34, 106, 108, 130}, yKB3 = new int[]{421, 437, 550, 370, 258, 219, 265, 287, 378, 475, 385, 366};
+    private static int[]
+            xKB2 = new int[] {168, 129, 238, 164, 55, 26, 40, 664, 698, 591, 664, 774, 812},
+            yKB2 = new int[] {421, 366, 335, 232, 265, 218, 199, 29, 86, 117, 219, 185, 245};
+    private static int[] xKB3 = new int[] {168, 142, 142, 11, 11, 24, 56, 34, 34, 106, 108, 130},
+            yKB3 = new int[] {421, 437, 550, 370, 258, 219, 265, 287, 378, 475, 385, 366};
     private static int[] xKB4 = new int[]{722, 655, 591, 700, 721}, yKB4 = new int[]{192, 205, 118, 86, 95};
     private static int[] xKB41 = new int[]{722, 655, 664, 734}, yKB41 = new int[]{192, 205, 219, 199};
     private static int[] xKB42 = new int[]{719, 700, 663, 676}, yKB42 = new int[]{90, 86, 31, 31};
@@ -33,9 +36,26 @@ public final class PowerModulePainter {
     private static int[] xKB5 = new int[]{104, 35, 164, 173, 130, 109}, yKB5 = new int[]{476, 377, 342, 353, 365, 387};
     private static int[] xKB6 = new int[]{34, 166, 164, 42, 34}, yKB6 = new int[]{377, 342, 231, 269, 290};
     private static int[] xKB7 = new int[]{166, 166, 175, 238}, yKB7 = new int[]{233, 343, 351, 335};
-    private static int[] xkb1 = new int[xKB1.length], ykb1 = new int[xKB1.length], xkb2 = new int[xKB2.length], ykb2 = new int[xKB2.length], xkb3 = new int[xKB3.length], ykb3 = new int[xKB3.length], xkb4 = new int[xKB4.length], ykb4 = new int[xKB4.length];
-    private static int[] xkb41 = new int[xKB41.length], ykb41 = new int[xKB41.length], xkb42 = new int[xKB42.length], ykb42 = new int[xKB42.length], xkb43 = new int[xKB43.length], ykb43 = new int[xKB43.length];
-    private static int[] xkb5 = new int[xKB5.length], ykb5 = new int[xKB5.length], xkb6 = new int[xKB6.length], ykb6 = new int[xKB6.length], xkb7 = new int[xKB7.length], ykb7 = new int[xKB7.length];
+    private static int[] xkb1 = new int[xKB1.length],
+            ykb1 = new int[xKB1.length],
+            xkb2 = new int[xKB2.length],
+            ykb2 = new int[xKB2.length],
+            xkb3 = new int[xKB3.length],
+            ykb3 = new int[xKB3.length],
+            xkb4 = new int[xKB4.length],
+            ykb4 = new int[xKB4.length];
+    private static int[] xkb41 = new int[xKB41.length],
+            ykb41 = new int[xKB41.length],
+            xkb42 = new int[xKB42.length],
+            ykb42 = new int[xKB42.length],
+            xkb43 = new int[xKB43.length],
+            ykb43 = new int[xKB43.length];
+    private static int[] xkb5 = new int[xKB5.length],
+            ykb5 = new int[xKB5.length],
+            xkb6 = new int[xKB6.length],
+            ykb6 = new int[xKB6.length],
+            xkb7 = new int[xKB7.length],
+            ykb7 = new int[xKB7.length];
     private static int xC = 430, yC = 250;  // Zentrum des Modul-Bildes in PixelPunkten
     private static double br = 2.5;
 

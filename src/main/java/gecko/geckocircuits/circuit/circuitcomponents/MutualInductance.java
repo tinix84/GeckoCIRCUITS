@@ -111,7 +111,7 @@ public final class MutualInductance extends AbstractCircuitBlockInterface implem
         final FontMetrics fontMetrics = graphics.getFontMetrics();
         final int stringWidth = fontMetrics.stringWidth(K_STRING);
         final int stringHeight = fontMetrics.getHeight();
-        graphics.drawString("k", -stringWidth/2, stringHeight/STRING_K_Y_FRAC);
+        graphics.drawString("k", -stringWidth / 2, stringHeight / STRING_K_Y_FRAC);
     }
 
     @Override
@@ -136,7 +136,7 @@ public final class MutualInductance extends AbstractCircuitBlockInterface implem
             _textInfo.addErrorValue(I18nKeys.NOT_DEFINED.getTranslation());
         }
 
-        if(firstInductor != null && secondInductor != null) {
+        if (firstInductor != null && secondInductor != null) {
             String parStr = firstInductor.getStringID() + " @ " + secondInductor.getStringID();
             _textInfo.addParameter(parStr);
         }

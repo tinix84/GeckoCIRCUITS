@@ -135,7 +135,7 @@ public final class CapacitanceCharacteristic {
             double lg10_y2 = Math.log10(y_val_C.get(i));
             double lg10_y = lg10_y1 + (lg10_y2 - lg10_y1) * (V - x1) / (x2 - x1);
             return Math.pow(10, lg10_y);
-        } else //otherwise simple linear interpolation
+        } else // otherwise simple linear interpolation
         {
             double y1 = y_val_C.get(i - 1);
             double y2 = y_val_C.get(i);

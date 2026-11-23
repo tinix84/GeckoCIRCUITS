@@ -145,7 +145,7 @@ public final class MotorDC extends AbstractMotorDC {
 
         _fieldResistance = _fieldResistanceParameter.getValue();
         _Re._resistance.setValueWithoutUndo(_fieldResistance);
-        if(_fieldWindings <= 0) {
+        if (_fieldWindings <= 0) {
             throw new IllegalArgumentException("Error: number of field windings must be > 0");
         }
         calculateEMK();
@@ -169,11 +169,19 @@ public final class MotorDC extends AbstractMotorDC {
         // draw the connector lines
         graphics.drawLine(XPOS_LEFT_TERM * dpix, -dpix, -dpix, -dpix);
         graphics.drawLine(XPOS_LEFT_TERM * dpix, YPOS_EXCITATION_1 * dpix, (int) (dpix * BLOCK_SYMB_Y), YPOS_EXCITATION_1 * dpix);
-        graphics.drawLine(-dpix, -dpix, - dpix, (int) (-dpix * MID_POSITION));
-        graphics.drawLine( -dpix, (int) (-dpix * MID_POSITION), (int) (dpix * BLOCK_SYMB_Y), (int) (-dpix * MID_POSITION));
+        graphics.drawLine(-dpix, -dpix, -dpix, (int) (-dpix * MID_POSITION));
+        graphics.drawLine(
+                -dpix,
+                (int) (-dpix * MID_POSITION),
+                (int) (dpix * BLOCK_SYMB_Y),
+                (int) (-dpix * MID_POSITION));
 
         // small rectangle for the excitation
-        graphics.fillRect((int) (-dpix * BLOCK_SYMB_Y), -dpix *2, (int) (dpix * 2 * BLOCK_SYMB_Y), (int) (dpix /2.0));
+        graphics.fillRect(
+                (int) (-dpix * BLOCK_SYMB_Y),
+                -dpix * 2,
+                (int) (dpix * 2 * BLOCK_SYMB_Y),
+                (int) (dpix / 2.0));
     }
 
     @Override

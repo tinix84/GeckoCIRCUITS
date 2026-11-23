@@ -57,7 +57,7 @@ public class ThyristorCalculator extends AbstractSwitchCalculator implements Cur
         if (isTurnOffNeeded()) {
             toTurnOff(time);
         }
-        if(isTurnOnNeeded()) {
+        if (isTurnOnNeeded()) {
             doTurnOn();
         }
     }

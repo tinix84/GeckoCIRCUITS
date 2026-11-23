@@ -107,7 +107,7 @@ abstract class AbstractThreePhaseMotor extends AbstractMotor {
     }
 
     void drawLeftMidTerminalLine(Graphics2D graphics) {
-        graphics.drawLine(-dpix, 0, -2*dpix, 0);
+        graphics.drawLine(-dpix, 0, -2 * dpix, 0);
         graphics.drawLine(-dpix, 0, 0, 0);
     }
 
@@ -123,7 +123,7 @@ abstract class AbstractThreePhaseMotor extends AbstractMotor {
     }
 
     void drawRightMidTerminalLine(final Graphics2D graphics) {
-        graphics.drawLine(dpix, 0, 2*dpix, 0);
+        graphics.drawLine(dpix, 0, 2 * dpix, 0);
         graphics.drawLine(dpix, 0, 0, 0);
     }
 

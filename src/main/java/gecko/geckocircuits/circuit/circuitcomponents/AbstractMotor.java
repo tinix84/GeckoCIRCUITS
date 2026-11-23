@@ -69,30 +69,30 @@ public abstract class AbstractMotor extends AbstractCircuitBlockInterface implem
             arrayIndex(this, getInertiaIndex()).
             build();
 
-    final UserParameter<Double> _initialRotationalSpeed = UserParameter.Builder.
-	<Double>start("initialRotationalSpeed", 0.0).
-	longName(I18nKeys.INITIAL_ROTATION_SPEED).
-	shortName("omega").
-	unit("1/s").
-	arrayIndex(this,getInitialRotationSpeedIndex()).
-	build();
+    final UserParameter<Double> _initialRotationalSpeed =
+            UserParameter.Builder.<Double>start("initialRotationalSpeed", 0.0)
+                    .longName(I18nKeys.INITIAL_ROTATION_SPEED)
+                    .shortName("omega")
+                    .unit("1/s")
+                    .arrayIndex(this, getInitialRotationSpeedIndex())
+                    .build();
 
     private double _frictionMech;
-    final UserParameter<Double> _frictionParameter = UserParameter.Builder.
-	<Double>start("frictionCoefficient", 0.1).
-	longName(I18nKeys.FRICTION_COEFFICIENT).
-	shortName("fr").
-	unit("Nms").
-	arrayIndex(this,getFrictionCoefficientIndex()).
-	build();
+    final UserParameter<Double> _frictionParameter =
+            UserParameter.Builder.<Double>start("frictionCoefficient", 0.1)
+                    .longName(I18nKeys.FRICTION_COEFFICIENT)
+                    .shortName("fr")
+                    .unit("Nms")
+                    .arrayIndex(this, getFrictionCoefficientIndex())
+                    .build();
 
-    final UserParameter<Double> _initialRotorPosition = UserParameter.Builder.
-	<Double>start("initialRotorPosition", 0.0).
-	longName(I18nKeys.INITIAL_ROTOR_POSITION).
-	shortName("theta").
-	unit("rad").
-	arrayIndex(this,getInitialRotorPositionIndex()).
-	build();
+    final UserParameter<Double> _initialRotorPosition =
+            UserParameter.Builder.<Double>start("initialRotorPosition", 0.0)
+                    .longName(I18nKeys.INITIAL_ROTOR_POSITION)
+                    .shortName("theta")
+                    .unit("rad")
+                    .arrayIndex(this, getInitialRotorPositionIndex())
+                    .build();
 
     private final List<AbstractBlockInterface> _qLK = new ArrayList<AbstractBlockInterface>();
 
@@ -126,7 +126,7 @@ public abstract class AbstractMotor extends AbstractCircuitBlockInterface implem
     @Override
     public void deleteActionIndividual() {
         super.deleteActionIndividual();
-        for(ComponentCoupling coup : _isReferencedBy) {
+        for (ComponentCoupling coup : _isReferencedBy) {
             coup.elementDeleted(this);
         }
 
@@ -165,12 +165,20 @@ public abstract class AbstractMotor extends AbstractCircuitBlockInterface implem
 
     @Override
     protected final void drawBackground(final Graphics2D graphics) {
-        graphics.fillOval((int) (-dpix * RADIUS_MOTOR_SYMBOL), (int) (-dpix * RADIUS_MOTOR_SYMBOL), (int) (dpix * 2 * RADIUS_MOTOR_SYMBOL), (int) (dpix * 2 * RADIUS_MOTOR_SYMBOL));
+        graphics.fillOval(
+                (int) (-dpix * RADIUS_MOTOR_SYMBOL),
+                (int) (-dpix * RADIUS_MOTOR_SYMBOL),
+                (int) (dpix * 2 * RADIUS_MOTOR_SYMBOL),
+                (int) (dpix * 2 * RADIUS_MOTOR_SYMBOL));
     }
 
     @Override
     protected final void drawForeground(final Graphics2D graphics) {
-        graphics.drawOval((int) (-dpix * RADIUS_MOTOR_SYMBOL), (int) (-dpix * RADIUS_MOTOR_SYMBOL), (int) (dpix * 2 * RADIUS_MOTOR_SYMBOL), (int) (dpix * 2 * RADIUS_MOTOR_SYMBOL));
+        graphics.drawOval(
+                (int) (-dpix * RADIUS_MOTOR_SYMBOL),
+                (int) (-dpix * RADIUS_MOTOR_SYMBOL),
+                (int) (dpix * 2 * RADIUS_MOTOR_SYMBOL),
+                (int) (dpix * 2 * RADIUS_MOTOR_SYMBOL));
         drawOnTop(graphics);
     }
 
@@ -181,7 +189,7 @@ public abstract class AbstractMotor extends AbstractCircuitBlockInterface implem
     public static AbstractCircuitBlockInterface fabricHiddenSub(final CircuitTyp typ,
             final AbstractCircuitSheetComponent parent) {
         final AbstractCircuitBlockInterface returnValue = AbstractTypeInfo.fabricHiddenSub(typ, parent);
-        assert parent instanceof AbstractMotor: "Invalid circuit type:  " + typ;
+        assert parent instanceof AbstractMotor : "Invalid circuit type:  " + typ;
         final AbstractMotor parentMotor = (AbstractMotor) parent;
         returnValue.getIDStringDialog().setRandomStringID();
         parentMotor._qLK.add(returnValue);
@@ -239,7 +247,7 @@ public abstract class AbstractMotor extends AbstractCircuitBlockInterface implem
     @Override
     protected void importIndividual(TokenMap tokenMap) {
         super.importIndividual(tokenMap);
-        if(ProjectData.readFileVersion < 170) {
+        if (ProjectData.readFileVersion < 170) {
             // backwards compatibility: before version 1.70, the
             // machines could not be rotated!
             setComponentDirection(ComponentDirection.NORTH_SOUTH);

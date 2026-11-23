@@ -31,15 +31,16 @@ implements CurrentMeasurable, DirectVoltageMeasurable {
     private static final double WIDTH = 0.9;
     private static final double HEIGHT = 0.4;
 
-    final UserParameter<Double> _capacitance = UserParameter.Builder.
-            <Double>start("capacitance", 100e-9).
-            mapDomains(ConnectorType.LK, ConnectorType.THERMAL).
-            longName(I18nKeys.CAPACITOR_C_F, I18nKeys.CAPACITOR_CTH_JK).
-            shortName("C", "Cth").
-            unit("F", "J/K").
-            showInTextInfo(TextInfoType.SHOW_NEVER). // nonlinearity: custom display!
-            arrayIndex(this, 0).
-            build();
+    final UserParameter<Double> _capacitance =
+            UserParameter.Builder.<Double>start("capacitance", 100e-9)
+                    .mapDomains(ConnectorType.LK, ConnectorType.THERMAL)
+                    .longName(I18nKeys.CAPACITOR_C_F, I18nKeys.CAPACITOR_CTH_JK)
+                    .shortName("C", "Cth")
+                    .unit("F", "J/K")
+                    .showInTextInfo(TextInfoType.SHOW_NEVER)
+                    . // nonlinearity: custom display!
+                    arrayIndex(this, 0)
+                    .build();
 
     UserParameter<Double> _initialValue = UserParameter.Builder.
             <Double>start("initVoltage", 0.0).
@@ -136,7 +137,7 @@ implements CurrentMeasurable, DirectVoltageMeasurable {
     @Override
     public final double[][] getInitalNonlinValues() {
         double[][] returnValue = new double[2][NONLIN_IND_X_DEFAULT.length];
-        for(int i = 0; i < NONLIN_IND_X_DEFAULT.length; i++) {
+        for (int i = 0; i < NONLIN_IND_X_DEFAULT.length; i++) {
             returnValue[0][i] = NONLIN_CAP_X_DEFAULT[i];
             returnValue[1][i] = NONLIN_CAP_Y_DEFAULT[i];
         }

@@ -37,7 +37,12 @@ public final class MotorPMSM extends AbstractThreePhaseMotor {
     private static final int STATOR_INDUCTANCE_Q_INDEX = 14;
     private static final int INI_CURRENT_A_INDEX = 15;
     private static final int INI_CURRENT_B_INDEX = 16;
-    public static final AbstractTypeInfo TYPE_INFO = new CircuitTypeInfo(MotorPMSM.class, "PMSM", I18nKeys.PMSM, I18nKeys.PERMANENT_MAGNET_SYNCHRONOUS_MACHINE);
+    public static final AbstractTypeInfo TYPE_INFO =
+            new CircuitTypeInfo(
+                    MotorPMSM.class,
+                    "PMSM",
+                    I18nKeys.PMSM,
+                    I18nKeys.PERMANENT_MAGNET_SYNCHRONOUS_MACHINE);
 
     private double _fluxLinkage;
     final UserParameter<Double> _fluxLinkagePar = UserParameter.Builder.

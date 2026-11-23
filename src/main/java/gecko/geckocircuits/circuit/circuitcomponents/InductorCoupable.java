@@ -27,7 +27,12 @@ public final class InductorCoupable extends AbstractInductor  {
     private static final int DOT_DIAMETER = 5;
     private static final double DOT_SPACING_X = 0.4;
     private static final double DOT_SPACING_Y = 1.1;
-    public static final AbstractTypeInfo TYPE_INFO = new CircuitTypeInfo(InductorCoupable.class, "Lc", I18nKeys.INDUCTOR_COUPLING_LC_H, I18nKeys.INDUCTOR_THAT_CAN_BE_COUPLED);
+    public static final AbstractTypeInfo TYPE_INFO =
+            new CircuitTypeInfo(
+                    InductorCoupable.class,
+                    "Lc",
+                    I18nKeys.INDUCTOR_COUPLING_LC_H,
+                    I18nKeys.INDUCTOR_THAT_CAN_BE_COUPLED);
 
     @Override
     protected void drawForeground(final Graphics2D graphics) {

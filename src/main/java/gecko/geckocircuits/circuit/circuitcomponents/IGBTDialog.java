@@ -57,7 +57,7 @@ public final class IGBTDialog extends AbstractDialogPowerSwitch<IGBT> {
 
         jCheckBoxSatCurrent.setFont(GlobalFonts.LAB_FONT_DIALOG_1);
         GridLayout grid = (GridLayout) returnValue.getLayout();
-        grid.setRows(grid.getRows()+2);
+        grid.setRows(grid.getRows() + 2);
         grid.setColumns(2);
         returnValue.add(new JLabel(""));
         returnValue.add(jCheckBoxSatCurrent);

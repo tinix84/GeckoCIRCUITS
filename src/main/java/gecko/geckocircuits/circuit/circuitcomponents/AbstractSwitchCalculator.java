@@ -67,7 +67,7 @@ public abstract class AbstractSwitchCalculator extends CircuitComponent implemen
         }
 
         _rDt = Math.max(_rDt, NEARLY_ZERO_R);
-        if(_bVector != null) {
+        if (_bVector != null) {
             _bVector.setUpdateAllFlag();
         }
 
@@ -109,8 +109,7 @@ public abstract class AbstractSwitchCalculator extends CircuitComponent implemen
 
         if (_rDt > _rON) {
             componentState = SwitchState.State.OFF;
-        }
-        else {
+        } else {
             componentState = SwitchState.State.ON;
         }
 

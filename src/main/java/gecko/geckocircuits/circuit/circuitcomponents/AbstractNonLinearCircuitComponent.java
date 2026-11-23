@@ -160,7 +160,7 @@ implements Operationable, Nonlinearable {
     public AbstractCircuitSheetComponent copyFabric(long shiftValue) {
         AbstractNonLinearCircuitComponent copy = (AbstractNonLinearCircuitComponent) super.copyFabric(shiftValue);
 
-        if(nonLinearChar != null) {
+        if (nonLinearChar != null) {
             copy.nonLinearCharHashValueForInit = nonLinearChar.getHashValue();
         } else {
             copy.nonLinearCharHashValueForInit = 0;
@@ -219,35 +219,44 @@ implements Operationable, Nonlinearable {
         //void (String elementName, String characteristicFileName) throws RemoteException, FileNotFoundException;
 
         final List<OperationInterface> returnValue = new ArrayList<OperationInterface>();
-        returnValue.add(new OperationInterface("setNonLinear", I18nKeys.SET_NONLINEAR_OPERATION_DOC) {
-            @Override
-            public Object doOperation(final Object parameterValue) {
-                if(!(parameterValue instanceof String)) {
-                    throw new IllegalArgumentException("Argument must be a file path as String type.");
-                }
-                String characteristicFileName = (String) parameterValue;
-                File nonLinFile = new File(characteristicFileName);
-                //if it doesn't exist, try first to see if it is in the same directory as the currently open model file
-                if (!nonLinFile.exists()) {
-                    final File modelFile = new File(MainWindow.getOpenFileName());
-                    final String currentModelDirectory = modelFile.getParent();
-                    final String nonLinFileName = currentModelDirectory + System.getProperty("file.separator") + characteristicFileName;
-                    nonLinFile = new File(nonLinFileName);
-                }
-                if (nonLinFile.exists() && !nonLinFile.isDirectory()) {
-                    try {
-                        AbstractNonLinearCircuitComponent.this.setNonLinearFile(nonLinFile);
-                    } catch (IllegalAccessException ex) {
-                        System.out.println("exception " + ex);
-                        ex.printStackTrace();
-                        throw new RuntimeException(ex);
+        returnValue.add(
+                new OperationInterface("setNonLinear", I18nKeys.SET_NONLINEAR_OPERATION_DOC) {
+                    @Override
+                    public Object doOperation(final Object parameterValue) {
+                        if (!(parameterValue instanceof String)) {
+                            throw new IllegalArgumentException(
+                                    "Argument must be a file path as String type.");
+                        }
+                        String characteristicFileName = (String) parameterValue;
+                        File nonLinFile = new File(characteristicFileName);
+                        // if it doesn't exist, try first to see if it is in the same directory as
+                        // the currently open model file
+                        if (!nonLinFile.exists()) {
+                            final File modelFile = new File(MainWindow.getOpenFileName());
+                            final String currentModelDirectory = modelFile.getParent();
+                            final String nonLinFileName =
+                                    currentModelDirectory
+                                            + System.getProperty("file.separator")
+                                            + characteristicFileName;
+                            nonLinFile = new File(nonLinFileName);
+                        }
+                        if (nonLinFile.exists() && !nonLinFile.isDirectory()) {
+                            try {
+                                AbstractNonLinearCircuitComponent.this.setNonLinearFile(nonLinFile);
+                            } catch (IllegalAccessException ex) {
+                                System.out.println("exception " + ex);
+                                ex.printStackTrace();
+                                throw new RuntimeException(ex);
+                            }
+                        } else {
+                            throw new RuntimeException(
+                                    "Specified non-linear characteristic file: "
+                                            + characteristicFileName
+                                            + " does not exist or is a directory.");
+                        }
+                        return null;
                     }
-                } else {
-                    throw new RuntimeException("Specified non-linear characteristic file: " + characteristicFileName + " does not exist or is a directory.");
-                }
-                return null;
-            }
-        });
+                });
 
         return Collections.unmodifiableList(returnValue);
     }

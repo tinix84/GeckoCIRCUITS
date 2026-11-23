@@ -24,7 +24,10 @@ import gecko.geckocircuits.allg.SolverType;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.List;
 
-@SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "Coupled inductors group must share inductor list reference for proper coupling behavior")
+@SuppressFBWarnings(
+        value = "EI_EXPOSE_REP2",
+        justification =
+                "Coupled inductors group must share inductor list reference for proper coupling behavior")
 public final class CoupledInductorsGroup implements AStampable, CurrentCalculatable {
 
     private double[][] inductanceMatrix;
@@ -112,11 +115,9 @@ public final class CoupledInductorsGroup implements AStampable, CurrentCalculata
         SolverType solver = getSolverType();
         if (solver == SolverType.SOLVER_BE) {
             solverCoeff = 1.0;
-        }
-        else if (solver == SolverType.SOLVER_TRZ) {
+        } else if (solver == SolverType.SOLVER_TRZ) {
             solverCoeff = 0.5;
-        }
-        else if (solver == SolverType.SOLVER_GS) {
+        } else if (solver == SolverType.SOLVER_GS) {
             solverCoeff = 2.0 / 3.0;
         }
 
@@ -252,8 +253,9 @@ public final class CoupledInductorsGroup implements AStampable, CurrentCalculata
                 oldAP2[i] += pOld[globalAdjIndicesPlus[i]];
                 oldAP2[i] -= pOld[globalAdjIndicesMinus[i]];
             }
-        }
-        else { //QUESTION: this should somehow perhaps be initialized to the initial value of the voltages??? -> or do we never set a non-zero initial voltage for coupled inductors?
+        } else { // QUESTION: this should somehow perhaps be initialized to the initial value of the
+                 // voltages??? -> or do we never set a non-zero initial voltage for coupled
+                 // inductors?
             for (int i = 0; i < n; i++) {
                 oldAP2[i] += 0.0;
                 oldAP2[i] -= 0.0;

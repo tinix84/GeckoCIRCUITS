@@ -240,8 +240,22 @@ abstract class AbstractMotorSM extends AbstractThreePhaseMotor {
         psimd = psimd0 = psisd0 - Lls * isd0;
         psimq = psimq0 = psisq0 - Lls * isq0;
 
-        isd = isd0 = 2.0 / 3.0 * (isa0 * Math.cos(_thetaElectric) + isb0 * Math.cos(_thetaElectric - 2.0 / 3 * Math.PI) - (isa0 + isb0) * Math.cos(_thetaElectric + 2.0 / 3 * Math.PI));
-        isq = isq0 = -2.0 / 3.0 * (isa0 * Math.sin(_thetaElectric) + isb0 * Math.sin(_thetaElectric - 2.0 / 3.0 * Math.PI) - (isa0 + isb0) * Math.sin(_thetaElectric + 2.0 / 3.0 * Math.PI));
+        isd =
+                isd0 =
+                        2.0
+                                / 3.0
+                                * (isa0 * Math.cos(_thetaElectric)
+                                        + isb0 * Math.cos(_thetaElectric - 2.0 / 3 * Math.PI)
+                                        - (isa0 + isb0)
+                                                * Math.cos(_thetaElectric + 2.0 / 3 * Math.PI));
+        isq =
+                isq0 =
+                        -2.0
+                                / 3.0
+                                * (isa0 * Math.sin(_thetaElectric)
+                                        + isb0 * Math.sin(_thetaElectric - 2.0 / 3.0 * Math.PI)
+                                        - (isa0 + isb0)
+                                                * Math.sin(_thetaElectric + 2.0 / 3.0 * Math.PI));
 
         Mi = (1.0 / Lmd0 - 1.0 / Lmdsat * (0.5 - Math.atan(tauT * psiT) / Math.PI)) / (0.5 + Math.atan(tauT * psiT) / Math.PI);
         tauT = fT / psiT * Lmd0 / Lmdsat;
