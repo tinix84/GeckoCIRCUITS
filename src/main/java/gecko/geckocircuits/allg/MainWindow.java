@@ -1341,7 +1341,7 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
                             throw new FileNotFoundException("File not found " + fileName);
                         }
                     } catch(Throwable error) {
-                        JOptionPane.showMessageDialog(MainWindow.this,
+                        JOptionPane.showMessageDialog(this,
                             "Error during file import : " + fileName + "\n" + error.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
                     }
             } else if (befehl.equals("Export")) {
@@ -1793,7 +1793,7 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
     }
     void copyFile(final File zipFile, final File newFile) {
 
-        final ProgressMonitor progressMonitor = new ProgressMonitor(MainWindow.this, "Saving applet...", "Please wait.", 0, 100);
+        final ProgressMonitor progressMonitor = new ProgressMonitor(this, "Saving applet...", "Please wait.", 0, 100);
 
         class Task extends SwingWorker<Void, Void> {
 

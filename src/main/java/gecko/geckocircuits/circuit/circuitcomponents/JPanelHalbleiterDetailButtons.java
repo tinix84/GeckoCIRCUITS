@@ -60,7 +60,7 @@ final class JPanelHalbleiterDetailButtons extends JPanel {
             }
         });
         //--------------
-        final Window parentWindow = SwingUtilities.getWindowAncestor(JPanelHalbleiterDetailButtons.this);
+        final Window parentWindow = SwingUtilities.getWindowAncestor(this);
         jbS2edit.setMaximumSize(new Dimension(BUTTON_WIDTH, 25));
         jbS2edit.addActionListener(new ActionListener() {
             @Override
