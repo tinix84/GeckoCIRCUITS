@@ -31,9 +31,9 @@ import java.util.Map;
 import java.util.Set;
 
 public abstract class AbstractCircuitGlobalTerminal extends AbstractCircuitBlockInterface implements GlobalTerminable {
-    private static final Map<AbstractComponentTyp, HashSet<AbstractCircuitGlobalTerminal>> ALL_GLOBALS_INTERNAL =
+    private static final Map<AbstractComponentTyp, Set<AbstractCircuitGlobalTerminal>> ALL_GLOBALS_INTERNAL =
             new HashMap<>();
-    public static final Map<AbstractComponentTyp, HashSet<AbstractCircuitGlobalTerminal>> ALL_GLOBALS =
+    public static final Map<AbstractComponentTyp, Set<AbstractCircuitGlobalTerminal>> ALL_GLOBALS =
             Collections.unmodifiableMap(ALL_GLOBALS_INTERNAL);
 
     /**

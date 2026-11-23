@@ -157,7 +157,7 @@ public final class SimulationAccess implements GeckoFileable {
     private static List<List<AbstractBlockInterface>> doListSort(final List<? extends AbstractBlockInterface> unsorted) {
         List<List<AbstractBlockInterface>> sortedListofLists = new ArrayList<>();
         List<Class<?>> types = new ArrayList<>();
-        HashMap<Class<?>, List<AbstractBlockInterface>> listsByType = new HashMap<>();
+        Map<Class<?>, List<AbstractBlockInterface>> listsByType = new HashMap<>();
         List<AbstractBlockInterface> currentList;
 
         for (AbstractBlockInterface elem : unsorted) {

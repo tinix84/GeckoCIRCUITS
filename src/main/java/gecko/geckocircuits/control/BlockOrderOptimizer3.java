@@ -27,8 +27,8 @@ public final class BlockOrderOptimizer3 {
      *
      */
     private List<RegelBlock> _allControlsInput;
-    private LinkedList<ControlOrderNode> _optimizedList;
-    private ArrayList<RegelBlock> _outList;
+    private List<ControlOrderNode> _optimizedList;
+    private List<RegelBlock> _outList;
     private Set<ControlOrderNode> _transferStops;
     private Set<ControlOrderNode> _transferStarts;
     private int _stopIteration;
@@ -255,8 +255,8 @@ public final class BlockOrderOptimizer3 {
         }
     }
 
-    private LinkedList<ControlOrderNode> sortNodesWithPriorities() {
-        LinkedList<ControlOrderNode> returnValue = new LinkedList<ControlOrderNode>();
+    private List<ControlOrderNode> sortNodesWithPriorities() {
+        List<ControlOrderNode> returnValue = new LinkedList<ControlOrderNode>();
 
         for (ControlOrderNode node : _allNodes) {
             int insertIndex = 0;

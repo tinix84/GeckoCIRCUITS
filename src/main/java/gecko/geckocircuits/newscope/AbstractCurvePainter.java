@@ -13,6 +13,8 @@
  */
 package gecko.geckocircuits.newscope;
 
+import java.util.Queue;
+
 import gecko.core.datacontainer.HiLoData;
 import gecko.geckocircuits.datacontainer.AbstractDataContainer;
 import java.awt.Graphics2D;
@@ -29,7 +31,7 @@ abstract class AbstractCurvePainter {
   final Axis _xAxis;
   final AbstractCurve _curve;
   final DataLoader _dataLoader = new DataLoader(this);
-  ConcurrentLinkedQueue<Point2D.Float> _allPoints = new ConcurrentLinkedQueue<Point2D.Float>();
+  Queue<Point2D.Float> _allPoints = new ConcurrentLinkedQueue<Point2D.Float>();
 
     abstract void paintComponent(final Graphics2D g2d);
 

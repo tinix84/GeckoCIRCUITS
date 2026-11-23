@@ -103,7 +103,7 @@ public abstract class AbstractCircuitSheetComponent {
         if (this instanceof GeckoFileable) {
             List<GeckoFile> filesList = ((GeckoFileable)this).getFiles();
             if (filesList != null) {
-                final ArrayList<GeckoFile> extraFiles = new ArrayList<GeckoFile>(filesList);
+                final List<GeckoFile> extraFiles = new ArrayList<GeckoFile>(filesList);
                 if (extraFiles != null && !extraFiles.isEmpty()) {
                     ((GeckoFileable) this).removeLocalComponentFiles(extraFiles);
                 }

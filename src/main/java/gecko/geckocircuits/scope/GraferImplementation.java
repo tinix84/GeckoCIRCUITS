@@ -13,6 +13,8 @@
  */
 package gecko.geckocircuits.scope;
 
+import java.util.List;
+
 import gecko.geckocircuits.allg.GlobalColors;
 import gecko.geckocircuits.allg.TechFormat;
 import java.awt.AlphaComposite;
@@ -171,7 +173,7 @@ public final class GraferImplementation extends GraferV3 implements MouseListene
     private TechFormat cf = new TechFormat();
     private NumberFormat nf = NumberFormat.getNumberInstance();
     //==========================================
-    private ArrayList<String> txtEintraege = new ArrayList<>();
+    private List<String> txtEintraege = new ArrayList<>();
     private int xSchieberPix2;
     private double[] xSchieberWert2 = new double[]{-1, -1};
     private double[][] ySchieberWert2;

@@ -38,7 +38,7 @@ public final class NetzlisteCONTROL {
     private String[] labelListeReglerKnoten;  // index ist Knotennummer und String-Eintrag ist zugehoeriger Label
     public RegelBlock[] _orderedControlBlocks;
     public final Map<Integer, IndexConnection> _scopePotentialMap = new HashMap<Integer, IndexConnection>();
-    public final Map<CircuitSheet, HashMap<String, IndexConnection>> _labelNodeMap = new HashMap<CircuitSheet, HashMap<String, IndexConnection>>();
+    public final Map<CircuitSheet, Map<String, IndexConnection>> _labelNodeMap = new HashMap<CircuitSheet, Map<String, IndexConnection>>();
     public final List<String> _inPortsStringWithoutConnection = new ArrayList<String>();
     public final List<String> _outPortsStringWithoutConnection = new ArrayList<String>();
     public final List<AbstractTerminal> _inPortsWithoutConnection = new ArrayList<AbstractTerminal>();
@@ -143,7 +143,7 @@ public final class NetzlisteCONTROL {
                         String label = potLab[i3].getLabel();
                         if (!label.isEmpty()) {
                             CircuitSheet circuitSheet = elementsControl.get(i1).getParentCircuitSheet();
-                            HashMap<String, IndexConnection> map = null;
+                            Map<String, IndexConnection> map = null;
                             if (_labelNodeMap.containsKey(circuitSheet)) {
                                 map = _labelNodeMap.get(circuitSheet);
                             } else {
@@ -209,7 +209,7 @@ public final class NetzlisteCONTROL {
     }
 
     public IndexConnection getIndexConnection(CircuitSheet searchCircuitSheet, String searchLabel) {
-        HashMap<String, IndexConnection> map = _labelNodeMap.get(searchCircuitSheet);
+        Map<String, IndexConnection> map = _labelNodeMap.get(searchCircuitSheet);
         if (map != null) {
             return map.get(searchLabel);
         } else {
@@ -253,7 +253,7 @@ public final class NetzlisteCONTROL {
      * blocks.
      */
     private void removeMuxAndDemux() {
-        Map<Integer, ArrayList<ReglerDemux>> demuxes = new LinkedHashMap<Integer, ArrayList<ReglerDemux>>();
+        Map<Integer, List<ReglerDemux>> demuxes = new LinkedHashMap<Integer, List<ReglerDemux>>();
         Map<Integer, ReglerMUX> muxes = new LinkedHashMap<Integer, ReglerMUX>();
         for (RegelBlock block : elementsControl.toArray(new RegelBlock[0])) {
             if (block instanceof ReglerMUX) {
@@ -267,7 +267,7 @@ public final class NetzlisteCONTROL {
             if (block instanceof ReglerDemux) {
                 if (block.YOUT.size() > 1) {
                     int nodeIndex = ((TerminalControl) block.XIN.get(0)).getNodeNumber();
-                    ArrayList<ReglerDemux> insertList = null;
+                    List<ReglerDemux> insertList = null;
                     if (demuxes.containsKey(nodeIndex)) {
                         insertList = demuxes.get(nodeIndex);
                     } else {

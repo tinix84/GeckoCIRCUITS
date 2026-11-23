@@ -560,7 +560,7 @@ public class CircuitSheet extends JPanel {
     }
 
     public List<AbstractBlockInterface> getLocalComponents(final ConnectorType connectorType) {
-        final LinkedList<AbstractBlockInterface> returnValue = new LinkedList<AbstractBlockInterface>();
+        final List<AbstractBlockInterface> returnValue = new LinkedList<AbstractBlockInterface>();
         final Collection<AbstractBlockInterface> allComponents = allElements.getClassFromContainer(AbstractBlockInterface.class);
         returnValue.addAll(allComponents);
         for (AbstractBlockInterface remove : allComponents) {

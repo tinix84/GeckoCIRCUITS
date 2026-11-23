@@ -13,6 +13,8 @@
  */
 package gecko.geckocircuits.datacontainer;
 
+import java.util.concurrent.ConcurrentMap;
+
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -23,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class IntegerMatrixCache {
 
-    private static ConcurrentHashMap<DimensionKey, int[][]> intMatrixCache = new ConcurrentHashMap<DimensionKey, int[][]>();
+    private static ConcurrentMap<DimensionKey, int[][]> intMatrixCache = new ConcurrentHashMap<DimensionKey, int[][]>();
     private static final int INIT_HASH = 5;
     private static final int HASH_FACTOR = 53;
 

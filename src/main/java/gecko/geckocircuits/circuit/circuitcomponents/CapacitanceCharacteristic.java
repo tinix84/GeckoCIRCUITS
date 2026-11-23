@@ -14,6 +14,8 @@
 
 package gecko.geckocircuits.circuit.circuitcomponents;
 
+import java.util.List;
+
 import java.util.ArrayList;
 
 /**
@@ -22,8 +24,8 @@ import java.util.ArrayList;
  */
 public final class CapacitanceCharacteristic {
 
-    private ArrayList<Double> y_val_C;
-    private ArrayList<Double> x_val_V;
+    private List<Double> y_val_C;
+    private List<Double> x_val_V;
     private boolean isLogYScale;
 
     public CapacitanceCharacteristic(double[] nonliny, double[] nonlinx, boolean logscaleY) {

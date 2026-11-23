@@ -104,7 +104,7 @@ implements Operationable, Nonlinearable {
         } else {
             try {
                 GeckoFile newFile = new GeckoFile(file, GeckoFile.StorageType.EXTERNAL, MainWindow.getOpenFileName());
-                ArrayList<GeckoFile> newFileList = new ArrayList<GeckoFile>();
+                List<GeckoFile> newFileList = new ArrayList<GeckoFile>();
                 newFileList.add(newFile);
                 addFiles(newFileList);
                 _isNonlinear.setValueWithoutUndo(true);
@@ -179,7 +179,7 @@ implements Operationable, Nonlinearable {
 
     @Override
     public List<GeckoFile> getFiles() {
-        ArrayList<GeckoFile> nonLinearFile = new ArrayList<GeckoFile>();
+        List<GeckoFile> nonLinearFile = new ArrayList<GeckoFile>();
         nonLinearFile.add(nonLinearChar);
         return nonLinearFile;
     }
@@ -279,7 +279,7 @@ implements Operationable, Nonlinearable {
     //reads a non linear characteristic from a file, returns an array which contains two array - non-linear x, non-linear y
     public static double[][] readNonLinearCharacteristicFromFile(GeckoFile file) throws NumberFormatException, IOException {
         double[] nonLinX, nonLinY;
-        ArrayList<String> lines = new ArrayList<String>();
+        List<String> lines = new ArrayList<String>();
         try (BufferedReader in = file.getBufferedReader()) {
             String inLine;
             while ((inLine = in.readLine()) != null) {
@@ -516,7 +516,7 @@ implements Operationable, Nonlinearable {
         try {
             byte[] fileContents = writeNonLinearCharacteristicToBytes();
             GeckoFile newFile = new GeckoFile(tmpFile, MainWindow.getOpenFileName(), fileContents);
-            ArrayList<GeckoFile> newFiles = new ArrayList<GeckoFile>();
+            List<GeckoFile> newFiles = new ArrayList<GeckoFile>();
             newFiles.add(newFile);
             addFiles(newFiles);
         } catch (FileNotFoundException ex) {

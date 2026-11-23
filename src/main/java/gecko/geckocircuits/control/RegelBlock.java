@@ -12,6 +12,8 @@
  *  GeckoCIRCUITS.  If not, see <http://www.gnu.org/licenses/>.
  */
 package gecko.geckocircuits.control;
+
+import java.util.List;
 import gecko.core.circuit.TokenMap;
 
 import gecko.geckocircuits.allg.*;
@@ -129,7 +131,7 @@ public abstract class RegelBlock extends AbstractBlockInterface implements Seria
 
     public abstract I18nKeys[] getOutputDescription();
 
-    public ArrayList<String[]> getOutputs() {
+    public List<String[]> getOutputs() {
         String[] outputs = getOutputNames();
         I18nKeys[] outputkeys = getOutputDescription();
         String[] output_description = new String[outputkeys.length];
@@ -141,7 +143,7 @@ public abstract class RegelBlock extends AbstractBlockInterface implements Seria
             return new ArrayList<>();
         }
 
-        ArrayList<String[]> outputList = new ArrayList<String[]>();
+        List<String[]> outputList = new ArrayList<String[]>();
         String[] output;
         for (int i = 0; i < outputs.length; i++) {
             output = new String[2];

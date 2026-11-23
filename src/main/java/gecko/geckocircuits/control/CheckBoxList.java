@@ -13,6 +13,8 @@
  */
 package gecko.geckocircuits.control;
 
+import java.util.Set;
+
 
 import java.awt.*;
 import javax.swing.*;
@@ -33,7 +35,7 @@ public class CheckBoxList extends JList<String>
         listSelectionBackground =  uid.getColor ("List.selectionBackground");
     }
 
-    HashSet<Integer> selectionCache = new HashSet<Integer>();
+    Set<Integer> selectionCache = new HashSet<Integer>();
     int toggleIndex = -1;
     boolean toggleWasSelected;
 
@@ -51,7 +53,7 @@ public class CheckBoxList extends JList<String>
             removeListSelectionListener (this);
 
             // remember everything selected as a result of this action
-            HashSet<Integer> newSelections = new HashSet<Integer>();
+            Set<Integer> newSelections = new HashSet<Integer>();
             int size = getModel().getSize();
             for (int i=0; i<size; i++) {
                 if (getSelectionModel().isSelectedIndex(i)) {

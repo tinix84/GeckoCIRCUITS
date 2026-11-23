@@ -799,7 +799,7 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
     }
 
     public List<AbstractCircuitBlockInterface> getElementLK() {
-        LinkedList<AbstractCircuitBlockInterface> returnValue = new LinkedList<AbstractCircuitBlockInterface>();
+        List<AbstractCircuitBlockInterface> returnValue = new LinkedList<AbstractCircuitBlockInterface>();
         List<AbstractCircuitBlockInterface> allBlocks = _circuitSheet.getAllElements().getClassFromContainer(AbstractCircuitBlockInterface.class);
 
         returnValue.addAll(allBlocks);
@@ -819,7 +819,7 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
     }
 
     public List<AbstractCircuitBlockInterface> getElementTHERM() {
-        LinkedList<AbstractCircuitBlockInterface> toFilter = new LinkedList<AbstractCircuitBlockInterface>();
+        List<AbstractCircuitBlockInterface> toFilter = new LinkedList<AbstractCircuitBlockInterface>();
         toFilter.addAll(_circuitSheet.getAllElements().getClassFromContainer(AbstractCircuitBlockInterface.class));
         for (AbstractCircuitBlockInterface remove : toFilter.toArray(new AbstractCircuitBlockInterface[0])) {
             if (remove.getSimulationDomain() != ConnectorType.THERMAL) {

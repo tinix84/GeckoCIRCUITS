@@ -999,15 +999,15 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
 
     public void openFile(BufferedReader in) throws IOException {
         _se.resetCircuitSheetsForNewFile();
-        Vector<String> datVec = new Vector<>();
+        List<String> datVec = new Vector<>();
         String z = null;
         while ((z = in.readLine()) != null) {
-            datVec.addElement(z);
+            datVec.add(z);
         }
         in.close();
         String[] zeile = new String[datVec.size()];
         for (int i1 = 0; i1 < datVec.size(); i1++) {
-            zeile[i1] = datVec.elementAt(i1);
+            zeile[i1] = datVec.get(i1);
             //System.out.println("zeile[i1]= "+zeile[i1]);
         }
 
@@ -2014,16 +2014,16 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
              GZIPInputStream in1 = new GZIPInputStream(fileIn);
              InputStreamReader streamReader = new InputStreamReader(in1, java.nio.charset.StandardCharsets.UTF_8);
              BufferedReader in = new BufferedReader(streamReader)) {
-            Vector<String> datVec = new Vector<>();
+            List<String> datVec = new Vector<>();
             String z = null;
 
             while ((z = in.readLine()) != null) {
-                datVec.addElement(z);
+                datVec.add(z);
             }
 
             lines = new String[datVec.size()];
             for (int i1 = 0; i1 < datVec.size(); i1++) {
-                lines[i1] = datVec.elementAt(i1);
+                lines[i1] = datVec.get(i1);
             }
 
 
@@ -2035,14 +2035,14 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
                  InflaterInputStream in1 = new InflaterInputStream(fileIn);
                  InputStreamReader streamReader = new InputStreamReader(in1, java.nio.charset.StandardCharsets.UTF_8);
                  BufferedReader in = new BufferedReader(streamReader)) {
-                Vector<String> datVec = new Vector<>();
+                List<String> datVec = new Vector<>();
                 String z = null;
                 while ((z = in.readLine()) != null) {
-                    datVec.addElement(z);
+                    datVec.add(z);
                 }
                 lines = new String[datVec.size()];
                 for (int i1 = 0; i1 < datVec.size(); i1++) {
-                    lines[i1] = datVec.elementAt(i1);
+                    lines[i1] = datVec.get(i1);
                     //System.out.println("zeile[i1]= "+zeile[i1]);
                 }
             } catch (Exception eGZIP) {

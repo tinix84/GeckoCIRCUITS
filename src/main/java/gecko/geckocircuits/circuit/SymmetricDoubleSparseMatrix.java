@@ -13,13 +13,16 @@
  */
 package gecko.geckocircuits.circuit;
 
+import java.util.Map;
+import java.util.Set;
+
 import java.util.HashMap;
 import java.util.HashSet;
 
 public final class SymmetricDoubleSparseMatrix {
 
-    public HashMap<Integer, HashSet<Integer>> rowEntries = new HashMap<Integer, HashSet<Integer>>();
-    public HashMap<Integer, HashMap<Integer, Double>> rowEntriesValue = new HashMap<Integer, HashMap<Integer, Double>>();
+    public Map<Integer, Set<Integer>> rowEntries = new HashMap<Integer, Set<Integer>>();
+    public Map<Integer, Map<Integer, Double>> rowEntriesValue = new HashMap<Integer, Map<Integer, Double>>();
     private final int _N;
 
     public SymmetricDoubleSparseMatrix(int N) {
@@ -42,8 +45,8 @@ public final class SymmetricDoubleSparseMatrix {
                 return;
             }
 
-        HashSet<Integer> rowE = rowEntries.get(row);
-        HashMap<Integer, Double> rowEValue = rowEntriesValue.get(row);
+        Set<Integer> rowE = rowEntries.get(row);
+        Map<Integer, Double> rowEValue = rowEntriesValue.get(row);
         if (rowE == null) {
             rowE = new HashSet<Integer>();
         }
@@ -61,7 +64,7 @@ public final class SymmetricDoubleSparseMatrix {
     }
 
     public double getValue(int row, int column) {
-        HashMap<Integer, Double> rowValues = rowEntriesValue.get(row);
+        Map<Integer, Double> rowValues = rowEntriesValue.get(row);
         if (rowValues == null) {
             return 0;
         } else {
@@ -81,10 +84,10 @@ public final class SymmetricDoubleSparseMatrix {
         }
 
         if (rowEntriesValue.containsKey(row)) {
-            HashMap<Integer, Double> roweValues = rowEntriesValue.get(row);
+            Map<Integer, Double> roweValues = rowEntriesValue.get(row);
             if (roweValues.containsKey(column)) {
                 roweValues.remove(column);
-                HashSet<Integer> rows = rowEntries.get(row);
+                Set<Integer> rows = rowEntries.get(row);
                 rows.remove(column);
                 if (rows.isEmpty()) {
                     rowEntries.remove(row);
