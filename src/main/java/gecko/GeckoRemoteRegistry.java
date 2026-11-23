@@ -174,8 +174,8 @@ public final class GeckoRemoteRegistry {
                 machineIPs.add(address.getHostAddress());
             }
         }
-        final String[] localIPs = machineIPs.toArray(new String[0]);
-        return localIPs;
+
+        return machineIPs.toArray(new String[0]);
     }
 
     /**
@@ -190,8 +190,8 @@ public final class GeckoRemoteRegistry {
         //ask a site to get the IP seen on the internet
         URL getMyIP = new URL(_ipQuerySite);
         try (BufferedReader in = new BufferedReader(new InputStreamReader(getMyIP.openStream(), StandardCharsets.UTF_8))) {
-            final String ip = in.readLine(); //the IP is the first line of the page
-            return ip;
+ //the IP is the first line of the page
+            return in.readLine();
         }
     }
 

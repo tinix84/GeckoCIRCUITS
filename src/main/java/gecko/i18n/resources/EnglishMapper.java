@@ -359,7 +359,7 @@ public class EnglishMapper {
      * @return DoubleMap containing all multiple-line English key-value pairs
      */
     public static DoubleMap initEnglishMap_multiple() {
-        DoubleMap dm = new DoubleMap();
+
 
         // initialize multiple-line pairs
 //        dm.putPair("DialogRemotePort.jTextAreaRemoteInfo.text", "Here you can allow the control of a \nGeckoCIRCUITS simulation by another\napplication (e.g. MATLAB) via a network \nport. For details see the GeckoSCRIPT\ntutorial. Currently only connections from\nthe local machine are allowed; network\naccess will be implemented in a future\nversion.");
@@ -375,6 +375,6 @@ public class EnglishMapper {
 //        dm.putPair("t13", "The model has changed since last save to the model\nfile. Would you like to save your model to the file:\n");
 
 
-        return dm;
+        return new DoubleMap();
     }
 }

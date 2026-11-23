@@ -99,10 +99,10 @@ public final class DataContainerMeanWrapper extends AbstractDataContainer {
             final double timeInterval = _meanSignals.get(columnIndex).getAveragingTime();
             // falsifies the result, makes little sense???
             // System.out.println("Test: " + (centerTimeValue - timeInterval / 2) + " " + (centerTimeValue + timeInterval / 2) + "::" + (timeInterval) + "::" + (intervalStart) + " " + (intervalStop));
-            Object returnValue = ((DataContainerIntegralCalculatable) _wrapped).getAVGValueInInterval(
+
+            return ((DataContainerIntegralCalculatable) _wrapped).getAVGValueInInterval(
                     centerTimeValue - timeInterval / 2, centerTimeValue + timeInterval / 2,
                     _meanSignals.get(columnIndex).getConnectedScopeInputIndex());
-            return returnValue;
         } else {
             return 0f;
         }
