@@ -536,7 +536,7 @@ public final class NetListLK {
         for (int i = 0; i < eLKneu.length; i++) {
             AbstractCircuitBlockInterface block = eLKneu[i];
 
-            if (!java.util.Objects.equals(block.getParentCircuitSheet(), parentCircuitSheet)) {
+            if (!Objects.equals(block.getParentCircuitSheet(), parentCircuitSheet)) {
                 continue;
             }
 

@@ -654,7 +654,7 @@ public final class BigMatrix implements java.io.Serializable {
       tokenizer.wordChars(0,255);
       tokenizer.whitespaceChars(0, ' ');
       tokenizer.eolIsSignificant(true);
-      java.util.List v = new java.util.Vector();
+      List v = new java.util.Vector();
 
       // Ignore initial empty lines
       while (tokenizer.nextToken() == StreamTokenizer.TT_EOL) {

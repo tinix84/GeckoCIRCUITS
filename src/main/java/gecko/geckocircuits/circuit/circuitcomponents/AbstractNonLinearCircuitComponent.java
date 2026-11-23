@@ -493,7 +493,7 @@ implements Operationable, Nonlinearable {
     //writes a non-linear characteristic to file
     public static File writeNonLinearCharacteristicToFile(double[][] data, File nonLinFile) throws IOException {
 
-        try (FileWriter fileWriter = new java.io.FileWriter(nonLinFile, StandardCharsets.UTF_8);
+        try (FileWriter fileWriter = new FileWriter(nonLinFile, StandardCharsets.UTF_8);
              BufferedWriter out = new BufferedWriter(fileWriter)) {
             for (int i = 0; i < data[0].length; i++) {
                 out.write(data[0][i] + " " + data[1][i] + "\n");

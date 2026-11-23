@@ -1894,14 +1894,14 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
 
         for (AbstractCircuitSheetComponent deselectTest
                 : datenSpeicher._allSheetComponents.toArray(new AbstractCircuitSheetComponent[0])) {
-            if (!java.util.Objects.equals(deselectTest.getParentCircuitSheet(), _visibleCircuitSheet)) {
+            if (!Objects.equals(deselectTest.getParentCircuitSheet(), _visibleCircuitSheet)) {
                 _selectedComponents.remove(deselectTest);
             }
         }
 
         final List<AbstractCircuitSheetComponent> visibleComponents = new ArrayList<AbstractCircuitSheetComponent>();
         for (AbstractCircuitSheetComponent testInsert : datenSpeicher._allSheetComponents) {
-            if (java.util.Objects.equals(testInsert.getParentCircuitSheet(), _visibleCircuitSheet)) {
+            if (Objects.equals(testInsert.getParentCircuitSheet(), _visibleCircuitSheet)) {
                 visibleComponents.add(testInsert);
             }
         }

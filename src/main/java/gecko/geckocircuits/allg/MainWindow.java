@@ -1565,7 +1565,7 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
      */
     public void setMenuDuringSimulation(boolean simulationRunning, boolean endReached,
             java.util.function.BooleanSupplier stillCurrent) {
-        java.util.List<Runnable> changes = new java.util.ArrayList<>();
+        List<Runnable> changes = new ArrayList<>();
         if (simulationRunning) {
             changes.add(() -> mItemNew.setEnabled(false));
             changes.add(() -> mItemOpen.setEnabled(false));
@@ -1590,13 +1590,13 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
 
     /** Restores editing and start actions without enabling continuation of a failed core calculation. */
     public void setMenusAfterSimulationFailure() {
-        java.util.List<Runnable> changes = new java.util.ArrayList<>();
+        List<Runnable> changes = new ArrayList<>();
         addStoppedMenuChanges(changes, false);
         changes.add(() -> jtfStatus.setText("Simulation aborted."));
         _simulationMenuUpdates.update(() -> true, changes.toArray(Runnable[]::new));
     }
 
-    private void addStoppedMenuChanges(java.util.List<Runnable> changes, boolean canContinue) {
+    private void addStoppedMenuChanges(List<Runnable> changes, boolean canContinue) {
         if (!IS_BRANDED) {
             changes.add(() -> mItemNew.setEnabled(true));
             changes.add(() -> mItemOpen.setEnabled(true));

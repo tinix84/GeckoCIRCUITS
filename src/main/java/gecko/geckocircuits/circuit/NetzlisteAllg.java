@@ -104,7 +104,7 @@ public final class NetzlisteAllg {
 
         List<AbstractBlockInterface> filteredList = new ArrayList<AbstractBlockInterface>();
         for (AbstractBlockInterface ab : elementsList) {
-            if (java.util.Objects.equals(ab.getParentCircuitSheet(), elementParent)) {
+            if (Objects.equals(ab.getParentCircuitSheet(), elementParent)) {
                 filteredList.add(ab);
             }
         }
