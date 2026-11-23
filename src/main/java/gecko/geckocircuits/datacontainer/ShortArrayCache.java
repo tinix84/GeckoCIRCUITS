@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class ShortArrayCache {
 
-    private static ConcurrentMap<Integer, short[]> shortMatrixCache = new ConcurrentHashMap<Integer, short[]>();
+    private static final ConcurrentMap<Integer, short[]> shortMatrixCache = new ConcurrentHashMap<Integer, short[]>();
 
     private ShortArrayCache() {
         // pure utility class!
