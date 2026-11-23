@@ -31,8 +31,11 @@ public class TerminalControlInput extends TerminalControl {
     @Override
     public void paintComponent(Graphics graphics) {
         final int dpix = AbstractCircuitSheetComponent.dpix;
-        graphics.drawLine( dpix * getPosition().x, dpix * getPosition().y,
-                _parentElement.getSheetPosition().x * dpix, dpix * getPosition().y);
+        graphics.drawLine(
+                dpix * getPosition().x,
+                dpix * getPosition().y,
+                _parentElement.getSheetPosition().x * dpix,
+                dpix * getPosition().y);
         super.paintComponent(graphics);
     }
 
@@ -48,8 +51,8 @@ public class TerminalControlInput extends TerminalControl {
         FontRenderContext frc = graphics2D.getFontRenderContext();
         final int stringLength = (int) graphics2D.getFont().getStringBounds(_label.getLabelString(), frc).getWidth();
         int xShift = 0;
-        if(!_hasDoubleLabel) {
-            xShift = - stringLength;
+        if (!_hasDoubleLabel) {
+            xShift = -stringLength;
         }
         if (!_label.getLabelString().isEmpty()) {
             graphics2D.drawString(_label.getLabelString(), (int) (AbstractCircuitSheetComponent.dpix * getPosition().x) + xShift,

@@ -36,7 +36,7 @@ public final class LossCalculationSimple implements AbstractLossCalculatorFabric
 
     @Override
     public AbstractLossCalculator lossCalculatorFabric() {
-        assert _uSWnorm != 0: "Voltage definition must be != 0!";
+        assert _uSWnorm != 0 : "Voltage definition must be != 0!";
         return new LossCalculatorSwitchSimple(_parent);
     }
 
@@ -52,7 +52,7 @@ public final class LossCalculationSimple implements AbstractLossCalculatorFabric
 
         public LossCalculatorSwitchSimple(final AbstractSemiconductor parent) {
             super(parent);
-            if(parent instanceof ForwardVoltageDropable) {
+            if (parent instanceof ForwardVoltageDropable) {
                 _uf = ((ForwardVoltageDropable) parent).getForwardVoltageDropParameter().getDoubleValue();
             } else {
                 _uf = 0;
@@ -81,7 +81,7 @@ public final class LossCalculationSimple implements AbstractLossCalculatorFabric
         @Override
         double calculateRelativeVoltageFactor(final double appliedVoltage) {
             double returnValue = Math.abs(appliedVoltage / _uSWnorm);
-            if(returnValue != returnValue) {
+            if (returnValue != returnValue) {
                 System.out.println("xxxxxxxx " + _uSWnorm);
             }
             return returnValue;

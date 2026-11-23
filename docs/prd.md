@@ -1,7 +1,7 @@
 # GeckoCIRCUITS Product Requirements Document
 
 **Version:** 3.0.0
-**Last Updated:** 2026-02-22
+**Last Updated:** 2026-03-14
 **Status:** v3.0.0 — Complete REST API Platform (32 endpoints, 7,434 tests)
 
 ---
@@ -67,6 +67,7 @@ GeckoCIRCUITS is an open-source, Java 21 circuit simulator for power electronics
 - **Real Solver Backend:** HeadlessSimulationEngine uses full MNA solver (MatrixSolver, CircuitNetlist, DomainCoupler)
 - **Batch Simulations:** Up to 100 concurrent simulations; linearSweep/logSweep/explicit parameter sets
 - **Parameter Overrides:** Dot-notation (`ComponentName.parameterKey`) applied before simulation
+- **Design References:** [Circuit preparation admission](adr/ADR-0001-circuit-preparation-admission.md) and [Circuit preparation interface](adr/ADR-0002-circuit-preparation-interface.md).
 - 224 tests passing
 - Docker packaging available (multi-stage Alpine JRE 21 build, ~180MB image)
 
@@ -144,6 +145,12 @@ GeckoCIRCUITS is an open-source, Java 21 circuit simulator for power electronics
 | v4.0.0 | Q1 2027 | [#8](https://github.com/tinix84/GeckoCIRCUITS/issues/8) | Kubernetes [#24], multi-tenant [#25], Redis/Postgres [#26], observability [#27] |
 | v5.0.0 | Q3 2027 | [#9](https://github.com/tinix84/GeckoCIRCUITS/issues/9) | RL optimization [#28], surrogate models [#29], component selection [#30] |
 
+**Solver Engine Improvements:** Epic [#56](https://github.com/tinix84/GeckoCIRCUITS/issues/56) — DC operating point [#57], zero-crossing [#58], adaptive stepping [#59], sparse matrix [#60], sampled control [#61]
+
+**Testing:** Golden traces [#62], application tests [#63]
+
+**Quality Targets:** PMD <400 [#64], Checkstyle <2,000 [#65], core coverage floor [#66]
+
 **Long-term vision:** Educational platform [#10], industry partnerships [#11], research collaboration [#12]
 
 **Note:** For detailed roadmap, release process, and issue tracking, see [docs/roadmap.md](roadmap.md).
@@ -211,16 +218,28 @@ GeckoCIRCUITS is an open-source, Java 21 circuit simulator for power electronics
 | Documentation Overhaul | Feb 11 | 95+ broken links fixed, 10 newsletter articles, GitHub Pages deployment |
 
 ### In Progress (v3.1.0 Roadmap)
-- Rate limiting and request throttling
-- JWT token authentication (complement to API key auth)
-- Pagination for list endpoints
-- WebSocket authentication
-- Enhanced circuit parsing (additional component types)
+- Rate limiting and request throttling ([#13](https://github.com/tinix84/GeckoCIRCUITS/issues/13))
+- JWT token authentication ([#14](https://github.com/tinix84/GeckoCIRCUITS/issues/14))
+- Pagination for list endpoints ([#15](https://github.com/tinix84/GeckoCIRCUITS/issues/15))
+- WebSocket authentication ([#16](https://github.com/tinix84/GeckoCIRCUITS/issues/16))
+- Enhanced circuit parsing ([#17](https://github.com/tinix84/GeckoCIRCUITS/issues/17))
+- Golden trace generation for 8 circuits ([#62](https://github.com/tinix84/GeckoCIRCUITS/issues/62))
+- Application test classes with per-step comparison ([#63](https://github.com/tinix84/GeckoCIRCUITS/issues/63))
+- PMD violations < 400 ([#64](https://github.com/tinix84/GeckoCIRCUITS/issues/64))
+- Checkstyle violations < 2,000 ([#65](https://github.com/tinix84/GeckoCIRCUITS/issues/65))
+- Core coverage floor enforced in the build ([#66](https://github.com/tinix84/GeckoCIRCUITS/issues/66))
+
+### Solver Engine Improvements ([#56](https://github.com/tinix84/GeckoCIRCUITS/issues/56))
+- DC Operating Point Analysis ([#57](https://github.com/tinix84/GeckoCIRCUITS/issues/57)) — HIGH priority
+- Zero-Crossing Detection & Interpolation ([#58](https://github.com/tinix84/GeckoCIRCUITS/issues/58)) — HIGH priority
+- Adaptive Time Stepping ([#59](https://github.com/tinix84/GeckoCIRCUITS/issues/59)) — HIGH priority
+- Sparse Matrix Solver ([#60](https://github.com/tinix84/GeckoCIRCUITS/issues/60)) — MEDIUM priority
+- Sampled Control Mode ([#61](https://github.com/tinix84/GeckoCIRCUITS/issues/61)) — LOW priority
 
 ### Planned (Future)
-1. **v3.2.0 (Q3 2026):** Web UI Launch — React + TypeScript circuit editor
-2. **v4.0.0 (Q1 2027):** Cloud Deployment — Kubernetes, multi-tenant SaaS
-3. **v5.0.0 (Q3 2027):** Machine Learning Integration — AI-assisted circuit design
+1. **v3.2.0 (Q3 2026):** Web UI Launch — React + TypeScript circuit editor ([#7](https://github.com/tinix84/GeckoCIRCUITS/issues/7))
+2. **v4.0.0 (Q1 2027):** Cloud Deployment — Kubernetes, multi-tenant SaaS ([#8](https://github.com/tinix84/GeckoCIRCUITS/issues/8))
+3. **v5.0.0 (Q3 2027):** Machine Learning Integration — AI-assisted circuit design ([#9](https://github.com/tinix84/GeckoCIRCUITS/issues/9))
 
 ## 7. Quality Assurance
 
@@ -235,8 +254,8 @@ GeckoCIRCUITS is an open-source, Java 21 circuit simulator for power electronics
 - `CorePackageValidationTest`: Zero GUI imports in core module
 - `mkdocs build --strict`: Zero broken links in documentation
 - SpotBugs: 0 bugs enforced (204 inline `@SuppressFBWarnings` annotations)
-- PMD: Custom ruleset (`pmd-ruleset.xml`), **496 remaining violations** ✅ **<500 TARGET ACHIEVED** (down 86% from original 3,443)
-- Checkstyle: Project-tuned config (`checkstyle.xml`), 4,632 remaining violations
+- PMD: Custom ruleset (`pmd-ruleset.xml`), 636 violations as of 2026-11-23 (reached 496 in v2.12.0, down from 3,443; has since regressed, see [#64](https://github.com/tinix84/GeckoCIRCUITS/issues/64))
+- Checkstyle: Project-tuned config (`checkstyle.xml`), 4,431 violations as of 2026-11-23
 
 ### Success Metrics
 
@@ -246,15 +265,15 @@ GeckoCIRCUITS is an open-source, Java 21 circuit simulator for power electronics
 | Core module classes | **216** ✅ | 230+ |
 | Core module test files | **80** | 85+ |
 | Core module tests | **1,837** ✅ | 2,000+ |
-| Core module coverage | 30%+ | 40%+ |
+| Core module coverage | 30%+ | 40%+ ([#66](https://github.com/tinix84/GeckoCIRCUITS/issues/66)) |
 | Main app files | 832 | — |
 | REST API endpoints | **32** ✅ | 35+ |
 | REST API tests | **224** | 250+ |
 | Docs site pages | 82+ | 100+ |
 | Broken links | 0 | 0 |
 | SpotBugs bugs | 0 | 0 |
-| PMD violations | **496** ✅ | <400 |
-| Checkstyle violations | 4,632 | <2,000 |
+| PMD violations | 636 (2026-11-23) | <400 ([#64](https://github.com/tinix84/GeckoCIRCUITS/issues/64)) |
+| Checkstyle violations | 4,431 (2026-11-23) | <2,000 ([#65](https://github.com/tinix84/GeckoCIRCUITS/issues/65)) |
 
 ## 8. Content Inventory
 

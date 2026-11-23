@@ -59,14 +59,14 @@ class AbstractCircuitSourceDialog extends DialogElementLK<AbstractCircuitSource>
 
         String labelText1 = "";
 
-        if(element instanceof AbstractVoltageSource) {
-            _dcValueField = getRegisteredTextField( ((AbstractVoltageSource) element)._dcValue);
-            _amplitudeField = getRegisteredTextField( ((AbstractVoltageSource) element)._amplitude);
+        if (element instanceof AbstractVoltageSource) {
+            _dcValueField = getRegisteredTextField(((AbstractVoltageSource) element)._dcValue);
+            _amplitudeField = getRegisteredTextField(((AbstractVoltageSource) element)._amplitude);
             _offsetField = getRegisteredTextField(((AbstractVoltageSource) element)._offset);
             labelText1 = ((AbstractVoltageSource) element)._amplitude.getShortName();
-        } else if(element instanceof AbstractCurrentSource) {
+        } else if (element instanceof AbstractCurrentSource) {
             _dcValueField = getRegisteredTextField(((AbstractCurrentSource) element)._dcValue);
-            _amplitudeField = getRegisteredTextField( ((AbstractCurrentSource) element)._amplitude);
+            _amplitudeField = getRegisteredTextField(((AbstractCurrentSource) element)._amplitude);
             _offsetField = getRegisteredTextField(((AbstractCurrentSource) element)._offset);
             labelText1 = ((AbstractCurrentSource) element)._amplitude.getShortName();
         }

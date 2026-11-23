@@ -35,7 +35,7 @@ public class MapList extends ArrayList<AbstractCircuitSheetComponent> {
         ComponentCoupable.class, PotentialCoupable.class,
         AbstractBlockInterface.class, Verbindung.class, SubcircuitBlock.class
     };
-    private final Map<Class<?>, ArrayList> classMap = new HashMap<Class<?>, ArrayList>();
+    private final Map<Class<?>, List> classMap = new HashMap<Class<?>, List>();
 
     @Override
     public void clear() {
@@ -45,8 +45,8 @@ public class MapList extends ArrayList<AbstractCircuitSheetComponent> {
 
     @Override
     public boolean remove(Object o) {
-        for (Entry<Class<?>, ArrayList> entry : classMap.entrySet()) {
-            ArrayList<?> list = entry.getValue();
+        for (Entry<Class<?>, List> entry : classMap.entrySet()) {
+            List<?> list = entry.getValue();
             if (list.contains(o)) {
                 list.remove(o);
             }
@@ -77,7 +77,7 @@ public class MapList extends ArrayList<AbstractCircuitSheetComponent> {
                 if (classMap.containsKey(type)) {
                     classMap.get(type).add(toAdd);
                 } else {
-                    ArrayList newList = new ArrayList<>();
+                    List newList = new ArrayList<>();
                     newList.add(toAdd);
                     classMap.put(type, newList);
                 }
@@ -88,7 +88,7 @@ public class MapList extends ArrayList<AbstractCircuitSheetComponent> {
 
     public <T> List<T> getClassFromContainer(final Class<T> type) {
         if (classMap.containsKey(type)) {
-            ArrayList<T> returnValue = classMap.get(type);
+            List<T> returnValue = classMap.get(type);
             return Collections.unmodifiableList(returnValue);
         } else {
             return Collections.unmodifiableList(new ArrayList<T>());

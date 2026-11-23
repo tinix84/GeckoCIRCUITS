@@ -13,6 +13,8 @@
  */
 package gecko.geckocircuits.math;
 
+import java.util.List;
+
 //package Jama;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.text.NumberFormat;
@@ -930,7 +932,7 @@ public final class Matrix implements Cloneable, java.io.Serializable {
         tokenizer.wordChars(0, 255);
         tokenizer.whitespaceChars(0, ' ');
         tokenizer.eolIsSignificant(true);
-        java.util.Vector v = new java.util.Vector();
+        List v = new java.util.Vector();
 
         // Ignore initial empty lines
         while (tokenizer.nextToken() == StreamTokenizer.TT_EOL) {
@@ -940,20 +942,20 @@ public final class Matrix implements Cloneable, java.io.Serializable {
             throw new java.io.IOException("Unexpected EOF on matrix read.");
         }
         do {
-            v.addElement(Double.valueOf(tokenizer.sval)); // Read & store 1st row.
+            v.add(Double.valueOf(tokenizer.sval)); // Read & store 1st row.
         } while (tokenizer.nextToken() == StreamTokenizer.TT_WORD);
 
         int n = v.size();  // Now we've got the number of columns!
         double row[] = new double[n];
         for (int j = 0; j < n; j++) // extract the elements of the 1st row.
         {
-            row[j] = ((Double) v.elementAt(j)).doubleValue();
+            row[j] = ((Double) v.get(j)).doubleValue();
         }
-        v.removeAllElements();
-        v.addElement(row);  // Start storing rows instead of columns.
+        v.clear();
+        v.add(row);  // Start storing rows instead of columns.
         while (tokenizer.nextToken() == StreamTokenizer.TT_WORD) {
             // While non-empty lines
-            v.addElement(row = new double[n]);
+            v.add(row = new double[n]);
             int j = 0;
             do {
                 if (j >= n) {
@@ -967,7 +969,7 @@ public final class Matrix implements Cloneable, java.io.Serializable {
         }
         int m = v.size();  // Now we've got the number of rows.
         double[][] A = new double[m][];
-        v.copyInto(A);  // copy the rows out of the vector
+        v.toArray(A);  // copy the rows out of the vector
         return new Matrix(A);
     }
 

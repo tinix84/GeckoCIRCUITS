@@ -65,7 +65,7 @@ public final class GeckoFileChooser {
     }
 
     public File getFileWithCheckedEnding() {
-        if(_fileEnding == null) {
+        if (_fileEnding == null) {
             return _fileChooser.getSelectedFile();
         }
 

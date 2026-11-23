@@ -113,18 +113,32 @@ public final class TraceComparisonHelper {
      */
     public static ComparisonResult compare(List<StepData> golden, List<StepData> actual,
                                             double relativeTolerance) {
-        int minLen = Math.min(golden.size(), actual.size());
-        if (minLen == 0) {
-            return ComparisonResult.ok();
+        if (golden.isEmpty() || actual.isEmpty()) {
+            return ComparisonResult.mismatch(0, "empty trace", golden.size(), actual.size());
+        }
+        if (golden.size() != actual.size()) {
+            return ComparisonResult.mismatch(Math.min(golden.size(), actual.size()),
+                    "trace length", golden.size(), actual.size());
         }
 
-        for (int step = 0; step < minLen; step++) {
+        for (int step = 0; step < golden.size(); step++) {
             StepData g = golden.get(step);
             StepData a = actual.get(step);
 
+            if (!Double.isFinite(g.time) || !Double.isFinite(a.time)
+                    || Math.abs(g.time - a.time) > 1e-12) {
+                return ComparisonResult.mismatch(step, "time", g.time, a.time);
+            }
+            if (g.nodeVoltages.length != a.nodeVoltages.length) {
+                return ComparisonResult.mismatch(step, "node count",
+                        g.nodeVoltages.length, a.nodeVoltages.length);
+            }
+            if (g.currents.length != a.currents.length) {
+                return ComparisonResult.mismatch(step, "current count", g.currents.length, a.currents.length);
+            }
+
             // Compare node voltages
-            int minV = Math.min(g.nodeVoltages.length, a.nodeVoltages.length);
-            for (int i = 0; i < minV; i++) {
+            for (int i = 0; i < g.nodeVoltages.length; i++) {
                 if (!withinTolerance(g.nodeVoltages[i], a.nodeVoltages[i], relativeTolerance)) {
                     return ComparisonResult.mismatch(step, "p[" + i + "]",
                             g.nodeVoltages[i], a.nodeVoltages[i]);
@@ -132,29 +146,30 @@ public final class TraceComparisonHelper {
             }
 
             // Compare currents
-            int minI = Math.min(g.currents.length, a.currents.length);
-            for (int i = 0; i < minI; i++) {
+            for (int i = 0; i < g.currents.length; i++) {
                 if (!withinTolerance(g.currents[i], a.currents[i], relativeTolerance)) {
                     return ComparisonResult.mismatch(step, "i[" + i + "]",
                             g.currents[i], a.currents[i]);
                 }
             }
 
-            // Compare switch resistances
-            for (Map.Entry<String, Double> entry : g.switchR.entrySet()) {
-                Double actualVal = a.switchR.get(entry.getKey());
-                if (actualVal != null && !withinTolerance(entry.getValue(), actualVal, relativeTolerance)) {
-                    return ComparisonResult.mismatch(step, "R_sw_" + entry.getKey(),
-                            entry.getValue(), actualVal);
+            String[] prefixes = {"R_sw_", "R_d_", "gate_"};
+            List<Map<String, Double>> expectedSignals = List.of(g.switchR, g.diodeR, g.gateSignals);
+            List<Map<String, Double>> actualSignals = List.of(a.switchR, a.diodeR, a.gateSignals);
+            for (int group = 0; group < prefixes.length; group++) {
+                Map<String, Double> expected = expectedSignals.get(group);
+                Map<String, Double> observed = actualSignals.get(group);
+                if (!expected.keySet().equals(observed.keySet())) {
+                    return ComparisonResult.mismatch(step,
+                            prefixes[group] + "names " + expected.keySet() + " != " + observed.keySet(),
+                            expected.size(), observed.size());
                 }
-            }
-
-            // Compare diode resistances
-            for (Map.Entry<String, Double> entry : g.diodeR.entrySet()) {
-                Double actualVal = a.diodeR.get(entry.getKey());
-                if (actualVal != null && !withinTolerance(entry.getValue(), actualVal, relativeTolerance)) {
-                    return ComparisonResult.mismatch(step, "R_d_" + entry.getKey(),
-                            entry.getValue(), actualVal);
+                for (Map.Entry<String, Double> entry : expected.entrySet()) {
+                    double actualValue = observed.get(entry.getKey());
+                    if (!withinTolerance(entry.getValue(), actualValue, relativeTolerance)) {
+                        return ComparisonResult.mismatch(step, prefixes[group] + entry.getKey(),
+                                entry.getValue(), actualValue);
+                    }
                 }
             }
         }
@@ -163,11 +178,14 @@ public final class TraceComparisonHelper {
     }
 
     private static boolean withinTolerance(double expected, double actual, double relTol) {
+        if (!Double.isFinite(expected) || !Double.isFinite(actual)) {
+            return false;
+        }
         double absDiff = Math.abs(expected - actual);
         double absExpected = Math.abs(expected);
         if (absExpected < 1e-15) {
             // Near zero: use absolute tolerance
-            return absDiff < relTol;
+            return absDiff < 1e-9;
         }
         return (absDiff / absExpected) <= relTol;
     }

@@ -34,6 +34,10 @@ import gecko.core.math.Matrix;
  * - Component currents (iALT, iALTALT, iALTALTALT) for multi-step integration
  */
 public class MatrixSolver {
+    /** Large conductance added to ground node (row/col 0) to anchor the MNA system.
+     *  Without this, the KCL equations are linearly dependent and the matrix is singular. */
+    private static final double GROUND_CONDUCTANCE = 1e15;
+
     private int matrixSize;           // Matrix order (node count + voltage source count + 1)
     private double[][] a;            // System matrix A for MNA
     private double[] bVector;         // Right-hand side vector b
@@ -49,6 +53,7 @@ public class MatrixSolver {
     // LU decomposition solver state
     private Matrix matrixSolverA;     // Cached Matrix wrapper for A
     private boolean matrixChanged;    // Flag to indicate A matrix needs refactorization
+    private boolean wireReference;
 
     /**
      * Constructs a MatrixSolver with specified solver type.
@@ -56,6 +61,9 @@ public class MatrixSolver {
      * @param solverType the numerical integration method (e.g., Backward Euler, Trapezoidal)
      */
     public MatrixSolver(SolverType solverType) {
+        if (solverType == null) {
+            throw new IllegalArgumentException("Solver type cannot be null");
+        }
         this.solverType = solverType;
         this.matrixSolverA = null;
         this.matrixChanged = true;
@@ -73,8 +81,13 @@ public class MatrixSolver {
      * @param elementCount the total number of circuit elements
      */
     public void initializeMatrices(int nodeCount, int voltageSourceCount, int elementCount) {
+        long requiredSize = (long) nodeCount + voltageSourceCount + 1;
+        if (nodeCount < 0 || voltageSourceCount < 0 || elementCount < 0 || requiredSize > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("Matrix dimensions must be non-negative and fit an integer");
+        }
         // Matrix size includes all nodes, voltage source variables, plus ground reference
-        matrixSize = nodeCount + voltageSourceCount + 1;
+        matrixSize = (int) requiredSize;
+        wireReference = false;
 
         // Allocate system matrix A and solution vector b
         a = new double[matrixSize][matrixSize];
@@ -90,6 +103,8 @@ public class MatrixSolver {
         iALT = new double[elementCount];
         iALTALT = new double[elementCount];
         iALTALTALT = new double[elementCount];
+        matrixSolverA = null;
+        matrixChanged = true;
     }
 
     // Getters for matrix components
@@ -151,23 +166,37 @@ public class MatrixSolver {
      *
      * @param dt the time step size (seconds)
      * @param time the current simulation time (seconds)
+     * @deprecated Use {@link #shiftHistory()} followed by storing currents into iALT.
+     *             This method exists for backward compatibility with existing tests.
      */
+    @Deprecated
     public void updateNodePotentials(double dt, double time) {
-        // Shift node potential history:
-        // Move two-steps-back to three-steps-back
+        shiftHistory();
+    }
+
+    /**
+     * Shifts all history arrays one step back, matching the proven
+     * {@code aktualisiereKnotenpotentiale()} method from LKMatrices.
+     *
+     * <p>Order (critical for correctness):
+     * <ol>
+     *   <li>pALTALTALT ← pALTALT ← pALT ← p</li>
+     *   <li>iALTALTALT ← iALTALT ← iALT</li>
+     * </ol>
+     *
+     * <p>After calling this method, iALT still holds the previous step's values
+     * (now also copied into iALTALT). The caller must then overwrite iALT with
+     * the newly converged currents.
+     */
+    public void shiftHistory() {
+        // Shift node potential history
         System.arraycopy(pALTALT, 0, pALTALTALT, 0, matrixSize);
-        // Move one-step-back to two-steps-back
         System.arraycopy(pALT, 0, pALTALT, 0, matrixSize);
-        // Move current to one-step-back
         System.arraycopy(p, 0, pALT, 0, matrixSize);
 
-        // Shift component current history:
-        // Move two-steps-back to three-steps-back
+        // Shift component current history
         System.arraycopy(iALTALT, 0, iALTALTALT, 0, iALT.length);
-        // Move one-step-back to two-steps-back
         System.arraycopy(iALT, 0, iALTALT, 0, iALT.length);
-        // Note: iALT will be populated with current values by ComponentCurrentCalculator
-        // before the next call to this method
     }
 
     /**
@@ -185,7 +214,7 @@ public class MatrixSolver {
      * - Clears the matrix
      * - Iterates through netlist components
      * - Uses stampers from the registry for component contributions
-     * - Skips magnetic couplings (future refinement)
+     * - Adds symmetric mutual-inductance constraints between winding currents
      *
      * @param netlist the circuit netlist containing components and topology
      * @param dt the time step size (used for dynamic components like capacitors)
@@ -223,17 +252,127 @@ public class MatrixSolver {
             // Step 3: Get stamper for this component type and stamp matrix A
             IMatrixStamper stamper = registry.getStamper(componentType);
             if (stamper != null) {
-                stamper.stampMatrixA(a, nodeX, nodeY, nodeZ, parameters, dt);
+                stamper.stampMatrixA(a, nodeX, nodeY, nodeZ, parameters, dt, solverType);
+            }
+            if (componentType == CircuitTypCore.LK_I && SourceControl.mode(parameters) == 5) {
+                int target = SourceControl.target(netlist, elementIndex);
+                int controlX = netlist.getNodeX(target);
+                int controlY = netlist.getNodeY(target);
+                double gain = parameters[11];
+                a[nodeX][controlX] += gain;
+                a[nodeY][controlY] += gain;
+                a[nodeX][controlY] -= gain;
+                a[nodeY][controlX] -= gain;
+            }
+            if ((componentType == CircuitTypCore.LK_U || componentType == CircuitTypCore.REL_MMF
+                    || componentType == CircuitTypCore.TH_TEMP)
+                    && SourceControl.mode(parameters) == 5 && parameters[14] == 0) {
+                int target = SourceControl.target(netlist, elementIndex);
+                double gain = parameters[11];
+                a[nodeZ][netlist.getNodeX(target)] -= gain;
+                a[nodeZ][netlist.getNodeY(target)] += gain;
+            }
+            if ((componentType == CircuitTypCore.LK_U || componentType == CircuitTypCore.REL_MMF
+                    || componentType == CircuitTypCore.TH_TEMP) && SourceControl.mode(parameters) == 3) {
+                int target = SourceControl.target(netlist, elementIndex);
+                a[nodeZ][SourceControl.branch(netlist, target)] -= parameters[11];
+            }
+            if ((componentType == CircuitTypCore.LK_U || componentType == CircuitTypCore.REL_MMF
+                    || componentType == CircuitTypCore.TH_TEMP) && SourceControl.mode(parameters) == 4) {
+                int target = SourceControl.target(netlist, elementIndex);
+                a[nodeZ][SourceControl.branch(netlist, target)] += parameters[11] / dt;
+            }
+            if ((componentType == CircuitTypCore.LK_U || componentType == CircuitTypCore.REL_MMF
+                    || componentType == CircuitTypCore.TH_TEMP) && SourceControl.mode(parameters) == 6) {
+                int target = SourceControl.target(netlist, elementIndex);
+                a[nodeZ][nodeX] -= 1.0;
+                a[nodeZ][nodeY] += 1.0;
+                a[nodeZ][nodeZ] += 1.0 / parameters[11];
+                a[nodeZ][SourceControl.branch(netlist, target)] += 1.0;
             }
             // If no stamper is registered, component is skipped (e.g., terminals, unimplemented types)
         }
 
-        // Note: Magnetic coupling (mutual inductance) handling is deferred for future refinement.
-        // The legacy code injects coupling contributions after component stamping;
-        // this will be added when LKOP2 coupling arrays are integrated into the netlist.
+        // Step 4: Pin ground node (node 0) to anchor the MNA system.
+        // Without this, the KCL equations for nodes 0..N are linearly dependent
+        // (they sum to zero by Kirchhoff's current law), making the matrix singular.
+        // Adding a large conductance to ground forces p[0] ≈ 0.
+        wireReference = netlist.usesWireReference();
+        if (!wireReference) a[0][0] += GROUND_CONDUCTANCE;
+        // Desktop LKMatrices pins each galvanically isolated group the same way: 1 S at its lowest node.
+        // No current leaves an isolated group, so the stamp only fixes its reference potential.
+        for (int node : isolatedGroupReferences(netlist)) a[node][node] += 1.0;
+
+        double alpha = solverType == SolverType.SOLVER_BE ? 1
+                : solverType == SolverType.SOLVER_TRZ ? 2 : 1.5;
+        for (var coupling : netlist.getAllCouplings()) {
+            int first = netlist.getNodeMax() + netlist.getVoltageSourceNumber(coupling.getInductor1Index());
+            int second = netlist.getNodeMax() + netlist.getVoltageSourceNumber(coupling.getInductor2Index());
+            double weight = alpha * coupling.getMutualInductance() / dt;
+            a[first][second] -= weight;
+            a[second][first] -= weight;
+        }
 
         // Mark matrix as changed so LU decomposition will be recalculated
         matrixChanged = true;
+    }
+
+    /**
+     * Updates controlled voltage-source limits from the current solution and invalidates the cached factorization when needed.
+     *
+     * @param netlist the circuit with its configured source limits and current limit states
+     * @param time the current simulation time
+     * @return true when a source changes its limit state
+     */
+    public boolean updateControlledSourceLimits(INetList netlist, double time) {
+        boolean changed = false;
+        for (int element = 0; element < netlist.getElementCount(); element++) {
+            if (netlist.getType(element) != CircuitTypCore.LK_U) {
+                continue;
+            }
+            double[] parameters = netlist.getParameter(element);
+            if (SourceControl.mode(parameters) != 5
+                    || ((int) parameters[0] == SourceType.QUELLE_VOLTAGECONTROLLED_DIRECTLY && time <= 0)) {
+                continue;
+            }
+            int target = SourceControl.target(netlist, element);
+            int controlX = netlist.getNodeX(target);
+            int controlY = netlist.getNodeY(target);
+            int branch = netlist.getNodeMax() + netlist.getVoltageSourceNumber(element);
+            double gain = parameters[11];
+            double voltage = gain * (p[controlX] - p[controlY]);
+            double oldState = parameters[14];
+            double newState = oldState;
+            if (oldState == 0) {
+                newState = voltage < parameters[12] ? -1 : voltage > parameters[13] ? 1 : 0;
+            } else if ((oldState == -1 && voltage >= parameters[12])
+                    || (oldState == 1 && voltage <= parameters[13])) {
+                // Return to the linear equation before a source can reach the opposite limit.
+                newState = 0;
+            }
+            if (oldState == newState) {
+                continue;
+            }
+
+            if (oldState == 0) {
+                a[branch][controlX] += gain;
+                a[branch][controlY] -= gain;
+            } else {
+                bVector[branch] -= oldState < 0 ? parameters[12] : parameters[13];
+            }
+            if (newState == 0) {
+                a[branch][controlX] -= gain;
+                a[branch][controlY] += gain;
+            } else {
+                bVector[branch] += newState < 0 ? parameters[12] : parameters[13];
+            }
+            parameters[14] = newState;
+            changed = true;
+        }
+        if (changed) {
+            matrixChanged = true;
+        }
+        return changed;
     }
 
     /**
@@ -320,20 +459,11 @@ public class MatrixSolver {
                 // ===== Coupled Inductors (LKOP2 with mutual inductance) =====
                 case LK_LKOP2:
                     params = netlist.getParameter(elementIdx);
-                    double inductanceInAMatrix = params[10];  // Inductance stored in parameter[10]
-
-                    if (solverType == SolverType.SOLVER_BE) {
-                        bContribution = -iALT[elementIdx] * (inductanceInAMatrix / dt);
-                    } else if (solverType == SolverType.SOLVER_TRZ) {
-                        bContribution = -(pALT[nodeX] - pALT[nodeY]) - iALT[elementIdx] * (2 * inductanceInAMatrix / dt);
-                    } else if (solverType == SolverType.SOLVER_GS) {
-                        bContribution = (-2.0 * iALT[elementIdx] + 0.5 * iALTALT[elementIdx]) * (inductanceInAMatrix / dt);
+                    bContribution = params[0] / dt * windingHistory(elementIdx);
+                    if (solverType == SolverType.SOLVER_TRZ) {
+                        bContribution -= pALT[nodeX] - pALT[nodeY];
                     }
-
                     bVector[voltageSourceIdx] += bContribution;
-
-                    // Apply mutual inductance coupling terms if present
-                    // (zuLKOP2gehoerigeM_spgQnr and zuLKOP2gehoerigeM_kWerte would be passed separately)
                     break;
 
                 // ===== Capacitors (with history terms) =====
@@ -466,7 +596,8 @@ public class MatrixSolver {
                             if (time <= 0) {
                                 bVector[voltageSourceIdx] += 2 * gain * params[15] / dt;
                             } else {
-                                bVector[voltageSourceIdx] += gain * pALT[voltageSourceIdx + 1] / dt;
+                                int target = SourceControl.target(netlist, elementIdx);
+                                bVector[voltageSourceIdx] += gain * pALT[SourceControl.branch(netlist, target)] / dt;
                             }
                             break;
                         }
@@ -493,6 +624,22 @@ public class MatrixSolver {
                     break;
             }
         }
+        for (var coupling : netlist.getAllCouplings()) {
+            int first = coupling.getInductor1Index();
+            int second = coupling.getInductor2Index();
+            double weight = coupling.getMutualInductance() / dt;
+            bVector[netlist.getNodeMax() + netlist.getVoltageSourceNumber(first)] += weight * windingHistory(second);
+            bVector[netlist.getNodeMax() + netlist.getVoltageSourceNumber(second)] += weight * windingHistory(first);
+        }
+
+    }
+
+    private double windingHistory(int element) {
+        return switch (solverType) {
+            case SOLVER_BE -> -iALT[element];
+            case SOLVER_TRZ -> -2 * iALT[element];
+            case SOLVER_GS -> -2 * iALT[element] + 0.5 * iALTALT[element];
+        };
     }
 
     /**
@@ -532,21 +679,40 @@ public class MatrixSolver {
                     "Matrices not initialized. Call initializeMatrices() first.");
         }
 
+        for (int row = 0; row < matrixSize; row++) {
+            if (!Double.isFinite(bVector[row])) {
+                throw new IllegalStateException("Nonfinite right-hand side at row " + row);
+            }
+            if (matrixChanged || matrixSolverA == null) {
+                if (a[row] == null || a[row].length != matrixSize) {
+                    throw new IllegalStateException("Invalid system matrix row " + row);
+                }
+                for (double value : a[row]) {
+                    if (!Double.isFinite(value)) {
+                        throw new IllegalStateException("Nonfinite system matrix at row " + row);
+                    }
+                }
+            }
+        }
+
         // Step 1: Create or update Matrix wrapper for A (only if matrix changed)
         if (matrixSolverA == null) {
             // First time: create Matrix wrapper from a[][]
-            matrixSolverA = new Matrix(a, matrixSize, matrixSize);
+            matrixSolverA = solveMatrix();
         } else if (matrixChanged) {
             // Matrix changed: reset cached LU decomposition and update wrapper
-            matrixSolverA.resetLUDecomp();
+            if (wireReference) matrixSolverA = solveMatrix();
+            else matrixSolverA.resetLUDecomp();
             // The underlying a[][] is already modified by buildMatrixA(),
             // so Matrix wrapper points to updated data
         }
 
         // Step 2: Create column vector B from b[] (nx1 matrix)
-        double[][] bArray = new double[matrixSize][1];
-        for (int i = 0; i < matrixSize; i++) {
-            bArray[i][0] = bVector[i];
+        int offset = wireReference ? 1 : 0;
+        int size = matrixSize - offset;
+        double[][] bArray = new double[size][1];
+        for (int i = 0; i < size; i++) {
+            bArray[i][0] = bVector[i + offset];
         }
         Matrix bMatrix = new Matrix(bArray);
 
@@ -557,11 +723,48 @@ public class MatrixSolver {
 
         // Step 4: Extract solution back to p[] array
         double[][] x = xMatrix.getArray();
-        for (int i = 0; i < matrixSize; i++) {
-            p[i] = x[i][0];
+        for (int i = 0; i < size; i++) {
+            if (!Double.isFinite(x[i][0])) {
+                throw new IllegalStateException("Nonfinite solution at row " + i);
+            }
+        }
+        if (wireReference) p[0] = 0;
+        for (int i = 0; i < size; i++) {
+            p[i + offset] = x[i][0];
         }
 
         // Mark that matrix is no longer changed (until next buildMatrixA or explicit flag)
         matrixChanged = false;
+    }
+
+    private Matrix solveMatrix() {
+        if (!wireReference) return new Matrix(a, matrixSize, matrixSize);
+        // Desktop excludes its reference row and column from LU decomposition.
+        double[][] reduced = new double[matrixSize - 1][matrixSize - 1];
+        for (int row = 1; row < matrixSize; row++) {
+            System.arraycopy(a[row], 1, reduced[row - 1], 0, matrixSize - 1);
+        }
+        return new Matrix(reduced);
+    }
+
+    /** Lowest node of every conductively connected node group that does not contain node 0. */
+    static int[] isolatedGroupReferences(INetList netlist) {
+        int[] parent = new int[netlist.getNodeMax() + 1];
+        for (int node = 0; node < parent.length; node++) parent[node] = node;
+        for (int element = 0; element < netlist.getElementCount(); element++) {
+            CircuitTypCore type = netlist.getType(element);
+            // An ideal current source adds no voltage constraint or conductance between its nodes.
+            if (type == CircuitTypCore.LK_I || type == CircuitTypCore.TH_FLOW) continue;
+            int x = root(parent, netlist.getNodeX(element)), y = root(parent, netlist.getNodeY(element));
+            // Keep the lower node as root, so each root is its group's lowest node.
+            if (x < y) parent[y] = x; else parent[x] = y;
+        }
+        return java.util.stream.IntStream.range(1, parent.length)
+                .filter(node -> root(parent, node) == node && root(parent, 0) != node).toArray();
+    }
+
+    private static int root(int[] parent, int node) {
+        while (parent[node] != node) node = parent[node] = parent[parent[node]];
+        return node;
     }
 }

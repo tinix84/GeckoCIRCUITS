@@ -38,17 +38,18 @@ public final class ReglerConstant extends RegelBlock {
     public ReglerConstant() {
         super(0, 1);
 
-        _constValue.addActionListener(new ActionListener() {
+        _constValue.addActionListener(
+                new ActionListener() {
 
-            @Override
-            public void actionPerformed(final ActionEvent event) {
-                if(_calculator instanceof ConstantCalculator) {
-                    ((ConstantCalculator) _calculator).setConst(_constValue.getValue());
-                    return;
-                }
-                assert _calculator == null;
-            }
-        });
+                    @Override
+                    public void actionPerformed(final ActionEvent event) {
+                        if (_calculator instanceof ConstantCalculator) {
+                            ((ConstantCalculator) _calculator).setConst(_constValue.getValue());
+                            return;
+                        }
+                        assert _calculator == null;
+                    }
+                });
     }
 
     @Override

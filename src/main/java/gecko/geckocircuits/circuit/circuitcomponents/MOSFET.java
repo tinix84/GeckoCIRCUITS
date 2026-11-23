@@ -222,21 +222,29 @@ public final class MOSFET extends AbstractSwitch implements HiddenSubCircuitable
         }
 
         if (_show170_22bugfixWarning && !warning1AlreadyShown) {
-            JOptionPane.showMessageDialog(GeckoSim._win, "Your model contains MOSEFET components. Beginning from GeckoCIRCUITS release 1.70 build number 23,"
-                    + "\n some bugfixes might change your model behavior. The relevant bugfixes are:\n\n"
-                    + "    - Loss calculation with simple parameters: An errorneous forward voltage drop was considered in the\n"
-                    + "      loss calculation. This additional loss is not present in this release of GeckoCIRCUITS, anymore.\n"
-                    + "    - Current measurement of MOSFET: Older GeckoCIRCUITS releases did not consider the antiparallel diode\n"
-                    + "      current in the MOSFET current measurement. If your control model depends on the MOSFET current,\n"
-                    + "      measurement it might behave different, now.", "MOSFET Bugfix Information", JOptionPane.PLAIN_MESSAGE);
+            JOptionPane.showMessageDialog(
+                    GeckoSim._win,
+                    "Your model contains MOSEFET components. Beginning from GeckoCIRCUITS release 1.70 build number 23,"
+                            + "\n some bugfixes might change your model behavior. The relevant bugfixes are:\n\n"
+                            + "    - Loss calculation with simple parameters: An errorneous forward voltage drop was considered in the\n"
+                            + "      loss calculation. This additional loss is not present in this release of GeckoCIRCUITS, anymore.\n"
+                            + "    - Current measurement of MOSFET: Older GeckoCIRCUITS releases did not consider the antiparallel diode\n"
+                            + "      current in the MOSFET current measurement. If your control model depends on the MOSFET current,\n"
+                            + "      measurement it might behave different, now.",
+                    "MOSFET Bugfix Information",
+                    JOptionPane.PLAIN_MESSAGE);
         }
 
         if (_show172_50bugfixWarning && !warning2AlreadyShown) {
-            JOptionPane.showMessageDialog(GeckoSim._win, "Your model contains MOSEFET components. Beginning from GeckoCIRCUITS release 1.72 build number 50,"
-                    + "\nfrom November 2015, the following bug fix might change your model behavior:\n\n"
-                    + "The current measurement of the Mosfet component had the wrong direction / sign during freewheeling state.\n"
-                    + "This bug is fixed in GeckoCIRCUITS 1.72, build number 50. In case your control model depends on the MOSFET\n"
-                    + "current during freewheeling state, then the simulation could behave different.", "MOSFET Bugfix Information", JOptionPane.PLAIN_MESSAGE);
+            JOptionPane.showMessageDialog(
+                    GeckoSim._win,
+                    "Your model contains MOSEFET components. Beginning from GeckoCIRCUITS release 1.72 build number 50,"
+                            + "\nfrom November 2015, the following bug fix might change your model behavior:\n\n"
+                            + "The current measurement of the Mosfet component had the wrong direction / sign during freewheeling state.\n"
+                            + "This bug is fixed in GeckoCIRCUITS 1.72, build number 50. In case your control model depends on the MOSFET\n"
+                            + "current during freewheeling state, then the simulation could behave different.",
+                    "MOSFET Bugfix Information",
+                    JOptionPane.PLAIN_MESSAGE);
         }
 
     }

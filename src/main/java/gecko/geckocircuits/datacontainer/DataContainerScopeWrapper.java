@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Observable;
 import java.util.Observer;
 
-//CHECKSTYLE:ON
+// CHECKSTYLE:ON
 /**
  * Be careful: in the scope, the number of input ports can be
  * increased/decreased. Therefore, check if we are out of bounds, and give zer0
@@ -29,8 +29,12 @@ import java.util.Observer;
  *
  * @author andy
  */
-@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "Wrapper intentionally shares references with wrapped containers for efficient data access")
-public final class DataContainerScopeWrapper extends AbstractDataContainer implements DataContainerIntegralCalculatable {
+@SuppressFBWarnings(
+        value = "EI_EXPOSE_REP",
+        justification =
+                "Wrapper intentionally shares references with wrapped containers for efficient data access")
+public final class DataContainerScopeWrapper extends AbstractDataContainer
+        implements DataContainerIntegralCalculatable {
 
     private final AbstractDataContainer _globalContainer;
     private final ScopeWrapperIndices _scopeIndices;

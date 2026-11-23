@@ -17,7 +17,7 @@ import gecko.geckocircuits.newscope.DefinedMeanSignals;
 import gecko.geckocircuits.newscope.ScopeSignalMean;
 import java.util.List;
 
-public interface DataContainerIntegralCalculatable{
+public interface DataContainerIntegralCalculatable {
   float getAVGValueInInterval(final double intervalStart, final double intervalStop, final int columnIndex);
 
   /**

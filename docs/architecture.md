@@ -94,7 +94,44 @@ src/main/java/gecko/
 4. **Solver**: Backward Euler (BE), Trapezoidal (TRZ), or Gear-Shichman (GS) integration
 5. **Results**: Time-domain waveforms stored in `DataContainer` classes
 
-### 3.2 Key Interfaces
+Design reference: [Circuit preparation interface](adr/ADR-0002-circuit-preparation-interface.md).
+
+### 3.2 Runtime Ownership
+
+`HeadlessSimulationEngine` owns the simulation clock, cancellation checks, progress reporting, and result logging.
+Two internal modules concentrate numerical and CONTROL behavior behind small interfaces.
+
+| Module | Responsibility |
+|--------|----------------|
+| `ElectricalTimeStep` | Assemble matrices, solve nonlinear iterations, reconstruct currents, commit histories once, publish electrical results, and capture the step trace. |
+| `ControlRuntime` | Build and initialize the control chain, apply pending gates, transfer solved probes, execute calculators, and sample SCOPE signals. |
+| `SimulationService` | Schedule simulation jobs, own engines, commit state transitions, enforce batch limits, and publish progress through SSE and WebSocket adapters. |
+
+The engine preserves this phase order for each electrical time step:
+
+1. Apply the previous CONTROL gate values.
+2. Solve the electrical time step and publish its results and trace.
+3. Transfer solved probes, execute CONTROL, and record gates for the next time step.
+4. Sample SCOPE signals and log the results.
+
+CONTROL runtimes initialize once per simulation run.
+Simulations without electrical elements retain their existing behavior and do not advance the control chain.
+SCOPE names and samples cross the runtime interface as independent copies.
+Existing public calculator, mapping, and coupling classes remain available for compatibility.
+
+The job module returns detached snapshots with consistent status, timestamps, errors, and results.
+Cancellation remains `FAILED` with the error `Cancelled by user`.
+A durable cancellation signal also covers cancellation before the engine starts.
+Each job commits one final transition and publishes at most one logical terminal event to its progress adapters.
+Transport delivery can still fail when a subscriber disconnects.
+Progress delivery is synchronous, so a slow subscriber can delay status reads or cancellation for the same job.
+
+Batch admission enforces the requested `maxConcurrent` limit within the shared executor capacity.
+A requested value of `0` uses an effective limit of `4`, while the response retains the requested value.
+The default limit remains `4`.
+Queued jobs remain `PENDING` until execution starts.
+
+### 3.3 Key Interfaces
 
 ```java
 // Circuit component stamping (Modified Nodal Analysis)
@@ -116,7 +153,7 @@ SolverContext {
 StamperRegistry.getStamper(CircuitTyp) → IMatrixStamper
 ```
 
-### 3.3 Operating Modes
+### 3.4 Operating Modes
 
 Defined in `OperatingMode` enum, selected at startup:
 
@@ -299,6 +336,8 @@ These files are NOT overwritten by `sync-docs.py` (path convention mismatch):
 
 ### 6.3 REST API (v3.0.0 — 32 Live Endpoints)
 
+Design references: [Circuit preparation admission](adr/ADR-0001-circuit-preparation-admission.md) and [Circuit preparation interface](adr/ADR-0002-circuit-preparation-interface.md).
+
 **Loss Calculation (3 endpoints):**
 ```
 POST   /api/v1/loss/switching                Switching loss (voltage/energy scaling)
@@ -390,7 +429,7 @@ mkdocs gh-deploy --force                   # Deploy to GitHub Pages
 - CorePackageValidationTest: No GUI imports in core
 - MkDocs strict mode: No broken internal links
 - SpotBugs: 0 bugs (204 inline `@SuppressFBWarnings` annotations)
-- PMD: Custom ruleset `pmd-ruleset.xml` (quickstart rules, 10 excluded rules, allowCommentedBlocks, excludes `com/intel/mkl/`), **496 violations** ✅ **<500 TARGET ACHIEVED** (code-style only, down 86% from original 3,443 after systematic cleanup: 327 violations fixed, 6 categories eliminated to 0, 116 false positives excluded)
+- PMD: Custom ruleset `pmd-ruleset.xml` (quickstart rules, 10 excluded rules, allowCommentedBlocks, excludes `com/intel/mkl/`), 636 violations as of 2026-11-23, regressed from 496 (see #64); code-style only, v2.12.0 cut it 86% from original 3,443 after systematic cleanup: 327 violations fixed, 6 categories eliminated to 0, 116 false positives excluded
 - Checkstyle: Custom config `checkstyle.xml` (150-char lines, relaxed naming), 4,632 violations
 
 ### 7.3 Release Automation

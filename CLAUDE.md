@@ -105,7 +105,31 @@ python -m src.cli run sw-arch .  # Run architecture analysis
 - .ipes files: gzip-compressed circuit files
 - Tests: 7,434 total (5,373 main + 1,837 core + 224 API) + 21 regression
 - Core module: 216 source classes, 80 test files
-- Static analysis: SpotBugs 0 bugs, PMD <500 violations (496 current)
+- Static analysis: PMD 399 violations (limit 400), Checkstyle 1,838 warnings (limit 2,000). Both checks run during `verify`.
 - Docs site: https://tinix84.github.io/GeckoCIRCUITS/
 - REST API v3.0.0: 32 endpoints, Spring Boot 3.2.1, Docker-ready
 - `CorePackageValidationTest` enforces zero GUI imports in gecko-simulation-core
+
+## Python Environment
+
+**Do not create `.venv` directories.** Use conda instead:
+- `conda activate ntbees2` (default)
+- `conda activate social_env` (social media work)
+
+Never run `python -m venv`, `uv venv`, or `virtualenv`.
+
+## Decision Log
+
+| Date | Decision |
+|---|---|
+| 2026-11-04 | [ADR-0001: Circuit preparation admission contract](docs/adr/ADR-0001-circuit-preparation-admission.md) |
+| 2026-11-04 | [ADR-0002: Circuit preparation interface](docs/adr/ADR-0002-circuit-preparation-interface.md) |
+| 2026-11-07 | [ADR-0003: CONTROL dependency ordering](docs/adr/ADR-0003-control-dependency-ordering.md) |
+| 2026-11-07 | [ADR-0004: Recorded signal analysis](docs/adr/ADR-0004-recorded-signal-analysis.md) |
+| 2026-11-08 | [ADR-0005: Shared CONTROL delay history](docs/adr/ADR-0005-shared-control-delay-history.md) |
+| 2026-11-09 | [ADR-0006: Scoped simulation retrieval](docs/adr/ADR-0006-scoped-simulation-retrieval.md) |
+| 2026-11-09 | [ADR-0007: Local simulation session](docs/adr/ADR-0007-local-simulation-session.md) |
+| 2026-11-09 | [ADR-0008: Controlled source compatibility](docs/adr/ADR-0008-controlled-source-compatibility.md) |
+| 2026-11-12 | [ADR-0010: Pull-based frontend and single-owner session](docs/adr/ADR-0010-pull-based-frontend-single-owner-session.md) |
+| 2026-11-13 | [ADR-0011: Numerical reference compatibility](docs/adr/ADR-0011-numerical-reference-compatibility.md) |
+| 2026-11-17 | [ADR-0012: Isolated electrical groups](docs/adr/ADR-0012-isolated-electrical-groups.md) |

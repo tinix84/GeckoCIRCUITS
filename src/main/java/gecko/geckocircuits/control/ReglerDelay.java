@@ -39,17 +39,18 @@ public final class ReglerDelay extends AbstractReglerSingleInputSingleOutput {
 
     public ReglerDelay() {
         super();
-        _tDelay.addActionListener(new ActionListener() {
+        _tDelay.addActionListener(
+                new ActionListener() {
 
-            @Override
-            public void actionPerformed(final ActionEvent event) {
-                if(_calculator instanceof DelayCalculator) {
-                    ((DelayCalculator) _calculator).setDelayTime(_tDelay.getValue());
-                    return;
-                }
-                assert _calculator == null;
-            }
-        });
+                    @Override
+                    public void actionPerformed(final ActionEvent event) {
+                        if (_calculator instanceof DelayCalculator) {
+                            ((DelayCalculator) _calculator).setDelayTime(_tDelay.getValue());
+                            return;
+                        }
+                        assert _calculator == null;
+                    }
+                });
     }
 
     @Override

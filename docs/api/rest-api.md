@@ -584,7 +584,8 @@ destination:/topic/simulations/9a1d5f7e-3b2c-4d9e-8f1a-6c2b4a7d9e3f
 
 **Progress Message Format**
 
-Both SSE (`/api/v1/simulations/{id}/stream`) and WebSocket (`/topic/simulations/{id}`) use the same JSON message structure:
+WebSocket/STOMP (`/topic/simulations/{id}`) uses this JSON message structure.
+Its `progress` field is a percentage from 0 to 100:
 
 ```json
 {
@@ -600,11 +601,26 @@ Both SSE (`/api/v1/simulations/{id}/stream`) and WebSocket (`/topic/simulations/
 }
 ```
 
+SSE progress events (`/api/v1/simulations/{id}/stream`) retain a completion ratio from 0 to 1.
+At the same point, their payload is:
+
+```json
+{
+  "simulationId": "9a1d5f7e-3b2c-4d9e-8f1a-6c2b4a7d9e3f",
+  "progress": 0.45,
+  "currentTime": 0.009,
+  "endTime": 0.02
+}
+```
+
+The polling endpoint (`/api/v1/simulations/{id}/progress`) reports `progress` as a percentage, like STOMP.
+
 **Comparison: SSE vs WebSocket**
 
 | Feature | SSE | WebSocket |
 |---------|-----|-----------|
 | Endpoint | `/api/v1/simulations/{id}/stream` | `/topic/simulations/{id}` |
+| Progress units | Ratio (0-1) | Percentage (0-100) |
 | Protocol | HTTP/1.1 (text/event-stream) | TCP (STOMP/1.2) |
 | Direction | Server → Client only | Bidirectional (client → server coming in future versions) |
 | Browser Support | Native EventSource API | Requires SockJS or ws library |
@@ -613,7 +629,7 @@ Both SSE (`/api/v1/simulations/{id}/stream`) and WebSocket (`/topic/simulations/
 | Overhead | Higher (HTTP headers) | Lower (raw TCP frames) |
 | Best For | Simple dashboards | Interactive monitoring, multi-client scenarios |
 
-Both endpoints receive updates simultaneously from the same `broadcastProgress()` call, ensuring synchronized progress messages.
+Both endpoints receive the same underlying progress updates with transport-specific payloads and units.
 
 Live in: **v2.21.0+**
 
@@ -664,6 +680,14 @@ Response:
   "sampleCount": 20000
 }
 ```
+
+Stored signals use their recorded timestamps. They do not require `sampleRate`, and a supplied rate does not replace the recorded clock.
+Each omitted time bound defaults to the corresponding recorded endpoint.
+Bounds must be finite, increasing, and within the recorded clock.
+Between timestamps, analysis holds the preceding sample value. Exact window boundaries preserve the requested duration.
+`sampleCount` includes inserted boundary samples. Raw arrays retain their explicit sample-rate contract.
+These window rules apply to characteristics, RMS, and Fourier analysis.
+Fourier uses the selected duration for its base frequency and rejects harmonic counts beyond the selected signal resolution.
 
 **Fourier Harmonic Analysis**
 

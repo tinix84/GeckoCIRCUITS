@@ -77,7 +77,7 @@ public final class UserParameter<T> {
         _parameterableObject = builder._paramterableObject;
 
         Object description = getShortName();
-        if(_parameterableObject != null) {
+        if (_parameterableObject != null) {
             description = new Object() {
 
                 @Override
@@ -103,7 +103,7 @@ public final class UserParameter<T> {
     }
 
     public boolean isShowTypeInfoConditionFromEnum() {
-        if(_enumConditionParameter == null || _enumConditionValue == null) {
+        if (_enumConditionParameter == null || _enumConditionValue == null) {
             return true;
         }
         return _enumConditionParameter.getValue() == _enumConditionValue;
@@ -178,7 +178,7 @@ public final class UserParameter<T> {
     public T getValue() {
         if (!_nameOpt.isEmpty() && _value.getValue() instanceof Number) {
             Double returnValue = (Double) MainWindow.optimizerParameterData.getNumberFromNameWOException(_nameOpt);
-            if(_value.getValue() instanceof Integer) {
+            if (_value.getValue() instanceof Integer) {
                 return (T) (Integer) returnValue.intValue();
             } else {
                 return (T) returnValue;
@@ -263,7 +263,7 @@ public final class UserParameter<T> {
             return type.getOldGeckoID();
         }
 
-        if(_value.getValue() instanceof SSAShape) {
+        if (_value.getValue() instanceof SSAShape) {
             return ((SSAShape) _value.getValue()).ordinal();
         }
 
@@ -280,7 +280,7 @@ public final class UserParameter<T> {
 
         if (tokenMap.containsToken(_identifier)) {
 
-            if(tokenMap.containsToken(_identifierNameOpt)) {
+            if (tokenMap.containsToken(_identifierNameOpt)) {
                 _nameOpt = tokenMap.readDataLine(_identifierNameOpt, "");
             }
 
@@ -302,12 +302,16 @@ public final class UserParameter<T> {
             }
 
             if (oldValue instanceof ControlSourceType) {
-                final ControlSourceType newValue = ControlSourceType.getFromID(tokenMap.readDataLine(_identifier, ControlSourceType.QUELLE_RECHTECK.getOldGeckoID()));
+                final ControlSourceType newValue =
+                        ControlSourceType.getFromID(
+                                tokenMap.readDataLine(
+                                        _identifier,
+                                        ControlSourceType.QUELLE_RECHTECK.getOldGeckoID()));
                 _value.setValueWithoutUndo((T) newValue);
                 return;
             }
 
-            if(oldValue instanceof SSAShape) {
+            if (oldValue instanceof SSAShape) {
                 final SSAShape newValue = SSAShape.getFromOrdinal(tokenMap.readDataLine(_identifier, SSAShape.RECTANGLE.ordinal()));
                 _value.setValueWithoutUndo((T) newValue);
                 return;
@@ -489,7 +493,7 @@ public final class UserParameter<T> {
         T value = getValue();
 
         final String nameOptString = getNameOpt();
-        if(!getNameOpt().isEmpty()) {
+        if (!getNameOpt().isEmpty()) {
             ProjectData.appendAsString(ascii.append("\n" + _identifierNameOpt), nameOptString);
         }
 
@@ -526,7 +530,7 @@ public final class UserParameter<T> {
 
         if (value instanceof String) {
             String writeString = (String) value;
-            if(writeString.contains("\n")) {
+            if (writeString.contains("\n")) {
                 writeString = writeString.replaceAll("\n", "\\\\n");
             }
             ProjectData.appendAsString(ascii.append("\n" + _identifier), writeString);
@@ -668,7 +672,7 @@ public final class UserParameter<T> {
 
         public Builder<T> longName(final I18nKeys name, final I18nKeys... additionalNames) {
             _longNames.add(name.getTranslation());
-            for(I18nKeys additionalName : additionalNames) {
+            for (I18nKeys additionalName : additionalNames) {
                 _longNames.add(additionalName.getTranslation());
             }
             return this;

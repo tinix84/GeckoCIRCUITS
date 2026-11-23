@@ -13,6 +13,8 @@
  */
 package gecko.core.circuit.matrix;
 
+import gecko.core.allg.SolverType;
+
 /**
  * Matrix stamper implementation for current source components.
  *
@@ -51,7 +53,7 @@ public class CurrentSourceStamper implements IMatrixStamper {
 
     @Override
     public void stampMatrixA(double[][] a, int nodeX, int nodeY, int nodeZ,
-                             double[] parameter, double dt) {
+                             double[] parameter, double dt, SolverType solverType) {
         // Ideal current source has infinite impedance - no A matrix contribution
     }
 

@@ -42,8 +42,7 @@ class TerminalControlOutputWithLabel extends TerminalControlOutput {
         final Color origColor = graphics.getColor();
         graphics.setColor(Color.magenta);
 
-
-        graphics.drawString(_magentaLabel, xPos - (int) (1.2 * dpix) , yPos);
+        graphics.drawString(_magentaLabel, xPos - (int) (1.2 * dpix), yPos);
         graphics.setColor(origColor);
         graphics.setFont(orig);
     }

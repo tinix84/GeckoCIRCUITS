@@ -58,7 +58,7 @@ public final class ReglerCISPR16 extends RegelBlock implements SpecialNameVisibl
         super(1, 0);
         try {
             _testReceiverCISPR16 = new TestReceiverWindow(this);
-        } catch(Throwable ex) {
+        } catch (Throwable ex) {
             ex.printStackTrace();
         }
 
@@ -205,8 +205,14 @@ public final class ReglerCISPR16 extends RegelBlock implements SpecialNameVisibl
         @Override
         public void doInit(final double deltaT) {
             try {
-                _zvDatenRam = DataContainerSimple.fabricConstantDtTimeSeries(1, (int) ((SimulationsKern.getStaticTEND() - SimulationsKern.getStaticTSTART()) / deltaT)
-                        + DATA_INDEX_ADD);
+                _zvDatenRam =
+                        DataContainerSimple.fabricConstantDtTimeSeries(
+                                1,
+                                (int)
+                                                ((SimulationsKern.getStaticTEND()
+                                                                - SimulationsKern.getStaticTSTART())
+                                                        / deltaT)
+                                        + DATA_INDEX_ADD);
             } catch (OutOfMemoryError err) {
                 _zvDatenRam = null;
                 JOptionPane.showMessageDialog(null,
@@ -252,14 +258,34 @@ public final class ReglerCISPR16 extends RegelBlock implements SpecialNameVisibl
 
         graphics.setColor(getBackgroundColor());
 
-        graphics.fillRect((int) (dpix * (xPos - WIDTH)), (int) (dpix * (yPos - DA_OFFSET)), (int) (dpix * (WIDTH + DA_OFFSET)), (int) (dpix * (WIDTH + DA_OFFSET)));
+        graphics.fillRect(
+                (int) (dpix * (xPos - WIDTH)),
+                (int) (dpix * (yPos - DA_OFFSET)),
+                (int) (dpix * (WIDTH + DA_OFFSET)),
+                (int) (dpix * (WIDTH + DA_OFFSET)));
         graphics.setColor(origColor);
-        graphics.drawRect((int) (dpix * (xPos - WIDTH)), (int) (dpix * (yPos - DA_OFFSET)), (int) (dpix * (WIDTH + DA_OFFSET)), (int) (dpix * (WIDTH + DA_OFFSET)));
-        graphics.drawRect((int) (dpix * (xPos - WIDTH)) + DI_OFFSET, (int) (dpix * (yPos - DA_OFFSET)) + DI_OFFSET, (int) (dpix * (WIDTH + DA_OFFSET)) - 2 * DI_OFFSET, (int) (dpix * (WIDTH + DA_OFFSET)) - 2 * DI_OFFSET);
+        graphics.drawRect(
+                (int) (dpix * (xPos - WIDTH)),
+                (int) (dpix * (yPos - DA_OFFSET)),
+                (int) (dpix * (WIDTH + DA_OFFSET)),
+                (int) (dpix * (WIDTH + DA_OFFSET)));
+        graphics.drawRect(
+                (int) (dpix * (xPos - WIDTH)) + DI_OFFSET,
+                (int) (dpix * (yPos - DA_OFFSET)) + DI_OFFSET,
+                (int) (dpix * (WIDTH + DA_OFFSET)) - 2 * DI_OFFSET,
+                (int) (dpix * (WIDTH + DA_OFFSET)) - 2 * DI_OFFSET);
         //
         int a1 = DI_OFFSET + 4, a2 = DI_OFFSET + 2;
-        graphics.drawLine((int) (dpix * (xPos - WIDTH) + a2), (int) (dpix * (yPos + WIDTH) - a1), (int) (dpix * (xPos + DA_OFFSET) - a2), (int) (dpix * (yPos + WIDTH) - a1));  // waagrechte Achse
-        graphics.drawLine((int) (dpix * (xPos - WIDTH) + a1), (int) (dpix * (yPos - DA_OFFSET) + a2), (int) (dpix * (xPos - WIDTH) + a1), (int) (dpix * (yPos + WIDTH) - a2));  // senkrechte Achse
+        graphics.drawLine(
+                (int) (dpix * (xPos - WIDTH) + a2),
+                (int) (dpix * (yPos + WIDTH) - a1),
+                (int) (dpix * (xPos + DA_OFFSET) - a2),
+                (int) (dpix * (yPos + WIDTH) - a1)); // waagrechte Achse
+        graphics.drawLine(
+                (int) (dpix * (xPos - WIDTH) + a1),
+                (int) (dpix * (yPos - DA_OFFSET) + a2),
+                (int) (dpix * (xPos - WIDTH) + a1),
+                (int) (dpix * (yPos + WIDTH) - a2)); // senkrechte Achse
         // Stuetzpunkte der Class A/B-Kurven:
         final int dx = (int) (dpix * (WIDTH + DA_OFFSET) - a1 - a2), dy = dx;
         final int xk1 = (int) (dpix * (xPos - WIDTH) + a1 + 2);
@@ -281,11 +307,30 @@ public final class ReglerCISPR16 extends RegelBlock implements SpecialNameVisibl
     }
 
     public void setTestReceiverCISPR16MenueEnabled(final boolean value) {
-        _testReceiverCISPR16.setTestReceiverCISPR16MenueEnabled(value);
         if (value) {
             _zvDatenRam.setContainerStatus(ContainerStatus.FINISHED);
         }
+        setSimulationPresentationActive(!value);
+    }
 
+    /**
+     * Updates receiver widgets without changing the simulation recording.
+     *
+     * @param active true while simulation execution is active
+     */
+    public void setSimulationPresentationActive(final boolean active) {
+        setSimulationPresentationActive(active, () -> true);
+    }
+
+    /**
+     * Updates receiver widgets while the caller owns their presentation.
+     *
+     * @param active true while simulation execution is active
+     * @param stillCurrent checks ownership before each widget change
+     */
+    public void setSimulationPresentationActive(final boolean active,
+            final java.util.function.BooleanSupplier stillCurrent) {
+        _testReceiverCISPR16.setTestReceiverCISPR16MenueEnabled(!active, stillCurrent);
     }
 
     @Override

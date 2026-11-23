@@ -44,8 +44,8 @@ public enum GeckoSymbol {
 
 
     static GeckoSymbol getFromCode(final int code) {
-        for(GeckoSymbol val : values()) {
-            if(val._code == code) {
+        for (GeckoSymbol val : values()) {
+            if (val._code == code) {
                 return val;
             }
         }
@@ -54,8 +54,8 @@ public enum GeckoSymbol {
     }
 
     static GeckoSymbol getFromOrdinal(final int ordinal) {
-        for(GeckoSymbol val : values()) {
-            if(val.ordinal() == ordinal) {
+        for (GeckoSymbol val : values()) {
+            if (val.ordinal() == ordinal) {
                 return val;
             }
         }

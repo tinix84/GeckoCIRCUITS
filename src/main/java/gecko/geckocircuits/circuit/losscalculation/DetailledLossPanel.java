@@ -103,11 +103,17 @@ abstract class DetailledLossPanel<T extends LossCurve> extends JPanel {
     final void baueGUI() {
 
         _jPanelCurvesSelection = new JPanel();
-        _jPanelCurvesSelection.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), "Edit Curves", TitledBorder.LEFT, TitledBorder.TOP));
+        _jPanelCurvesSelection.setBorder(
+                BorderFactory.createTitledBorder(
+                        BorderFactory.createEtchedBorder(),
+                        "Edit Curves",
+                        TitledBorder.LEFT,
+                        TitledBorder.TOP));
         _jPanelCurvesSelection.setLayout(new BorderLayout());
 
-//jpSWed.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), "", TitledBorder.LEFT, TitledBorder.TOP, TxtI.ti_Font_border));
-        _leftPanelTempAndBlocking.setLayout(new GridLayout(getTableCaptions().length+1, 1));
+        // jpSWed.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), "",
+        // TitledBorder.LEFT, TitledBorder.TOP, TxtI.ti_Font_border));
+        _leftPanelTempAndBlocking.setLayout(new GridLayout(getTableCaptions().length + 1, 1));
 
         final JButton jbAdd = GuiFabric.getJButton(I18nKeys.ADD_NEW);
         jbAdd.addActionListener(new ActionListener() {
@@ -141,9 +147,19 @@ abstract class DetailledLossPanel<T extends LossCurve> extends JPanel {
 
 
         _table = createTable();
-        _table.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), "Data of Selected Curve", TitledBorder.LEFT, TitledBorder.TOP));
+        _table.setBorder(
+                BorderFactory.createTitledBorder(
+                        BorderFactory.createEtchedBorder(),
+                        "Data of Selected Curve",
+                        TitledBorder.LEFT,
+                        TitledBorder.TOP));
 
-        _jPanelTemperatureInput.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), "Curve temperature Parameter", TitledBorder.LEFT, TitledBorder.TOP));
+        _jPanelTemperatureInput.setBorder(
+                BorderFactory.createTitledBorder(
+                        BorderFactory.createEtchedBorder(),
+                        "Curve temperature Parameter",
+                        TitledBorder.LEFT,
+                        TitledBorder.TOP));
         _jPanelTemperatureInput.setLayout(new GridLayout(1, 2));
         JLabel jlTJ = new JLabel("Tj [°C] = ");
         _jPanelTemperatureInput.add(jlTJ);
@@ -154,7 +170,7 @@ abstract class DetailledLossPanel<T extends LossCurve> extends JPanel {
         jPanelData.add(_table, BorderLayout.CENTER);
         jPanelData.add(_jPanelTemperatureInput, BorderLayout.NORTH);
 
-        if(!_lossCurves.isEmpty()) {
+        if (!_lossCurves.isEmpty()) {
             _selectedCurve = _lossCurves.get(0);
             loadSelectedCurveIntoTable();
         }

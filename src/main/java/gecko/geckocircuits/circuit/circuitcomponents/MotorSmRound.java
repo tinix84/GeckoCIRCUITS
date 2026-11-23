@@ -36,7 +36,12 @@ public final class MotorSmRound extends AbstractMotorSM {
     private static final int INIT_STAT_FLUX_Q_INDEX = 38;
     private static final double INIT_DAMPER_RES_Q2_VALUE = 0.2;
     private static final double INIT_LEAKAGE_INDUCTANCE_Q2 = 0.002;
-    public static final AbstractTypeInfo TYPE_INFO = new CircuitTypeInfo(MotorSmRound.class, "SM-RO", I18nKeys.SM_RO, I18nKeys.ROUND_ROTOR_SYNCHRONOUS_MACHINE);
+    public static final AbstractTypeInfo TYPE_INFO =
+            new CircuitTypeInfo(
+                    MotorSmRound.class,
+                    "SM-RO",
+                    I18nKeys.SM_RO,
+                    I18nKeys.ROUND_ROTOR_SYNCHRONOUS_MACHINE);
     private double _damperResistanceQ2;
 
     final UserParameter<Double> _damperResistanceQ2_par = UserParameter.Builder.
@@ -96,8 +101,16 @@ public final class MotorSmRound extends AbstractMotorSM {
                 + isq * _omegaElectric + ifd * (Rkd / Llkd - Rf / Llf)
                 - Rkd * inv_Lm / Llkd * psimd + _omegaElectric / Lls * psimq
                 + ud / Lls + uf / Llf) / (inv_Lm + 1 / Lls + 1 / Llf + 1 / Llkd);
-        double ddt_psimq = (-_omegaElectric * isd + isq * (_damperResistanceQ2 / _damperLeakageIndQ2 - _statorResistance / Lls) + (_damperResistanceQ2 / _damperLeakageIndQ2 - Rkq / Llkq1) * _ikq1
-                - _omegaElectric / Lls * psimd - _damperResistanceQ2 * inv_Lm / _damperLeakageIndQ2 * psimq + uq / Lls) / (inv_Lm + 1 / Lls + 1 / Llkq1 + 1 / _damperLeakageIndQ2);
+        double ddt_psimq =
+                (-_omegaElectric * isd
+                                + isq
+                                        * (_damperResistanceQ2 / _damperLeakageIndQ2
+                                                - _statorResistance / Lls)
+                                + (_damperResistanceQ2 / _damperLeakageIndQ2 - Rkq / Llkq1) * _ikq1
+                                - _omegaElectric / Lls * psimd
+                                - _damperResistanceQ2 * inv_Lm / _damperLeakageIndQ2 * psimq
+                                + uq / Lls)
+                        / (inv_Lm + 1 / Lls + 1 / Llkq1 + 1 / _damperLeakageIndQ2);
 
         psimd = psimd0 + ddt_psimd * deltaT;
         psimq = psimq0 + ddt_psimq * deltaT;

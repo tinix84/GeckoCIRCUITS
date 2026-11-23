@@ -52,7 +52,7 @@ public final class HorizontalLevel {
 
         graphics.drawLine(xmin, ySPix, xmax, ySPix);
 
-        if(_lastPaintedY != ySPix) {
+        if (_lastPaintedY != ySPix) {
             _lastPaintedY = ySPix;
         }
 

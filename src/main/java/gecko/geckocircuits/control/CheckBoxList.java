@@ -13,6 +13,8 @@
  */
 package gecko.geckocircuits.control;
 
+import java.util.Set;
+
 
 import java.awt.*;
 import javax.swing.*;
@@ -27,33 +29,33 @@ public class CheckBoxList extends JList<String>
         listSelectionBackground;
     static {
         UIDefaults uid = UIManager.getLookAndFeel().getDefaults();
-        listForeground =  uid.getColor ("List.foreground");
-        listBackground =  uid.getColor ("List.background");
-        listSelectionForeground =  uid.getColor ("List.selectionForeground");
-        listSelectionBackground =  uid.getColor ("List.selectionBackground");
+        listForeground = uid.getColor("List.foreground");
+        listBackground = uid.getColor("List.background");
+        listSelectionForeground = uid.getColor("List.selectionForeground");
+        listSelectionBackground = uid.getColor("List.selectionBackground");
     }
 
-    HashSet<Integer> selectionCache = new HashSet<Integer>();
+    Set<Integer> selectionCache = new HashSet<Integer>();
     int toggleIndex = -1;
     boolean toggleWasSelected;
 
     public CheckBoxList() {
         super();
-        setCellRenderer (new CheckBoxListCellRenderer());
-        addListSelectionListener (this);
+        setCellRenderer(new CheckBoxListCellRenderer());
+        addListSelectionListener(this);
     }
 
     // ListSelectionListener implementation
     @Override
-    public void valueChanged (ListSelectionEvent lse) {
-        System.out.println (lse);
-        if (! lse.getValueIsAdjusting()) {
-            removeListSelectionListener (this);
+    public void valueChanged(ListSelectionEvent lse) {
+        System.out.println(lse);
+        if (!lse.getValueIsAdjusting()) {
+            removeListSelectionListener(this);
 
             // remember everything selected as a result of this action
-            HashSet<Integer> newSelections = new HashSet<Integer>();
+            Set<Integer> newSelections = new HashSet<Integer>();
             int size = getModel().getSize();
-            for (int i=0; i<size; i++) {
+            for (int i = 0; i < size; i++) {
                 if (getSelectionModel().isSelectedIndex(i)) {
                     newSelections.add(i);
                 }
@@ -63,7 +65,7 @@ public class CheckBoxList extends JList<String>
             Iterator<Integer> it = selectionCache.iterator();
             while (it.hasNext()) {
                 int index = it.next();
-                System.out.println ("adding " + index);
+                System.out.println("adding " + index);
                 getSelectionModel().addSelectionInterval(index, index);
             }
 
@@ -72,49 +74,46 @@ public class CheckBoxList extends JList<String>
             while (it.hasNext()) {
                 Integer nextInt = (Integer) it.next();
                 int index = nextInt;
-                if (selectionCache.contains (nextInt)) {
-                    getSelectionModel().removeSelectionInterval (index, index);
+                if (selectionCache.contains(nextInt)) {
+                    getSelectionModel().removeSelectionInterval(index, index);
                 } else {
-                    getSelectionModel().addSelectionInterval (index, index);
+                    getSelectionModel().addSelectionInterval(index, index);
                 }
             }
 
             // save selections for next time
             selectionCache.clear();
-            for (int i=0; i<size; i++) {
+            for (int i = 0; i < size; i++) {
                 if (getSelectionModel().isSelectedIndex(i)) {
-                    System.out.println ("caching " + i);
+                    System.out.println("caching " + i);
                     selectionCache.add(i);
                 }
             }
 
-            addListSelectionListener (this);
-
+            addListSelectionListener(this);
         }
     }
 
-
-
-
-    public static void main (String[] args) {
+    public static void main(String[] args) {
         JList<String> list = new CheckBoxList();
         DefaultListModel<String> defModel = new DefaultListModel<String>();
-        list.setModel (defModel);
+        list.setModel(defModel);
         String[] listItems = {
             "Chris", "Joshua", "Daniel", "Michael",
             "Don", "Kimi", "Kelly", "Keagan"
         };
         Iterator<String> it = Arrays.asList(listItems).iterator();
         while (it.hasNext()) {
-            defModel.addElement (it.next());
+            defModel.addElement(it.next());
         }
         // show list
         JScrollPane scroller =
-            new JScrollPane (list,
-                            ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
-                            ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        JFrame frame = new JFrame ("Checkbox JList");
-        frame.getContentPane().add (scroller);
+                new JScrollPane(
+                        list,
+                        ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
+                        ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        JFrame frame = new JFrame("Checkbox JList");
+        frame.getContentPane().add(scroller);
         frame.pack();
         frame.setVisible(true);
     }
@@ -125,21 +124,17 @@ public class CheckBoxList extends JList<String>
         DefaultListCellRenderer defaultComp;
         JCheckBox checkbox;
         public CheckBoxListCellRenderer() {
-            setLayout (new BorderLayout());
+            setLayout(new BorderLayout());
             defaultComp = new DefaultListCellRenderer();
             checkbox = new JCheckBox();
-            add (checkbox, BorderLayout.WEST);
-            add (defaultComp, BorderLayout.CENTER);
+            add(checkbox, BorderLayout.WEST);
+            add(defaultComp, BorderLayout.CENTER);
         }
 
         @Override
-        public Component getListCellRendererComponent(JList<?> list,
-                                                      Object  value,
-                                                      int index,
-                                                      boolean isSelected,
-                                                      boolean cellHasFocus){
-            defaultComp.getListCellRendererComponent (list, value, index,
-                                                      isSelected, cellHasFocus);
+        public Component getListCellRendererComponent(
+                JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+            defaultComp.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
             /*
             checkbox.setSelected (isSelected);
             checkbox.setForeground (isSelected ?
@@ -149,11 +144,11 @@ public class CheckBoxList extends JList<String>
                                     listSelectionBackground :
                                     listBackground);
             */
-            checkbox.setSelected (isSelected);
+            checkbox.setSelected(isSelected);
             Component[] comps = getComponents();
             for (Component comp : comps) {
-                comp.setForeground (listForeground);
-                comp.setBackground (listBackground);
+                comp.setForeground(listForeground);
+                comp.setBackground(listBackground);
             }
             return this;
         }

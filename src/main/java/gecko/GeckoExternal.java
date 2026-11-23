@@ -56,12 +56,14 @@ public class GeckoExternal {
 
         System.out.println("***WARNING: GeckoExternal is a DEPRECATED API***");
         System.out.println("GeckoExternal is deprecated as of GeckoCIRCUITS version 1.6.");
-        System.out.println("Please switch to using GeckoRemote (as explained in the Appendix of the GeckoSCRIPT tutorial included with your GeckoCIRCUITS distribution).\n");
+        System.out.println(
+                "Please switch to using GeckoRemote (as explained in the Appendix of the GeckoSCRIPT tutorial included with your GeckoCIRCUITS distribution).\n");
         System.out.println("Reasons to switch: ");
         System.out.println("Using GeckoRemote runs GeckoCIRCUITS in its own JVM, not inside MATLAB, this means that");
         System.out.println("1) You can close GeckoCIRCUITS without having to close all of MATLAB;");
         System.out.println("2) You don't have to worry about memory allocation for GeckoCIRCUITS in the MATLAB JVM;");
-        System.out.println("3) You will not have problems with compiling Java blocks in your model as was the case with some MATLAB installations.\n");
+        System.out.println(
+                "3) You will not have problems with compiling Java blocks in your model as was the case with some MATLAB installations.\n");
         System.out.println("GeckoExternal continues to function as before for backwards compatibility. However it is no longer maintained.");
         System.out.println("This means that:");
         System.out.println("1) Any new problems with using GeckoExternal in MATLAB will not be addressed;");

@@ -13,6 +13,8 @@
  */
 package gecko.core.circuit.matrix;
 
+import gecko.core.allg.SolverType;
+
 /**
  * Strategy interface for stamping component contributions into MNA matrices.
  *
@@ -48,8 +50,10 @@ public interface IMatrixStamper {
      * @param nodeZ auxiliary node index (for voltage sources, inductors with LKOP2)
      * @param parameter component parameters array
      * @param dt time step size
+     * @param solverType the numerical integration method (BE, TRZ, GS)
      */
-    void stampMatrixA(double[][] a, int nodeX, int nodeY, int nodeZ, double[] parameter, double dt);
+    void stampMatrixA(double[][] a, int nodeX, int nodeY, int nodeZ, double[] parameter,
+                      double dt, SolverType solverType);
 
     /**
      * Stamps the component's contribution into the b vector (sources).

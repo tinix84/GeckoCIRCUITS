@@ -47,9 +47,11 @@ public class NComplex {
       return im;
    }
 
-   /** return a string representation of the complex number */
-   @Override
-   public String toString()  { return re + " + " + im + "i"; }
+    /** return a string representation of the complex number */
+    @Override
+    public String toString() {
+        return re + " + " + im + "i";
+    }
 
    /** returns a new complex number with value a + b */
    public static NComplex add(NComplex a, NComplex b) {
@@ -72,8 +74,8 @@ public class NComplex {
    /** returns a new complex number with value a*b */
    public static NComplex mul(NComplex a, NComplex b) {
       float re, im;
-      re = a.re*b.re - a.im*b.im;
-      im = a.im*b.re + a.re*b.im;
+        re = a.re * b.re - a.im * b.im;
+        im = a.im * b.re + a.re * b.im;
 
       return new NComplex(re, im);
    }
@@ -89,15 +91,15 @@ public class NComplex {
       float r,den;
 
       if (Math.abs(b.re) >= Math.abs(b.im)) {
-         r = b.im/b.re;
-         den = b.re+r*b.im;
-         re = (a.re+r*a.im)/den;
-         im = (a.im-r*a.re)/den;
+            r = b.im / b.re;
+            den = b.re + r * b.im;
+            re = (a.re + r * a.im) / den;
+            im = (a.im - r * a.re) / den;
       } else {
-         r = b.re/b.im;
-         den = b.im+r*b.re;
-         re = (a.re*r+a.im)/den;
-         im = (a.im*r-a.re)/den;
+            r = b.re / b.im;
+            den = b.im + r * b.re;
+            re = (a.re * r + a.im) / den;
+            im = (a.im * r - a.re) / den;
       }
 
       return new NComplex(re, im);
@@ -107,7 +109,7 @@ public class NComplex {
    public static float abs(NComplex a) {
         final float epsilon = 1e-6f;
         if (Math.abs(a.re) > epsilon || Math.abs(a.im) > epsilon) {
-            return (float)Math.sqrt(a.re*a.re + a.im*a.im);
+            return (float) Math.sqrt(a.re * a.re + a.im * a.im);
         } else {
             return 0.0f;
         }
@@ -127,18 +129,20 @@ public class NComplex {
          y = Math.abs(a.im);
 
          if (x >= y) {
-            r = y/x;
-            w = (float)Math.sqrt(x)*(float)Math.sqrt(0.5f*(1.0f + Math.sqrt(1.0f + r*r)));
+                r = y / x;
+                w =
+                        (float) Math.sqrt(x)
+                                * (float) Math.sqrt(0.5f * (1.0f + Math.sqrt(1.0f + r * r)));
          } else {
-            r = x/y;
-            w = (float)Math.sqrt(y)*(float)Math.sqrt(0.5f*(r + Math.sqrt(1.0f + r*r)));
+                r = x / y;
+                w = (float) Math.sqrt(y) * (float) Math.sqrt(0.5f * (r + Math.sqrt(1.0f + r * r)));
          }
          if (a.re >= 0.0) {
             re = w;
-            im = a.im/(2.0f*w);
+                im = a.im / (2.0f * w);
          } else {
             im = (a.im >= 0.0f) ? w : -w;
-            re = a.im/(2.0f*im);
+                re = a.im / (2.0f * im);
          }
       }
 
@@ -149,23 +153,23 @@ public class NComplex {
    public static NComplex RCmul(float x, NComplex a) {
       float im,re;
 
-      re = x*a.re;
-      im = x*a.im;
+        re = x * a.re;
+        im = x * a.im;
 
       return new NComplex(re, im);
    }
 
     public String nicePrint() {
         final float epsilon = 1e-6f;
-        if(Math.abs(re) > epsilon && Math.abs(im) > epsilon) {
-            if(im > 0) {
-                if(Math.abs(im - 1.0f) < epsilon) {
+        if (Math.abs(re) > epsilon && Math.abs(im) > epsilon) {
+            if (im > 0) {
+                if (Math.abs(im - 1.0f) < epsilon) {
                     return tcf.formatENG(re, 3) + "+i";
                 } else {
                     return tcf.formatENG(re, 3) + "+" + tcf.formatENG(im, 3) + "i";
                 }
             } else {
-                if(Math.abs(im + 1.0f) < epsilon) {
+                if (Math.abs(im + 1.0f) < epsilon) {
                     return tcf.formatENG(re, 3) + "-i";
                 } else {
                     return tcf.formatENG(re, 3) + ""  + tcf.formatENG(im, 3) + "i";
@@ -173,11 +177,15 @@ public class NComplex {
             }
         }
 
-        if(Math.abs(re) > epsilon) {
+        if (Math.abs(re) > epsilon) {
             return "" + tcf.formatENG(re, 3);
         } else {
-            if(Math.abs(Math.abs(im) - 1.0f) < epsilon) {
-                if(im > 0) { return "i"; } else { return "-i"; }
+            if (Math.abs(Math.abs(im) - 1.0f) < epsilon) {
+                if (im > 0) {
+                    return "i";
+                } else {
+                    return "-i";
+                }
             } else {
                 return tcf.formatENG(im, 3) + "i";
             }
@@ -191,7 +199,7 @@ public class NComplex {
 
     @Override
     public boolean equals(Object o) {
-        if(o instanceof NComplex) {
+        if (o instanceof NComplex) {
             NComplex compare = (NComplex) o;
             final float epsilon = 1e-6f;
             return Math.abs(compare.re - this.re) < epsilon && Math.abs(compare.im - this.im) < epsilon;

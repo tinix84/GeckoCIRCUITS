@@ -69,55 +69,80 @@ public class DataTablePanelParameters extends JPanel {
         TableColumn secondColumn = _table.getColumnModel().getColumn(1);
         secondColumn.setPreferredWidth(30);
         secondColumn.setCellEditor(new MyTableCellEditor());
-        _table.getColumnModel().getColumn(1).setCellRenderer(new MyTableCellRenderer() {
+        _table.getColumnModel()
+                .getColumn(1)
+                .setCellRenderer(
+                        new MyTableCellRenderer() {
 
-            @Override
-            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                return super.getTableCellRendererComponent(table, value, false, hasFocus, row, column); //To change body of generated methods, choose Tools | Templates.
-            }
-
-        });
+                            @Override
+                            public Component getTableCellRendererComponent(
+                                    JTable table,
+                                    Object value,
+                                    boolean isSelected,
+                                    boolean hasFocus,
+                                    int row,
+                                    int column) {
+                                return super.getTableCellRendererComponent(
+                                        table, value, false, hasFocus, row,
+                                        column); // To change body of generated methods, choose
+                                                 // Tools | Templates.
+                            }
+                        });
 
         TableColumn thirdColumn = _table.getColumnModel().getColumn(2);
         thirdColumn.setPreferredWidth(20);
-        thirdColumn.setCellRenderer(new MyTableCellRenderer() {
-            @Override
-            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                return super.getTableCellRendererComponent(table, value, false, hasFocus, row, column); //To change body of generated methods, choose Tools | Templates.
-            }
-
-        });
+        thirdColumn.setCellRenderer(
+                new MyTableCellRenderer() {
+                    @Override
+                    public Component getTableCellRendererComponent(
+                            JTable table,
+                            Object value,
+                            boolean isSelected,
+                            boolean hasFocus,
+                            int row,
+                            int column) {
+                        return super.getTableCellRendererComponent(
+                                table, value, false, hasFocus, row,
+                                column); // To change body of generated methods, choose Tools |
+                                         // Templates.
+                    }
+                });
 
         TableColumn firstColumn = _table.getColumnModel().getColumn(0);
-        firstColumn.setCellRenderer(new TableCellRenderer() {
-            @Override
-            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                String valueString = "";
-                if (value != null) {
-                    valueString = value.toString();
-                }
+        firstColumn.setCellRenderer(
+                new TableCellRenderer() {
+                    @Override
+                    public Component getTableCellRendererComponent(
+                            JTable table,
+                            Object value,
+                            boolean isSelected,
+                            boolean hasFocus,
+                            int row,
+                            int column) {
+                        String valueString = "";
+                        if (value != null) {
+                            valueString = value.toString();
+                        }
 
-                int numberOfUsages = 0;
-                if(_usedParameterNames.containsKey(valueString)) {
-                    numberOfUsages = _usedParameterNames.get(valueString);
-                }
+                        int numberOfUsages = 0;
+                        if (_usedParameterNames.containsKey(valueString)) {
+                            numberOfUsages = _usedParameterNames.get(valueString);
+                        }
 
-                JLabel returnValue = new JLabel(valueString);
+                        JLabel returnValue = new JLabel(valueString);
 
-                if (!valueString.startsWith("$")) {
-                    returnValue.setForeground(Color.red);
-                } else {
-                    if(valueString != null && !valueString.isEmpty() && numberOfUsages == 0) {
-                        returnValue.setForeground(Color.blue);
+                        if (!valueString.startsWith("$")) {
+                            returnValue.setForeground(Color.red);
+                        } else {
+                            if (valueString != null
+                                    && !valueString.isEmpty()
+                                    && numberOfUsages == 0) {
+                                returnValue.setForeground(Color.blue);
+                            }
+                        }
+                        return returnValue;
                     }
-                }
-                return returnValue;
-            }
-        });
-
-
-
-
+                });
     }
 
     public void setValues(double[][] data) {
@@ -165,7 +190,7 @@ public class DataTablePanelParameters extends JPanel {
     public List<String> getVariableNames() {
         final List<Integer> validIndices = getIndicesWithValidData();
         final List<String> returnValue = new ArrayList<String>();
-        for(int index : validIndices) {
+        for (int index : validIndices) {
             returnValue.add(_tableModel.getValueAt(index, 0).toString());
         }
         return Collections.unmodifiableList(returnValue);
@@ -174,7 +199,7 @@ public class DataTablePanelParameters extends JPanel {
     public List<Double> getVariableValues() {
         final List<Integer> validIndices = getIndicesWithValidData();
         final List<Double> returnValue = new ArrayList<Double>();
-        for(int index : validIndices) {
+        for (int index : validIndices) {
             returnValue.add((Double) _tableModel.getValueAt(index, 1));
         }
         return Collections.unmodifiableList(returnValue);
@@ -182,13 +207,15 @@ public class DataTablePanelParameters extends JPanel {
 
     private List<Integer> getIndicesWithValidData() {
         List<Integer> returnValue = new ArrayList<Integer>();
-        for(int row = 0; row < _tableModel.getRowCount(); row++) {
+        for (int row = 0; row < _tableModel.getRowCount(); row++) {
             String firstColValue = (String) _tableModel.getValueAt(row, 0);
-            if(firstColValue == null || firstColValue.isEmpty() || !firstColValue.startsWith("$")) {
+            if (firstColValue == null
+                    || firstColValue.isEmpty()
+                    || !firstColValue.startsWith("$")) {
                 continue;
             }
             Object secondColValue = _tableModel.getValueAt(row, 1);
-            if(secondColValue == null) {
+            if (secondColValue == null) {
                 continue;
             }
             returnValue.add(row);
@@ -228,7 +255,7 @@ public class DataTablePanelParameters extends JPanel {
                 return null;
             }
 
-            switch(col) {
+            switch (col) {
                 case 0:
                     return variableNames.get(row);
                 case 1:
@@ -236,7 +263,7 @@ public class DataTablePanelParameters extends JPanel {
                 case 2:
 
                     String variableName = variableNames.get(row);
-                    if(_usedParameterNames.containsKey(variableName)) {
+                    if (_usedParameterNames.containsKey(variableName)) {
                         return _usedParameterNames.get(variableName);
                     } else {
                         return 0;
@@ -288,10 +315,10 @@ public class DataTablePanelParameters extends JPanel {
 
                 if (isNullValue) {
                     boolean isNullName = false;
-                    if(variableNames.get(row) == null) {
+                    if (variableNames.get(row) == null) {
                         isNullName = true;
                     } else  {
-                        if(variableNames.get(row).isEmpty()) {
+                        if (variableNames.get(row).isEmpty()) {
                             isNullName = true;
                         }
                     }
@@ -305,7 +332,7 @@ public class DataTablePanelParameters extends JPanel {
                 fireTableCellUpdated(row, col);
                 fireTableCellUpdated(row, 2);
             } else {
-                if (value != null && value instanceof String && ((String) value).isEmpty()) {
+                if (value instanceof String && ((String) value).isEmpty()) {
                     return;
                 }
                 if (value != null) {

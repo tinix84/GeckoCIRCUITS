@@ -34,7 +34,7 @@ public final class NiceScale {
 
     public NiceScale(final HiLoData minMaxData, boolean isXAxis) {
         double SMALL_INCREASE = 1.001;
-        if(isXAxis) {
+        if (isXAxis) {
             SMALL_INCREASE = 1.0;
         }
 

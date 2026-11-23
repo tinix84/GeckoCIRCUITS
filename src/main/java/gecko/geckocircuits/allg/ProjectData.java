@@ -35,8 +35,15 @@ import javax.swing.JOptionPane;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 // Helper class: Format for project data storage
-@SuppressFBWarnings(value = {"MS_CANNOT_BE_FINAL", "EI_EXPOSE_REP2", "PA_PUBLIC_PRIMITIVE_ATTRIBUTE", "SE_TRANSIENT_FIELD_NOT_RESTORED"},
-        justification = "readFileVersion is intentionally mutable; constructor stores external references; public fields for file format serialization compatibility; transient fields are repopulated during project load")
+@SuppressFBWarnings(
+        value = {
+            "MS_CANNOT_BE_FINAL",
+            "EI_EXPOSE_REP2",
+            "PA_PUBLIC_PRIMITIVE_ATTRIBUTE",
+            "SE_TRANSIENT_FIELD_NOT_RESTORED"
+        },
+        justification =
+                "readFileVersion is intentionally mutable; constructor stores external references; public fields for file format serialization compatibility; transient fields are repopulated during project load")
 public final class ProjectData implements Serializable {
     private static final long serialVersionUID = 1L;
 
@@ -74,7 +81,8 @@ public final class ProjectData implements Serializable {
     public int sizeX = 30;
     public int sizeY = 30;
     public static final String SEPARATOR_ASCII_STRINGARRAY = "/";
-    // NULL-Symbol ("") fuer Labels --> notwendig, weil " " als Separator bei der ASCII-Speicherung genutzt wird, und "" schwer zum Wiederherstellen ist
+    // NULL-Symbol ("") fuer Labels --> notwendig, weil " " als Separator bei der ASCII-Speicherung
+    // genutzt wird, und "" schwer zum Wiederherstellen ist
     public static final String NIX = "NIX_NIX_NIX";
     public List<String> _optimizerNames = new ArrayList<String>();
     public List<Double> _optimizerData = new ArrayList<Double>();
@@ -310,7 +318,7 @@ public final class ProjectData implements Serializable {
             _optimizerData = tokenMap.readDataLineDoubleArray("optimizerValue[]");
         }
 
-        if(_optimizer != null) {
+        if (_optimizer != null) {
             _optimizer.clearAndInitializeWithoutUndo(_optimizerNames, _optimizerData);
         }
 
@@ -318,7 +326,7 @@ public final class ProjectData implements Serializable {
             _scripterCode = tokenMap.createSubBlock("<scripterCode>", "<\\scripterCode>");
             _scripterImports = tokenMap.createSubBlock("<scripterImports>", "<\\scripterImports>");
             _scripterDeclarations = tokenMap.createSubBlock("<scripterDeclarations>", "<\\scripterDeclarations>");
-            if(tokenMap.containsToken("<extraScriptSourceFiles>")) {
+            if (tokenMap.containsToken("<extraScriptSourceFiles>")) {
                 _scripterExtraFiles = tokenMap.createSubBlock("<extraScriptSourceFiles>", "<\\extraScriptSourceFiles>");
             }
         }
@@ -528,7 +536,7 @@ public final class ProjectData implements Serializable {
 
     @SuppressWarnings("unchecked")
     public static void appendAsString(StringBuffer ascii, List<? extends Object> wert) {
-        if(!wert.isEmpty() && wert.get(0) instanceof String) {
+        if (!wert.isEmpty() && wert.get(0) instanceof String) {
             appendStringArray(ascii, (List<String>)wert);
             return;
         }

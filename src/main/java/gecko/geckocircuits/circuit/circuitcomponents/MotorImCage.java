@@ -24,7 +24,12 @@ import java.util.List;
 
 // Squirrel-Cage Induction Machine (Kurzschlusslaeufer)
 public final class MotorImCage extends AbstractMotorIM {
-    public static final AbstractTypeInfo TYPE_INFO = new CircuitTypeInfo(MotorImCage.class, "IM-CAGE", I18nKeys.IM_CAGE, I18nKeys.SQUIRREL_CAGE_INDUCTION_MACHINE);
+    public static final AbstractTypeInfo TYPE_INFO =
+            new CircuitTypeInfo(
+                    MotorImCage.class,
+                    "IM-CAGE",
+                    I18nKeys.IM_CAGE,
+                    I18nKeys.SQUIRREL_CAGE_INDUCTION_MACHINE);
 
     private int drMpix = 3;
     // Mechanische und Elektrische Kenngroessen der Maschine -->
@@ -97,8 +102,14 @@ public final class MotorImCage extends AbstractMotorIM {
         double kk2d = urd + upsird + isd0 * _magnetizingInductance / deltaT + ird0 * (Llr + _magnetizingInductance) / deltaT;
         double kk1q = usq + isq0 * (Lls + _magnetizingInductance) / deltaT + irq0 * _magnetizingInductance / deltaT;
         double kk2q = urq + upsirq + isq0 * _magnetizingInductance / deltaT + irq0 * (Llr + _magnetizingInductance) / deltaT;
-        double kk3 = _magnetizingInductance / deltaT * (_magnetizingInductance / deltaT) - (Rr + (Llr + _magnetizingInductance) / deltaT) * (_statorResistance + (Lls + _magnetizingInductance) / deltaT);
-        double kk4 = -(_magnetizingInductance / deltaT) * (_magnetizingInductance / deltaT) + (Rr + (Llr + _magnetizingInductance) / deltaT) * (_statorResistance + (Lls + _magnetizingInductance) / deltaT);
+        double kk3 =
+                _magnetizingInductance / deltaT * (_magnetizingInductance / deltaT)
+                        - (Rr + (Llr + _magnetizingInductance) / deltaT)
+                                * (_statorResistance + (Lls + _magnetizingInductance) / deltaT);
+        double kk4 =
+                -(_magnetizingInductance / deltaT) * (_magnetizingInductance / deltaT)
+                        + (Rr + (Llr + _magnetizingInductance) / deltaT)
+                                * (_statorResistance + (Lls + _magnetizingInductance) / deltaT);
         isd = (kk1d * (Rr + (Llr + _magnetizingInductance) / deltaT) - kk2d * (_magnetizingInductance / deltaT)) / kk4;
         isq = (kk1q * (Rr + (Llr + _magnetizingInductance) / deltaT) - kk2q * (_magnetizingInductance / deltaT)) / kk4;
         ird = (kk1d * (_magnetizingInductance / deltaT) - kk2d * (_statorResistance + (Lls + _magnetizingInductance) / deltaT)) / kk3;
@@ -138,7 +149,11 @@ public final class MotorImCage extends AbstractMotorIM {
 
     @Override
     protected void drawOnTop(Graphics2D graphics) {
-        graphics.drawOval((int) (-dpix * RADIUS_MOTOR_SYMBOL) + drMpix, (int) (-dpix * RADIUS_MOTOR_SYMBOL) + drMpix, (int) (dpix * 2 * RADIUS_MOTOR_SYMBOL) - 2 * drMpix, (int) (dpix * 2 * RADIUS_MOTOR_SYMBOL) - 2 * drMpix);
+        graphics.drawOval(
+                (int) (-dpix * RADIUS_MOTOR_SYMBOL) + drMpix,
+                (int) (-dpix * RADIUS_MOTOR_SYMBOL) + drMpix,
+                (int) (dpix * 2 * RADIUS_MOTOR_SYMBOL) - 2 * drMpix,
+                (int) (dpix * 2 * RADIUS_MOTOR_SYMBOL) - 2 * drMpix);
     }
 
     @Override

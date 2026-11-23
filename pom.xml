@@ -203,7 +203,9 @@
               <configLocation>checkstyle.xml</configLocation>
               <excludes>com/intel/mkl/**</excludes>
               <consoleOutput>true</consoleOutput>
-              <failOnViolation>false</failOnViolation>
+              <violationSeverity>warning</violationSeverity>
+              <maxAllowedViolations>2000</maxAllowedViolations>
+              <failOnViolation>true</failOnViolation>
             </configuration>
           </plugin>
           <!-- PMD for code quality -->
@@ -215,7 +217,8 @@
               <rulesets>
                 <ruleset>pmd-ruleset.xml</ruleset>
               </rulesets>
-              <failOnViolation>false</failOnViolation>
+              <maxAllowedViolations>400</maxAllowedViolations>
+              <failOnViolation>true</failOnViolation>
               <printFailingErrors>true</printFailingErrors>
             </configuration>
           </plugin>
@@ -267,6 +270,28 @@
     </pluginManagement>
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-pmd-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>check-pmd</id>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>check-style</id>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
         <version>0.8.11</version>
@@ -292,6 +317,13 @@
             </goals>
             <configuration>
               <rules>
+                <rule>
+                  <element>CLASS</element>
+                  <includes><include>gecko.geckocircuits.control.calculators.DelayCalculator</include></includes>
+                  <limits>
+                    <limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>1.00</minimum></limit>
+                  </limits>
+                </rule>
                 <!-- Core packages must maintain 60%+ instruction coverage -->
                 <rule>
                   <element>PACKAGE</element>
@@ -355,6 +387,24 @@
 
   <!-- Distribution profiles -->
   <profiles>
+    <profile>
+      <id>desktop-jacoco-audit</id>
+      <activation>
+        <property><name>gecko.desktop.jacocoFile</name></property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <configuration>
+              <destFile>${gecko.desktop.jacocoFile}</destFile>
+              <dataFile>${gecko.desktop.jacocoFile}</dataFile>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <!-- Regression test profile: runs ONLY regression-tagged tests -->
     <!-- Usage: mvn test -Pregression -->
     <profile>

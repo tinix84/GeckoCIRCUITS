@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.swing.JOptionPane;
 
-final class SliderContainer{
+final class SliderContainer {
   private boolean _sliderActive = false;
   private final List<SliderValues> _ySliderValues = new ArrayList<SliderValues>();
   private boolean _inDiffMode = false;
@@ -39,98 +39,99 @@ final class SliderContainer{
           + "a curve by clicking on its label name.";
   private static final String JOPTION_PANE_MESSAGE_HEAD = "Warning";
 
-  public SliderContainer(final GraferV4 grafer, final XSliderValueDrawer xSliderDrawer){
+    public SliderContainer(final GraferV4 grafer, final XSliderValueDrawer xSliderDrawer) {
     _grafer = grafer;
     _xSliderDrawer = xSliderDrawer;
   }
 
-  public boolean isSliderActive(){
+    public boolean isSliderActive() {
     return _sliderActive;
   }
 
-  public void setSliderActivity(final boolean value){
+    public void setSliderActivity(final boolean value) {
     _sliderActive = value;
   }
 
-  public void setInDiffMode(final boolean isInDiffMode){
+    public void setInDiffMode(final boolean isInDiffMode) {
     _inDiffMode = isInDiffMode;
   }
 
-  public double getYSliderValueRealOrDiff(final int curveID){
-    if(_activeSlider.equals(_redSlider)){
+    public double getYSliderValueRealOrDiff(final int curveID) {
+        if (_activeSlider.equals(_redSlider)) {
       return getSliderValues(curveID).getYValue1();
-    }else{
+        } else {
       return getSliderValues(curveID).getYValue2() - getSliderValues(curveID).getYValue1();
     }
   }
 
-  public double getActiveSliderYValue(final int curveID){
-    if(_ySliderValues.size() != _grafer.getDataContainer().getRowLength()){
+    public double getActiveSliderYValue(final int curveID) {
+        if (_ySliderValues.size() != _grafer.getDataContainer().getRowLength()) {
       initYSliderValue();
     }
-    if(_ySliderValues.size() != _grafer.getDataContainer().getRowLength()){
+        if (_ySliderValues.size() != _grafer.getDataContainer().getRowLength()) {
       System.out.println("ERROR");
     }
-    if(_activeSlider.equals(_redSlider)){
+        if (_activeSlider.equals(_redSlider)) {
       return getSliderValues(curveID).getYValue1();
-    }else{
+        } else {
       return getSliderValues(curveID).getYValue2();
     }
   }
 
-  public double getActiveSliderXValue(){
-    if(_ySliderValues.size() != _grafer.getDataContainer().getRowLength()){
+    public double getActiveSliderXValue() {
+        if (_ySliderValues.size() != _grafer.getDataContainer().getRowLength()) {
       initYSliderValue();
     }
 
-    if(_activeSlider.equals(_redSlider)){
+        if (_activeSlider.equals(_redSlider)) {
       return getSliderValues(0).getXValue1();
-    }else{
+        } else {
       return getSliderValues(0).getXValue2();
     }
   }
 
-  /**
-   *
-   * @param curveID the selected curve
-   * @return a paix of x-y-Values
-   */
-  public SliderValues getSliderValues(final int curveID){
-//        System.out.println("xxyxyx. " + _ySliderValues.size() +" " +  _grafer.getManager().getNumberInputSignals());
-    if(_ySliderValues.size() != _grafer.getManager().getNumberInputSignals()){
+    /**
+     *
+     * @param curveID the selected curve
+     * @return a paix of x-y-Values
+     */
+    public SliderValues getSliderValues(final int curveID) {
+        //        System.out.println("xxyxyx. " + _ySliderValues.size() +" " +
+        // _grafer.getManager().getNumberInputSignals());
+        if (_ySliderValues.size() != _grafer.getManager().getNumberInputSignals()) {
       initYSliderValue();
     }
 
-    try{
-      if(curveID < _ySliderValues.size()){
+        try {
+            if (curveID < _ySliderValues.size()) {
         return _ySliderValues.get(curveID);
-      }else{
+            } else {
       return new SliderValues(0, 0, 0, 0);
       }
-    }catch(Exception ex){
+        } catch (Exception ex) {
       ex.printStackTrace();
       return new SliderValues(0, 0, 0, 0);
     }
   }
 
-  public void initYSliderValue(){
+    public void initYSliderValue() {
     _ySliderValues.clear();
 
-    for(int i = 0; i < _grafer.getManager().getNumberInputSignals(); i++){
+        for (int i = 0; i < _grafer.getManager().getNumberInputSignals(); i++) {
       _ySliderValues.add(new SliderValues());
     }
   }
 
-  public void calculateSliderFromXValues(){
+    public void calculateSliderFromXValues() {
 
-    if(_ySliderValues.size() != _grafer.getDataContainer().getRowLength()){
+        if (_ySliderValues.size() != _grafer.getDataContainer().getRowLength()) {
       initYSliderValue();
     }
 
     final int index1 = _grafer.getDataContainer().findTimeIndex(_redSlider.getXSliderValue(), 0);
     final int index2 = _grafer.getDataContainer().findTimeIndex(_greenSlider.getXSliderValue(), 0);
 
-    for(int i = 0; i < _ySliderValues.size(); i++){
+        for (int i = 0; i < _ySliderValues.size(); i++) {
       final double x1Value = _redSlider.getXSliderValue();
       final double y1Value = _grafer.getDataContainer().getValue(i, index1);
 
@@ -140,8 +141,8 @@ final class SliderContainer{
     }
   }
 
-  public void drawSlider(final Graphics graphics){
-    if(!_sliderActive){
+    public void drawSlider(final Graphics graphics) {
+        if (!_sliderActive) {
       return;
     }
 
@@ -160,8 +161,11 @@ final class SliderContainer{
 
   }
 
-  protected void goToZeroOrEqual(final IterationDirection direction, final boolean isZeroTransition,
-                                 final GraferV4 grafer) throws NoCurveSelectedException{
+    void goToZeroOrEqual(
+            final IterationDirection direction,
+            final boolean isZeroTransition,
+            final GraferV4 grafer)
+            throws NoCurveSelectedException {
 
     final AbstractDataContainer data = grafer.getDataContainer();
     final AbstractCurve selectedCurve = grafer.getSelectedCurve();
@@ -170,17 +174,16 @@ final class SliderContainer{
     final double oldSliderXValue = getActiveSliderXValue();
     double transitionValue = 0;
 
-    if(!isZeroTransition){
+        if (!isZeroTransition) {
       transitionValue = getActiveSliderYValue(selectedCurve.getValueDataIndex());
     }
 
     final double newXValue = SliderUtils.nextZeroOrEqual(oldSliderXValue,
                                                          selectedCurve, direction, data, transitionValue);
 
-
-    if(isZeroTransition){
+        if (isZeroTransition) {
       _activeSlider.setXSliderValue(newXValue);
-    }else{
+        } else {
       getNonActiveSlider().setXSliderValue(newXValue);
     }
 
@@ -188,16 +191,17 @@ final class SliderContainer{
     _grafer.repaint();
   }
 
-  Slider getNonActiveSlider(){
-    if(_activeSlider.equals(_redSlider)){
+    Slider getNonActiveSlider() {
+        if (_activeSlider.equals(_redSlider)) {
       return _greenSlider;
-    }else{
+        } else {
       return _redSlider;
     }
   }
 
-  protected void goToExtrema(final IterationDirection direction, final ExtremumType maxMin, final GraferV4 grafer)
-          throws NoCurveSelectedException{
+    void goToExtrema(
+            final IterationDirection direction, final ExtremumType maxMin, final GraferV4 grafer)
+            throws NoCurveSelectedException {
 
     final AbstractDataContainer data = grafer.getDataContainer();
     final AbstractCurve curveSelected = grafer.getSelectedCurve();
@@ -211,8 +215,9 @@ final class SliderContainer{
     grafer.repaint();
   }
 
-  protected void goToSignalFlank(final IterationDirection direction, final FlankType flankType,
-                                 final GraferV4 grafer) throws NoCurveSelectedException{
+    void goToSignalFlank(
+            final IterationDirection direction, final FlankType flankType, final GraferV4 grafer)
+            throws NoCurveSelectedException {
 
     final AbstractDataContainer data = grafer.getDataContainer();
     final AbstractCurve curveSelected = grafer.getSelectedCurve();
@@ -227,27 +232,27 @@ final class SliderContainer{
     grafer.repaint();
   }
 
-  protected String getLabelString(final AbstractCurve curve){
+    String getLabelString(final AbstractCurve curve) {
     String returnValue = "";
 
-    if(curve.getAxisConnection() == AxisConnection.ZUORDNUNG_SIGNAL){
-      if(isSliderActive()){
+        if (curve.getAxisConnection() == AxisConnection.ZUORDNUNG_SIGNAL) {
+            if (isSliderActive()) {
         double value;
-        if(_activeSlider.equals(_redSlider)){
+                if (_activeSlider.equals(_redSlider)) {
           value = getSliderValues(curve.getValueDataIndex()).getYValue1();
-        }else{
+                } else {
           value = getSliderValues(curve.getValueDataIndex()).getYValue2();
         }
 
-        if(value < CurvePainterSignal.SGN_THRESHOLD){
+                if (value < CurvePainterSignal.SGN_THRESHOLD) {
           return " = off";
-        }else{
+                } else {
           return " = on";
         }
       }
       return returnValue;
-    }else{
-      if(_inDiffMode){
+        } else {
+            if (_inDiffMode) {
         returnValue = "diff";
       }
       return returnValue;
@@ -255,18 +260,19 @@ final class SliderContainer{
 
   }
 
-  protected void doMouseAction(final MouseEvent mouseEvent, final AbstractDiagram diag){
-    if(_grafer._mausModus != GraferV4.MausModus.SLIDER){
+    void doMouseAction(final MouseEvent mouseEvent, final AbstractDiagram diag) {
+        if (_grafer._mausModus != GraferV4.MausModus.SLIDER) {
       return;
     }
 
-    if(mouseEvent.getID() != MouseEvent.NOBUTTON && isSliderActive()){
+        if (mouseEvent.getID() != MouseEvent.NOBUTTON && isSliderActive()) {
       final Axis xAxis = _grafer.getManager().getDiagram(0)._xAxis;
-      if((mouseEvent.getModifiersEx() & MouseEvent.BUTTON1_DOWN_MASK) == 0 || mouseEvent.isControlDown()){
+            if ((mouseEvent.getModifiersEx() & MouseEvent.BUTTON1_DOWN_MASK) == 0
+                    || mouseEvent.isControlDown()) {
         setInDiffMode(true);
         _activeSlider = _greenSlider;
 
-      }else{
+            } else {
         setInDiffMode(false);
         _activeSlider = _redSlider;
       }
@@ -277,25 +283,25 @@ final class SliderContainer{
     }
   }
 
-  double[] getSliderXRange(){
+    double[] getSliderXRange() {
     return new double[]{_redSlider.getXSliderValue(), _greenSlider.getXSliderValue()};
   }
 
-  private void checkCurveSelection(final AbstractCurve curve) throws NoCurveSelectedException{
-    if(curve == null){
+    private void checkCurveSelection(final AbstractCurve curve) throws NoCurveSelectedException {
+        if (curve == null) {
       JOptionPane.showMessageDialog(GeckoSim._win, JOPTION_PANE_MESSAGE,
                                     JOPTION_PANE_MESSAGE_HEAD, JOptionPane.WARNING_MESSAGE);
       throw new NoCurveSelectedException("Please select a curve by clicking on the curve name.");
     }
   }
 
-  void mouseWheelSlider(final MouseWheelEvent event, final AbstractDiagram wheeledDiagram){
+    void mouseWheelSlider(final MouseWheelEvent event, final AbstractDiagram wheeledDiagram) {
     final int oldXPixel = _activeSlider.getXSliderPix();
 
     final Axis xAxis = _grafer.getManager().getDiagram(0)._xAxis;
-    if(event.getWheelRotation() > 0){
+        if (event.getWheelRotation() > 0) {
       _activeSlider.setXSliderPix(oldXPixel + 1, xAxis, _grafer);
-    }else{
+        } else {
       _activeSlider.setXSliderPix(oldXPixel - 1, xAxis, _grafer);
     }
     calculateSliderFromXValues();

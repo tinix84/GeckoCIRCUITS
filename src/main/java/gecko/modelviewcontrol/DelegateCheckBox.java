@@ -55,7 +55,7 @@ public class DelegateCheckBox<M extends ModelMVC<Boolean>> extends JCheckBox
 
     @Override
     public void unregisterModel() {
-        if(_model != null) {
+        if (_model != null) {
             _model.removeModelListener(this);
             _model = null;
         }

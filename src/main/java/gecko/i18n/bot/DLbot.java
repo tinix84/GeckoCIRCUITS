@@ -67,7 +67,7 @@ public class DLbot {
             progress = Math.min(progress + 22, 99); // update progress
             connected = true;
             return dm;
-        } catch(Exception e) {
+        } catch (Exception e) {
             new TranslationDialog(InitParameters.DATABASE_ERROR_MESSAGEa,InitParameters.DATABASE_ERROR_MESSAGEb).setVisible(true);
             connected = false;
             return null;
@@ -138,9 +138,10 @@ public class DLbot {
         String[] lines = wikiCode.split("\n");
         progress = Math.min(progress + 2, 99); // update progress
         // iterate through all lines
-        for (int i=0; i<lines.length; i=i+2) {
-            I18nKeys key = I18nKeys.fabricFromKeyString(lines[i].substring(0, lines[i].length()-2));
-            String value = lines[i+1];
+        for (int i = 0; i < lines.length; i = i + 2) {
+            I18nKeys key =
+                    I18nKeys.fabricFromKeyString(lines[i].substring(0, lines[i].length() - 2));
+            String value = lines[i + 1];
             dm.insertPair(key, value);
             progress = Math.min(progress + 1, 99); // keep increasing progress to 99%
         }

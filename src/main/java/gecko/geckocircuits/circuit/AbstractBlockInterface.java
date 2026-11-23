@@ -46,9 +46,12 @@ import gecko.modelviewcontrol.AbstractUndoGenericModel;
 import gecko.modelviewcontrol.ModelMVC;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
-    @SuppressWarnings("rawtypes")
-    @SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "Block interface exposes terminals and parameters for circuit connectivity and configuration")
-    public abstract class AbstractBlockInterface extends AbstractCircuitSheetComponent
+@SuppressWarnings("rawtypes")
+@SuppressFBWarnings(
+        value = "EI_EXPOSE_REP",
+        justification =
+                "Block interface exposes terminals and parameters for circuit connectivity and configuration")
+public abstract class AbstractBlockInterface extends AbstractCircuitSheetComponent
         implements ComponentTerminable, ComponentIdentifiable {
 
     public List<UserParameter<? extends Object>> registeredParameters = new ArrayList<UserParameter<? extends Object>>();
@@ -66,7 +69,9 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
     public final Stack<AbstractTerminal> XIN = new Stack<AbstractTerminal>();
     public final Stack<AbstractTerminal> YOUT = new Stack<AbstractTerminal>();
     private AffineTransform _origTransform;
-    private ModelMVC<ComponentDirection> _componentDirection = new ModelMVC<ComponentDirection>(ComponentDirection.NORTH_SOUTH, "Rotation/orientation of sheet component");
+    private ModelMVC<ComponentDirection> _componentDirection =
+            new ModelMVC<ComponentDirection>(
+                    ComponentDirection.NORTH_SOUTH, "Rotation/orientation of sheet component");
     public final String[] nameOpt = new String[40]; // GeckoOPTIMIZER --> names of variable parameters
     public final SchematicTextInfo _textInfo = new SchematicTextInfo(this);
     public final Set<ComponentCoupling> _isReferencedBy = new HashSet<ComponentCoupling>() {
@@ -128,18 +133,18 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
             }
         }
 
-        if(paramname.equalsIgnoreCase("enabled")) { // this is only for forward compatibility.
+        if (paramname.equalsIgnoreCase("enabled")) { // this is only for forward compatibility.
             // the next release > 1.70 will have the same command, but implemented in a clean way!
             int intValue = (int) paramValue;
-            if(intValue == 0) {
+            if (intValue == 0) {
                 setCircuitEnabled(Enabled.DISABLED);
                 return;
             }
-            if(intValue == 1) {
+            if (intValue == 1) {
                 setCircuitEnabled(Enabled.ENABLED);
                 return;
             }
-            if(intValue == 2) {
+            if (intValue == 2) {
                 setCircuitEnabled(Enabled.DISABLED_SHORT);
                 return;
             }
@@ -372,6 +377,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
         // no-op
     }
 
+    @Override
     public final String getStringID() {
         return getIDStringDialog().toString();
     }
@@ -737,7 +743,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
         graphics.setColor(getForeGroundColor());
 
         for (AbstractTerminal term : XIN) {
-            if (java.util.Objects.equals(term.getCircuitSheet(), _parentCircuitSheet)) {
+            if (Objects.equals(term.getCircuitSheet(), _parentCircuitSheet)) {
                 term.paintLabelString(graphics);
                 //if(term instanceof TerminalControl) {
                 //    ((TerminalControl) term).paintControlState(graphics);
@@ -746,7 +752,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
         }
 
         for (AbstractTerminal term : YOUT) {
-            if (java.util.Objects.equals(term.getCircuitSheet(), _parentCircuitSheet)) {
+            if (Objects.equals(term.getCircuitSheet(), _parentCircuitSheet)) {
                 term.paintLabelString(graphics);
                 //if(term instanceof TerminalControl) {
                 //    ((TerminalControl) term).paintControlState(graphics);
@@ -779,7 +785,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
         _textInfo.zeichneLinie(graphics, getDisplayProperties().showTextLine);
 
         for (TerminalInterface term : getAllTerminals()) {
-            if (java.util.Objects.equals(term.getCircuitSheet(), _parentCircuitSheet)) {
+            if (Objects.equals(term.getCircuitSheet(), _parentCircuitSheet)) {
                 term.paintComponent(graphics);
             }
         }
@@ -978,7 +984,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
     @Override
     public void doDoubleClickAction(final Point clickedPoint) {
         final TerminalInterface clickedTerm = clickedTerminal(clickedPoint);
-        if (clickedTerm != null && java.util.Objects.equals(clickedTerm.getCircuitSheet(), SchematicEditor2.Singleton._visibleCircuitSheet)) {
+        if (clickedTerm != null && Objects.equals(clickedTerm.getCircuitSheet(), SchematicEditor2.Singleton._visibleCircuitSheet)) {
             final DialogLabelEingeben labelDialog = new DialogLabelEingeben(clickedTerm);
             labelDialog.setVisible(true);
             return;

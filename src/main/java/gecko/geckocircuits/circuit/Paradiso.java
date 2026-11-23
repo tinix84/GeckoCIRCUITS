@@ -132,7 +132,7 @@ public class Paradiso {
     public static double[] solve(double[] values, int[] ai, int[] aj, double[] rhs, int n, int mtype, int nRHS, Paradiso paradiso) {
         /* RHS and solution vectors. */
         double[] x = null;
-        if(mtype == 13) {
+        if (mtype == 13) {
              x = new double[2 * n * nRHS];
         } else {
             x = new double[n * nRHS];

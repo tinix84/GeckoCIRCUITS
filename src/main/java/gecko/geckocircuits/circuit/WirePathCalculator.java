@@ -307,7 +307,7 @@ public class WirePathCalculator {
         xPoints[3] = (int)(gridSize * (gridX + 0.1));
         yPoints[3] = gridSize * gridY;
 
-        return new int[][] { xPoints, yPoints };
+        return new int[][] {xPoints, yPoints};
     }
 
     /**

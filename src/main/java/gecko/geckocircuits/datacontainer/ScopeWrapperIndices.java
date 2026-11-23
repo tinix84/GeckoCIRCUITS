@@ -40,7 +40,7 @@ public final class ScopeWrapperIndices {
     }
 
     public int getContainerRowIndex(final int row) {
-        if(row < _globalIndices.size()) {
+        if (row < _globalIndices.size()) {
             return _globalIndices.get(row);
         } else {
             return 0;

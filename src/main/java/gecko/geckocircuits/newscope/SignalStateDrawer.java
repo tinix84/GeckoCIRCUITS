@@ -143,7 +143,7 @@ final class SignalStateDrawer {
 
     private int findModifiedColor(int colorBelow255) {
          int returnValue = colorBelow255 * 6 / 5;
-         if(returnValue > 255) {
+        if (returnValue > 255) {
              returnValue = colorBelow255 * 5 / 6;
          }
          return returnValue;

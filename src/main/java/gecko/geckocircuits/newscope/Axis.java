@@ -206,7 +206,7 @@ public final class Axis {
         @Override
         protected void drawMinorTicks(Graphics2D g2d, Axis otherAxis, List<Tick> majorTicks) {
             if (majorTicks.size() > 2) {
-                if(minorTicksNotTooClose(majorTicks)) {
+                if (minorTicksNotTooClose(majorTicks)) {
                     super.drawMinorTicks(g2d, otherAxis, majorTicks);
                 }
             } else {
@@ -216,7 +216,7 @@ public final class Axis {
                 double distance = (upperValue - lowerValue) / (noTicks + 1);
 
                 double tickValue = lowerValue;
-                for(int i = 0; i < noTicks; i++) {
+                for (int i = 0; i < noTicks; i++) {
                     tickValue += distance;
                     Tick newTick = new Tick(tickValue, (int) _axisTickSettings.getTickLengthMin(), false);
                     newTick.drawTick(g2d, TECH_FORMAT.formatT(newTick._wert, "#.#E0"),
@@ -363,11 +363,11 @@ public final class Axis {
         }
     }
 
-    protected double getPixelFromValue(final double value) {
+    double getPixelFromValue(final double value) {
         return _axisScale.getPixelFromValue(value);
     }
 
-    protected double getValueFromPixel(final int xPix) {
+    double getValueFromPixel(final int xPix) {
         return _axisScale.getValueFromPixel(xPix);
     }
 

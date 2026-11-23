@@ -104,7 +104,7 @@ public final class NetzlisteAllg {
 
         List<AbstractBlockInterface> filteredList = new ArrayList<AbstractBlockInterface>();
         for (AbstractBlockInterface ab : elementsList) {
-            if (java.util.Objects.equals(ab.getParentCircuitSheet(), elementParent)) {
+            if (Objects.equals(ab.getParentCircuitSheet(), elementParent)) {
                 filteredList.add(ab);
             }
         }
@@ -327,7 +327,7 @@ public final class NetzlisteAllg {
             _pot2 = pot2;
         }
 
-        private void traverse(Map<PotentialArea, ArrayList<GraphEdge>> graphMap, LinkedHashSet<GraphEdge> connectedEdges) {
+        private void traverse(Map<PotentialArea, List<GraphEdge>> graphMap, Set<GraphEdge> connectedEdges) {
             isVisited = true;
             connectedEdges.add(this);
             for (GraphEdge nextEdge : graphMap.get(_pot1)) {
@@ -346,7 +346,7 @@ public final class NetzlisteAllg {
     void deSingularizeIsolatedPotentials() {
 
         List<GraphEdge> connectionGraph = new ArrayList<GraphEdge>();
-        Map<PotentialArea, ArrayList<GraphEdge>> graphMap = new LinkedHashMap<PotentialArea, ArrayList<GraphEdge>>();
+        Map<PotentialArea, List<GraphEdge>> graphMap = new LinkedHashMap<PotentialArea, List<GraphEdge>>();
 
         for (int i = 0; i < _potentialAreas.size(); i++) {
             PotentialArea pot1 = _potentialAreas.get(i);
@@ -369,11 +369,11 @@ public final class NetzlisteAllg {
             }
         }
 
-        ArrayList<LinkedHashSet<PotentialArea>> potentialAreasGroups = new ArrayList<LinkedHashSet<PotentialArea>>();
+        List<Set<PotentialArea>> potentialAreasGroups = new ArrayList<Set<PotentialArea>>();
 
         while (!connectionGraph.isEmpty()) {
-            LinkedHashSet<GraphEdge> connectedEdges = new LinkedHashSet<GraphEdge>();
-            LinkedHashSet<PotentialArea> connectedPotentials = new LinkedHashSet<PotentialArea>();
+            Set<GraphEdge> connectedEdges = new LinkedHashSet<GraphEdge>();
+            Set<PotentialArea> connectedPotentials = new LinkedHashSet<PotentialArea>();
             GraphEdge firstEdge = connectionGraph.iterator().next();
 
             firstEdge.traverse(graphMap, connectedEdges);

@@ -43,7 +43,7 @@ public final class CallbackClientImpl extends UnicastRemoteObject implements Cal
             Logger.getLogger(CallbackClientImpl.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-        if(addr == null) {
+        if (addr == null) {
             _clientHostname = "unknown";
         } else {
             _clientHostname = addr.getHostName();

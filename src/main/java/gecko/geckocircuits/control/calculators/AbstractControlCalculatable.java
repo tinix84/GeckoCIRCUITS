@@ -18,9 +18,19 @@ package gecko.geckocircuits.control.calculators;
  *
  * @author andreas
  */
-@SuppressWarnings({"PMD.ArrayIsStoredDirectly", "PMD.PublicAttribute", "PMD.StaticNonFinal"}) // Public fields required by simulator architecture
-@edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = {"MS_CANNOT_BE_FINAL", "PA_PUBLIC_PRIMITIVE_ATTRIBUTE", "PA_PUBLIC_ARRAY_ATTRIBUTE"},
-        justification = "_time is intentionally mutable - tracks current simulation time; public fields for signal array access required for performance")
+@SuppressWarnings({
+    "PMD.ArrayIsStoredDirectly",
+    "PMD.PublicAttribute",
+    "PMD.StaticNonFinal"
+}) // Public fields required by simulator architecture
+@edu.umd.cs.findbugs.annotations.SuppressFBWarnings(
+        value = {
+            "MS_CANNOT_BE_FINAL",
+            "PA_PUBLIC_PRIMITIVE_ATTRIBUTE",
+            "PA_PUBLIC_ARRAY_ATTRIBUTE"
+        },
+        justification =
+                "_time is intentionally mutable - tracks current simulation time; public fields for signal array access required for performance")
 public abstract class AbstractControlCalculatable {
     public static final double SIGNAL_THRESHOLD = 0.5;
     public static double _time = 0; // Shared simulation time state
@@ -55,7 +65,7 @@ public abstract class AbstractControlCalculatable {
      * @return true if input port has no connection
      */
     public boolean checkInputWithoutConnectionAndFill(final int inputIndex) {
-        if(_inputSignal[inputIndex] == null) {
+        if (_inputSignal[inputIndex] == null) {
             _inputSignal[inputIndex] = new double[1];
             return true;
         } else {

@@ -104,7 +104,7 @@ implements Operationable, Nonlinearable {
         } else {
             try {
                 GeckoFile newFile = new GeckoFile(file, GeckoFile.StorageType.EXTERNAL, MainWindow.getOpenFileName());
-                ArrayList<GeckoFile> newFileList = new ArrayList<GeckoFile>();
+                List<GeckoFile> newFileList = new ArrayList<GeckoFile>();
                 newFileList.add(newFile);
                 addFiles(newFileList);
                 _isNonlinear.setValueWithoutUndo(true);
@@ -160,7 +160,7 @@ implements Operationable, Nonlinearable {
     public AbstractCircuitSheetComponent copyFabric(long shiftValue) {
         AbstractNonLinearCircuitComponent copy = (AbstractNonLinearCircuitComponent) super.copyFabric(shiftValue);
 
-        if(nonLinearChar != null) {
+        if (nonLinearChar != null) {
             copy.nonLinearCharHashValueForInit = nonLinearChar.getHashValue();
         } else {
             copy.nonLinearCharHashValueForInit = 0;
@@ -179,7 +179,7 @@ implements Operationable, Nonlinearable {
 
     @Override
     public List<GeckoFile> getFiles() {
-        ArrayList<GeckoFile> nonLinearFile = new ArrayList<GeckoFile>();
+        List<GeckoFile> nonLinearFile = new ArrayList<GeckoFile>();
         nonLinearFile.add(nonLinearChar);
         return nonLinearFile;
     }
@@ -219,35 +219,44 @@ implements Operationable, Nonlinearable {
         //void (String elementName, String characteristicFileName) throws RemoteException, FileNotFoundException;
 
         final List<OperationInterface> returnValue = new ArrayList<OperationInterface>();
-        returnValue.add(new OperationInterface("setNonLinear", I18nKeys.SET_NONLINEAR_OPERATION_DOC) {
-            @Override
-            public Object doOperation(final Object parameterValue) {
-                if(!(parameterValue instanceof String)) {
-                    throw new IllegalArgumentException("Argument must be a file path as String type.");
-                }
-                String characteristicFileName = (String) parameterValue;
-                File nonLinFile = new File(characteristicFileName);
-                //if it doesn't exist, try first to see if it is in the same directory as the currently open model file
-                if (!nonLinFile.exists()) {
-                    final File modelFile = new File(MainWindow.getOpenFileName());
-                    final String currentModelDirectory = modelFile.getParent();
-                    final String nonLinFileName = currentModelDirectory + System.getProperty("file.separator") + characteristicFileName;
-                    nonLinFile = new File(nonLinFileName);
-                }
-                if (nonLinFile.exists() && !nonLinFile.isDirectory()) {
-                    try {
-                        AbstractNonLinearCircuitComponent.this.setNonLinearFile(nonLinFile);
-                    } catch (IllegalAccessException ex) {
-                        System.out.println("exception " + ex);
-                        ex.printStackTrace();
-                        throw new RuntimeException(ex);
+        returnValue.add(
+                new OperationInterface("setNonLinear", I18nKeys.SET_NONLINEAR_OPERATION_DOC) {
+                    @Override
+                    public Object doOperation(final Object parameterValue) {
+                        if (!(parameterValue instanceof String)) {
+                            throw new IllegalArgumentException(
+                                    "Argument must be a file path as String type.");
+                        }
+                        String characteristicFileName = (String) parameterValue;
+                        File nonLinFile = new File(characteristicFileName);
+                        // if it doesn't exist, try first to see if it is in the same directory as
+                        // the currently open model file
+                        if (!nonLinFile.exists()) {
+                            final File modelFile = new File(MainWindow.getOpenFileName());
+                            final String currentModelDirectory = modelFile.getParent();
+                            final String nonLinFileName =
+                                    currentModelDirectory
+                                            + System.getProperty("file.separator")
+                                            + characteristicFileName;
+                            nonLinFile = new File(nonLinFileName);
+                        }
+                        if (nonLinFile.exists() && !nonLinFile.isDirectory()) {
+                            try {
+                                AbstractNonLinearCircuitComponent.this.setNonLinearFile(nonLinFile);
+                            } catch (IllegalAccessException ex) {
+                                System.out.println("exception " + ex);
+                                ex.printStackTrace();
+                                throw new RuntimeException(ex);
+                            }
+                        } else {
+                            throw new RuntimeException(
+                                    "Specified non-linear characteristic file: "
+                                            + characteristicFileName
+                                            + " does not exist or is a directory.");
+                        }
+                        return null;
                     }
-                } else {
-                    throw new RuntimeException("Specified non-linear characteristic file: " + characteristicFileName + " does not exist or is a directory.");
-                }
-                return null;
-            }
-        });
+                });
 
         return Collections.unmodifiableList(returnValue);
     }
@@ -279,7 +288,7 @@ implements Operationable, Nonlinearable {
     //reads a non linear characteristic from a file, returns an array which contains two array - non-linear x, non-linear y
     public static double[][] readNonLinearCharacteristicFromFile(GeckoFile file) throws NumberFormatException, IOException {
         double[] nonLinX, nonLinY;
-        ArrayList<String> lines = new ArrayList<String>();
+        List<String> lines = new ArrayList<String>();
         try (BufferedReader in = file.getBufferedReader()) {
             String inLine;
             while ((inLine = in.readLine()) != null) {
@@ -493,7 +502,7 @@ implements Operationable, Nonlinearable {
     //writes a non-linear characteristic to file
     public static File writeNonLinearCharacteristicToFile(double[][] data, File nonLinFile) throws IOException {
 
-        try (FileWriter fileWriter = new java.io.FileWriter(nonLinFile, StandardCharsets.UTF_8);
+        try (FileWriter fileWriter = new FileWriter(nonLinFile, StandardCharsets.UTF_8);
              BufferedWriter out = new BufferedWriter(fileWriter)) {
             for (int i = 0; i < data[0].length; i++) {
                 out.write(data[0][i] + " " + data[1][i] + "\n");
@@ -516,7 +525,7 @@ implements Operationable, Nonlinearable {
         try {
             byte[] fileContents = writeNonLinearCharacteristicToBytes();
             GeckoFile newFile = new GeckoFile(tmpFile, MainWindow.getOpenFileName(), fileContents);
-            ArrayList<GeckoFile> newFiles = new ArrayList<GeckoFile>();
+            List<GeckoFile> newFiles = new ArrayList<GeckoFile>();
             newFiles.add(newFile);
             addFiles(newFiles);
         } catch (FileNotFoundException ex) {

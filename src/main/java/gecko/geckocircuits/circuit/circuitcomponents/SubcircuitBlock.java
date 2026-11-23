@@ -116,19 +116,20 @@ public final class SubcircuitBlock extends AbstractSpecialBlock {
             }
         });
 
-        _myCircuitSheet._worksheetSize._worksheetDimension.addModelListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                int newX = _myCircuitSheet._worksheetSize._worksheetDimension.getValue().x;
-                if(newX != _sheetSizeX.getValue()) {
-                    _sheetSizeX.setUserValue(newX);
-                }
-                int newY = _myCircuitSheet._worksheetSize._worksheetDimension.getValue().y;
-                if(newY != _sheetSizeY.getValue()) {
-                    _sheetSizeY.setUserValue(newY);
-                }
-            }
-        });
+        _myCircuitSheet._worksheetSize._worksheetDimension.addModelListener(
+                new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        int newX = _myCircuitSheet._worksheetSize._worksheetDimension.getValue().x;
+                        if (newX != _sheetSizeX.getValue()) {
+                            _sheetSizeX.setUserValue(newX);
+                        }
+                        int newY = _myCircuitSheet._worksheetSize._worksheetDimension.getValue().y;
+                        if (newY != _sheetSizeY.getValue()) {
+                            _sheetSizeY.setUserValue(newY);
+                        }
+                    }
+                });
 
         _sheetSizeX.addActionListener(new ActionListener() {
             @Override
@@ -158,7 +159,9 @@ public final class SubcircuitBlock extends AbstractSpecialBlock {
 
     public boolean areTerminalPositionsOK() {
         System.err.println("Warning: Terminal position check disabled!");
-        if(1>0) { return true; }
+        if (1 > 0) {
+            return true;
+        }
         for (SubCircuitTerminable terminal1 : _myTerminals) {
             for (SubCircuitTerminable terminal2 : _myTerminals) {
                 if (!terminal1.equals(terminal2) && TerminalToWrap.sameBlockPosition(terminal1, terminal2)) {
@@ -418,7 +421,7 @@ public final class SubcircuitBlock extends AbstractSpecialBlock {
     protected void importIndividual(TokenMap tokenMap) {
         super.importIndividual(tokenMap);
 
-        if(tokenMap.containsToken("sheetSizeX")) {
+        if (tokenMap.containsToken("sheetSizeX")) {
             _sheetSizeX.setValueWithoutUndo(tokenMap.readDataLine("sheetSizeX", _sheetSizeX.getValue()));
             _sheetSizeY.setValueWithoutUndo(tokenMap.readDataLine("sheetSizeY", _sheetSizeY.getValue()));
         }

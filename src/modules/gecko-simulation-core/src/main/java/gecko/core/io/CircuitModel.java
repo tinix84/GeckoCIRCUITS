@@ -27,6 +27,11 @@ import java.util.Map;
  * <p>This class is designed for headless operation and contains no Swing/AWT dependencies.</p>
  */
 public class CircuitModel {
+    /** Captured grid geometry. Hidden proxy terminals do not have physical junctions. */
+    public record TerminalData(String domain, long sheetIdentifier, CircuitTopology.Side side, int port,
+                               int x, int y, boolean geometric) { }
+    /** Retains a nonexecuting block that still defines terminal connectivity. */
+    public record StructuralComponent(String domain, ComponentData component) { }
 
     // Simulation parameters
     private double simulationDuration;
@@ -54,6 +59,23 @@ public class CircuitModel {
     private final List<ComponentData> controlComponents = new ArrayList<>();
     private final List<ComponentData> thermalComponents = new ArrayList<>();
     private final List<ConnectionData> connections = new ArrayList<>();
+    private final List<StructuralComponent> structuralComponents = new ArrayList<>();
+    private final List<ComponentData> specialComponents = new ArrayList<>();
+    private final List<SavedCircuitBlock> savedBlocks = new ArrayList<>();
+    private final Map<String, String> savedSettings = new HashMap<>();
+    private final List<SavedCircuitBlock.Section> savedSections = new ArrayList<>();
+    private final Map<Long, CircuitResource> resources = new HashMap<>();
+    private final Map<Long, CircuitResourceFailure> resourceFailures = new HashMap<>();
+
+    public List<ComponentData> getSpecialComponents() { return specialComponents; }
+    public List<StructuralComponent> getStructuralComponents() { return structuralComponents; }
+    public List<SavedCircuitBlock> getSavedBlocks() { return savedBlocks; }
+    public Map<String, String> getSavedSettings() { return savedSettings; }
+    public List<SavedCircuitBlock.Section> getSavedSections() { return savedSections; }
+    public Map<Long, CircuitResource> getResources() { return resources; }
+    public Map<Long, CircuitResourceFailure> getResourceFailures() { return resourceFailures; }
+
+    private final List<ImportIssue> importIssues = new ArrayList<>();
 
     // Optimizer parameters
     private final Map<String, Double> optimizerParameters = new HashMap<>();
@@ -202,6 +224,10 @@ public class CircuitModel {
         return circuitComponents;
     }
 
+    public List<ImportIssue> getImportIssues() {
+        return importIssues;
+    }
+
     public void addCircuitComponent(ComponentData component) {
         circuitComponents.add(component);
     }
@@ -229,6 +255,8 @@ public class CircuitModel {
     public void addConnection(ConnectionData connection) {
         connections.add(connection);
     }
+
+
 
     // Optimizer parameters
 
@@ -320,6 +348,40 @@ public class CircuitModel {
         private final int orientation;
         private String[] terminalXLabels = new String[0];  // labelAnfangsKnoten[]
         private String[] terminalYLabels = new String[0];  // labelEndKnoten[]
+        private String[] parameterStrings = new String[0]; // parameterString[]
+        private double[] numericParameters = new double[0]; // parameter[] raw values
+
+        private boolean parsedInput;
+        private boolean configurationNormalized;
+        private final Map<String, String> importTokens = new HashMap<>();
+        private int importedParameterCount = -1;
+        private String sourceLocation;
+        private SavedCircuitBlock savedBlock;
+        private int sourceOrdinal = -1;
+        private final List<TerminalData> terminalData = new ArrayList<>();
+
+        public List<TerminalData> getTerminalData() { return terminalData; }
+        /** Keeps the original domain-list order when an execution view excludes components. */
+        public int getSourceOrdinal() { return sourceOrdinal; }
+        public void setSourceOrdinal(int ordinal) { sourceOrdinal = ordinal; }
+
+        /** @return the shared immutable saved configuration, or null when absent */
+        public SavedCircuitBlock getSavedBlock() { return savedBlock; }
+        /**
+         * Retains immutable saved configuration without copying it.
+         * @param block the saved configuration, or null to clear it
+         */
+        public void setSavedBlock(SavedCircuitBlock block) { savedBlock = block; }
+
+        public boolean isParsedInput() { return parsedInput; }
+        public void setParsedInput(boolean parsedInput) { this.parsedInput = parsedInput; }
+        public boolean isConfigurationNormalized() { return configurationNormalized; }
+        public void setConfigurationNormalized(boolean normalized) { this.configurationNormalized = normalized; }
+        public Map<String, String> getImportTokens() { return importTokens; }
+        public int getImportedParameterCount() { return importedParameterCount; }
+        public void setImportedParameterCount(int count) { this.importedParameterCount = count; }
+        public String getSourceLocation() { return sourceLocation; }
+        public void setSourceLocation(String sourceLocation) { this.sourceLocation = sourceLocation; }
 
         public ComponentData(int type, String name) {
             this.type = type;
@@ -377,6 +439,22 @@ public class CircuitModel {
             this.terminalYLabels = terminalYLabels != null ? terminalYLabels : new String[0];
         }
 
+        public String[] getParameterStrings() {
+            return parameterStrings;
+        }
+
+        public void setParameterStrings(String[] parameterStrings) {
+            this.parameterStrings = parameterStrings != null ? parameterStrings : new String[0];
+        }
+
+        public double[] getNumericParameters() {
+            return numericParameters;
+        }
+
+        public void setNumericParameters(double[] numericParameters) {
+            this.numericParameters = numericParameters != null ? numericParameters : new double[0];
+        }
+
         @Override
         public String toString() {
             return "ComponentData{type=" + type + ", name='" + name + "'}";
@@ -388,11 +466,30 @@ public class CircuitModel {
      */
     public static class ConnectionData {
         private final String type; // LK, CONTROL, THERMAL
+        private final String label;
         private final int[][] points;
+        private SavedCircuitBlock savedBlock;
+
+        /** @return the shared immutable saved configuration, or null when absent */
+        public SavedCircuitBlock getSavedBlock() { return savedBlock; }
+        /**
+         * Retains immutable saved configuration without copying it.
+         * @param block the saved configuration, or null to clear it
+         */
+        public void setSavedBlock(SavedCircuitBlock block) { savedBlock = block; }
 
         public ConnectionData(String type, int[][] points) {
+            this(type, points, "");
+        }
+
+        public ConnectionData(String type, int[][] points, String label) {
             this.type = type;
             this.points = points;
+            this.label = label;
+        }
+
+        public String getLabel() {
+            return label;
         }
 
         public String getType() {

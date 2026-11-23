@@ -35,7 +35,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 public final class ReglerToEXTERNAL extends RegelBlockSimulink implements Comparable, VariableTerminalNumber {
 
     public static final ControlTypeInfo tinfo = new ControlTypeInfo(ReglerToEXTERNAL.class, "ToEXT", I18nKeys.EXPORT_DATA_TO_SIMULINK);
-    private static final ArrayList<RegelBlock> toExternalsInternal = new ArrayList<>();
+    private static final List<RegelBlock> toExternalsInternal = new ArrayList<>();
     public static final List<RegelBlock> toExternals = Collections.unmodifiableList(toExternalsInternal);
     private String _externalName = "";
     private static final double WIDTH = 0.3;

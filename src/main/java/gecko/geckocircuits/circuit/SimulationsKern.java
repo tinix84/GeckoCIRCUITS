@@ -18,7 +18,8 @@ import gecko.geckocircuits.circuit.circuitcomponents.AbstractCircuitBlockInterfa
 import gecko.geckocircuits.circuit.circuitcomponents.AbstractMotor;
 import gecko.geckocircuits.circuit.circuitcomponents.AbstractVoltageSource;
 import gecko.geckocircuits.circuit.circuitcomponents.AbstractCurrentSource;
-import gecko.geckocircuits.allg.MainWindow;
+import gecko.geckocircuits.allg.SolverType;
+import gecko.geckocircuits.allg.LegacySimulationFrontend;
 import gecko.geckocircuits.circuit.circuitcomponents.ReluctanceInductor;
 import gecko.core.circuit.SourceType;
 import gecko.geckocircuits.control.*;
@@ -26,14 +27,39 @@ import gecko.geckocircuits.control.calculators.AbstractControlCalculatable;
 import gecko.geckocircuits.datacontainer.CompressorIntMatrix;
 import gecko.geckocircuits.datacontainer.IntegerMatrixCache;
 import gecko.geckocircuits.datacontainer.ShortMatrixCache;
-import gecko.geckocircuits.newscope.ScopeFrame;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-@SuppressFBWarnings(value = {"ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD", "PA_PUBLIC_PRIMITIVE_ATTRIBUTE"},
-        justification = "Static fields staticTSTART/staticTEND are intentionally written for backward compatibility; public simulation status for runtime monitoring")
+@SuppressFBWarnings(
+        value = {"ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD", "PA_PUBLIC_PRIMITIVE_ATTRIBUTE"},
+        justification =
+                "Static fields staticTSTART/staticTEND are intentionally written for backward compatibility; public simulation status for runtime monitoring")
 public class SimulationsKern implements ISimulationEngine {
+
+    private static final Logger LOGGER = Logger.getLogger(SimulationsKern.class.getName());
+    private final Supplier<SolverType> solverTypeSupplier;
+    private final Consumer<Boolean> scopeActivity;
+    private final Consumer<NetListContainer> bindPresentation;
+    private final Object executionMonitor = new Object();
+    private volatile ExecutionTicket executionTicket;
+
+    private volatile SimulationTraceLogger _traceLogger;
+
+    /** Sets the optional logger before simulation starts. */
+    public void setTraceLogger(SimulationTraceLogger logger) {
+        _traceLogger = logger;
+    }
+
+    public SimulationTraceLogger getTraceLogger() {
+        return _traceLogger;
+    }
 
     private double dt, t, tPAUSE;
     private double tSTART, tEND;
@@ -68,7 +94,10 @@ public class SimulationsKern implements ISimulationEngine {
     private int[][] zuordnung_SchalterLK_SWITCH;  // Welcher Schalter wird durch welchen SWITCH angesteuert?
     private int[][] zuordnung_QuelleLK_signalCONTROL;  // Welcher CONTROL-Knoten steuert welche signalgesteuerte LK-Quelle?
     private int[][] zuordnung_QuelleTHERM_signalCONTROL;  // Welcher CONTROL-Knoten steuert welche signalgesteuerte THERM-Quelle?
-    private int[][] zuordnung_MaschineLK_LoadParameterInCONTROL;  // Welcher CONTROL-Knoten definiert welche mechanischen Signale (zB. externes Moment) des Motors?
+    private int[][]
+            zuordnung_MaschineLK_LoadParameterInCONTROL; // Welcher CONTROL-Knoten definiert welche
+                                                         // mechanischen Signale (zB. externes
+                                                         // Moment) des Motors?
     //
     private RegelBlock[] c;
     private double[][] controlParameters;
@@ -105,7 +134,39 @@ public class SimulationsKern implements ISimulationEngine {
         }
     }
 
+    /** Preserves legacy desktop settings and scope updates through a temporary frontend bridge. */
     public SimulationsKern() {
+        this(new LegacySimulationFrontend());
+    }
+
+    private SimulationsKern(LegacySimulationFrontend frontend) {
+        this(frontend::selectedSolver, frontend, frontend::bind);
+    }
+
+    /**
+     * Creates a kernel with fixed solver configuration and a presentation adapter.
+     * The adapter receives true at scope activation and false when execution stops or pauses.
+     * Calls run synchronously on the simulation caller's thread.
+     * Runtime presentation failures are logged independently of numerical execution.
+     *
+     * @param solverType solver for the electrical and thermal matrices
+     * @param scopeActivity frontend adapter for scope activity changes
+     * @throws NullPointerException if either argument is null
+     */
+    public SimulationsKern(SolverType solverType, Consumer<Boolean> scopeActivity) {
+        this(fixedSolver(solverType), scopeActivity, netlist -> { });
+    }
+
+    private static Supplier<SolverType> fixedSolver(SolverType solverType) {
+        Objects.requireNonNull(solverType, "Solver type is required");
+        return () -> solverType;
+    }
+
+    private SimulationsKern(Supplier<SolverType> solverTypeSupplier, Consumer<Boolean> scopeActivity,
+            Consumer<NetListContainer> bindPresentation) {
+        this.solverTypeSupplier = solverTypeSupplier;
+        this.scopeActivity = Objects.requireNonNull(scopeActivity, "Scope activity adapter is required");
+        this.bindPresentation = bindPresentation;
         _thLuDecompCache = new LUDecompositionCache();
         _luDecompCache = new LUDecompositionCache();
     }
@@ -169,6 +230,10 @@ public class SimulationsKern implements ISimulationEngine {
             nl.berechneSubCircuitAlsDifferentialgleichung(dt, t);  // interne Berechungen in SubCircuits diverser LK-Elemente
             lkmLK.aktualisiereKnotenpotentiale(dt, t);     // pALT=p;
             dataTransferLK_Control();
+            SimulationTraceLogger traceLogger = _traceLogger;
+            if (traceLogger != null) {
+                traceLogger.logStep(t, lkmLK, nl);
+            }
         }
 
         if (simuliereThermKreis) {
@@ -198,7 +263,9 @@ public class SimulationsKern implements ISimulationEngine {
     }
 
     private void doDiodeErrorsRecalculations() {
-        int switchingErrorCounter = 0;   // 'stoergroesse<1.0' verhindert, dass der Algorithmus beim Dioden-Umschalten zwischen Zustaenden haengen bleibt
+        int switchingErrorCounter =
+                0; // 'stoergroesse<1.0' verhindert, dass der Algorithmus beim Dioden-Umschalten
+                   // zwischen Zustaenden haengen bleibt
         double stoergroesse = 1;//0.9999999;
         boolean isNewIteration = false;
 
@@ -206,7 +273,6 @@ public class SimulationsKern implements ISimulationEngine {
             isNewIteration = true;
             if (switchingErrorCounter > 10000) {
                 //new DialogDiodenError(switchingErrorCounter, t);
-                this.lastUpdateOfScope();  // die endgueltige Simulation wird sicherheitshalber noch einmal aktualisiert
                 throw new Error("Numerical instablity of switch!\nAborting simulation.");
             }
 
@@ -286,7 +352,9 @@ public class SimulationsKern implements ISimulationEngine {
             int outputIndex = mapping[2];
             double[] par = e.parameter;
             double[][] blockOutput = unsortedCalculators[reglerIndex]._outputSignal;
-            par[((AbstractMotor) e).getIndexForLoadTorque()] = blockOutput[outputIndex][0];  // bei signalgesteuerten Quellen ist parameter[1] das Signal
+            par[((AbstractMotor) e).getIndexForLoadTorque()] =
+                    blockOutput[outputIndex][
+                            0]; // bei signalgesteuerten Quellen ist parameter[1] das Signal
         }
         //-------------------------------------------------------------------
         // Potentialdifferenzen im LK-Kreis an Regelkreiselement VOLT uebergeben:
@@ -380,40 +448,189 @@ public class SimulationsKern implements ISimulationEngine {
 
     @Override
     public void runSimulation() {
-        while ((t <= tEND) && (_simulationStatus != _simulationStatus.PAUSED)) {
-            simulateOneTimeStep();
-            t += dt;
+        ExecutionTicket ticket = reserveExecution(() -> true);
+        ticket.bindCompletion();
+        ticket.run();
+    }
+
+    /**
+     * Reserves execution at a committed time-step boundary and checkpoints its history.
+     * Bind completion after configuration and presentation activation are prepared, before starting a worker.
+     *
+     * @param stillCurrent identifies the caller that owns this execution request
+     * @return a ticket that cannot advance a later execution of this kernel
+     */
+    public ExecutionTicket reserveExecution(BooleanSupplier stillCurrent) {
+        Objects.requireNonNull(stillCurrent, "Execution ownership is required");
+        synchronized (executionMonitor) {
+            ExecutionTicket ticket = new ExecutionTicket(stillCurrent);
+            if (stillCurrent.getAsBoolean()) {
+                checkpointIfInitialized();
+                executionTicket = ticket;
+            }
+            return ticket;
+        }
+    }
+
+    /** Execution ownership for one prepared simulation segment. */
+    public final class ExecutionTicket implements Runnable {
+        private final BooleanSupplier stillCurrent;
+        private final java.util.concurrent.atomic.AtomicBoolean invoked = new java.util.concurrent.atomic.AtomicBoolean();
+        private final java.util.concurrent.atomic.AtomicBoolean finalized = new java.util.concurrent.atomic.AtomicBoolean();
+        private Runnable completion;
+
+        private ExecutionTicket(BooleanSupplier stillCurrent) {
+            this.stillCurrent = stillCurrent;
         }
 
-        this.lastUpdateOfScope();
+        /** Captures this activation's completion before the worker starts. */
+        public void bindCompletion() {
+            synchronized (executionMonitor) {
+                completion = executionTicket == this && stillCurrent.getAsBoolean()
+                        ? captureScopeCompletion() : () -> { };
+            }
+        }
 
-        // Speichern der letzten Loesung, um im Fall von CONTINUE korrekt weitermachen zu koennen -->$
-        pLK_ALT = new double[lkmLK.p.length];
-        System.arraycopy(lkmLK.p, 0, pLK_ALT, 0, pLK_ALT.length);
-        pTHERM_ALT = new double[lkmTHERM.p.length];
-        System.arraycopy(lkmTHERM.p, 0, pTHERM_ALT, 0, pTHERM_ALT.length);
+        /** Cancels this ticket at a committed boundary without notifying Swing. */
+        public void supersede() {
+            if (executionTicket != this) {
+                return;
+            }
+            synchronized (executionMonitor) {
+                if (executionTicket == this) {
+                    checkpointIfInitialized();
+                    executionTicket = null;
+                }
+            }
+        }
+
+        /**
+         * Stops only this execution and completes its current frontend activation.
+         * The method releases the execution monitor before it calls the completion listeners.
+         *
+         * @return true if this ticket owned and stopped the kernel
+         */
+        public boolean endSimulation() {
+            Runnable captured;
+            synchronized (executionMonitor) {
+                if (executionTicket != this || !stillCurrent.getAsBoolean()) {
+                    return false;
+                }
+                captured = captureScopeCompletion();
+                _simulationStatus = SimulationStatus.FINISHED;
+                saveContinuationState();
+            }
+            notifyPresentation(captured);
+            return true;
+        }
+
+        /**
+         * Pauses this execution at a committed boundary without notifying Swing.
+         *
+         * @return true if this ticket still owns the kernel
+         */
+        public boolean pause() {
+            if (executionTicket != this) {
+                return false;
+            }
+            synchronized (executionMonitor) {
+                if (executionTicket != this) {
+                    return false;
+                }
+                _simulationStatus = SimulationStatus.PAUSED;
+                return true;
+            }
+        }
+
+        /**
+         * Finishes numerical state and teardown without changing a newer reserved execution.
+         *
+         * @return true if this execution can finish its numerical state
+         */
+        public boolean finish() {
+            if (!finalized.compareAndSet(false, true)) {
+                return false;
+            }
+            ExecutionTicket current = executionTicket;
+            if (current != null && current != this) {
+                return false;
+            }
+            synchronized (executionMonitor) {
+                if (executionTicket != null && executionTicket != this) {
+                    return false;
+                }
+                _simulationStatus = SimulationStatus.FINISHED;
+                tearDownOnPause();
+                return true;
+            }
+        }
+
+        /** Advances only this ticket and delivers completion without holding numerical ownership. */
+        @Override
+        public void run() {
+            if (!invoked.compareAndSet(false, true)) {
+                return;
+            }
+            Runnable captured = Objects.requireNonNull(completion, "Bind completion before execution");
+            try {
+                while (executionTicket == this && stillCurrent.getAsBoolean()) {
+                    synchronized (executionMonitor) {
+                        if (executionTicket != this || !stillCurrent.getAsBoolean()) {
+                            break;
+                        }
+                        if (!(t <= tEND) || _simulationStatus == SimulationStatus.PAUSED) {
+                            saveContinuationState();
+                            break;
+                        }
+                        simulateOneTimeStep();
+                        t += dt;
+                    }
+                }
+            } finally {
+                notifyPresentation(captured);
+            }
+        }
     }
 
     @Override
     public void simulateOneStep() throws Exception {
-        if (t + dt > tEND) {
-            throw new Exception("Specified end of simulation reached! Cannot simulate another step.");
+        Runnable failureCompletion = captureScopeCompletion();
+        try {
+            synchronized (executionMonitor) {
+                if (t + dt > tEND) {
+                    throw new Exception("Specified end of simulation reached! Cannot simulate another step.");
+                }
+                simulateOneTimeStep();
+                t += dt;
+            }
+        } catch (Error error) {
+            notifyPresentation(failureCompletion);
+            throw error;
         }
-        simulateOneTimeStep();
-        t += dt;
     }
 
     @Override
     public void simulateTime(double time) throws Exception {
+        Runnable failureCompletion = captureScopeCompletion();
         double simtime = t + time;
         boolean overReach = false;
         if (simtime > tEND) {
             simtime = tEND;
             overReach = true;
         }
-        while (t <= simtime) {
-            simulateOneTimeStep();
-            t += dt;
+        try {
+            while (true) {
+                synchronized (executionMonitor) {
+                    if (!(t <= simtime)) {
+                        break;
+                    }
+                    simulateOneTimeStep();
+                    t += dt;
+                }
+            }
+        } catch (Error error) {
+            notifyPresentation(failureCompletion);
+            throw error;
         }
 
         if (overReach) {
@@ -423,16 +640,30 @@ public class SimulationsKern implements ISimulationEngine {
 
     @Override
     public void endSim() {
-        _simulationStatus = SimulationStatus.FINISHED;
-        this.lastUpdateOfScope();
-        //controlNL.tearDownOnPause();
-        //-------------------------------
-        // Speichern der letzten Loesung, um im Fall von CONTINUE korrekt weitermachen zu koennen -->$
-        pLK_ALT = new double[lkmLK.p.length];
-        System.arraycopy(lkmLK.p, 0, pLK_ALT, 0, pLK_ALT.length);
-        pTHERM_ALT = new double[lkmTHERM.p.length];
-        System.arraycopy(lkmTHERM.p, 0, pTHERM_ALT, 0, pTHERM_ALT.length);
-        //-------------------------------
+        Runnable completion = captureScopeCompletion();
+        synchronized (executionMonitor) {
+            _simulationStatus = SimulationStatus.FINISHED;
+            saveContinuationState();
+        }
+        notifyPresentation(completion);
+    }
+
+    private void checkpointIfInitialized() {
+        if (lkmLK != null && lkmTHERM != null) {
+            saveContinuationState();
+        }
+    }
+
+    private void saveContinuationState() {
+        pLK_ALT = lkmLK.p.clone();
+        pTHERM_ALT = lkmTHERM.p.clone();
+    }
+
+    private Runnable captureScopeCompletion() {
+        if (scopeActivity instanceof LegacySimulationFrontend frontend) {
+            return frontend.captureCompletion();
+        }
+        return () -> scopeActivity.accept(false);
     }
 
     // setze die Anfangsbedingungen entsprechend der letzten Berechnung, wenn CONTINUE gedrueckt wurde -->
@@ -503,12 +734,27 @@ public class SimulationsKern implements ISimulationEngine {
         definiereInteraktion_VOLT_AMP_LK();  // wie messe ich Stroeme und Spannungen im LK mit CONTROL-AMP bzw. CONTROL-VOLT?
         definiereInteraktion_MaschineLK_VIEWMOT();  // zur Messung von Maschinen-internen Parametern
         //
-        zuordnung_SchalterLK_SWITCH = definiereInteraktion_Schalter_Regler();  // welches CONTROL-GATE steuert welchen LK_SWITCH (LK_S,LK_IGBT,LK_THYR) an?
-        zuordnung_QuelleLK_signalCONTROL = definiereInteraktion_SignalgesteuerteQuelle_Regler(nl);  // welches allg. CONTROL-Signal steuert welche LK_QUELLE (LK_U, LK_I) an?
-        zuordnung_QuelleTHERM_signalCONTROL = definiereInteraktion_SignalgesteuerteQuelle_Regler(thermNL);  // welches allg. CONTROL-Signal steuert welche THERM_QUELLE (LK_TEMP, LK_FLOW) an?
+        zuordnung_SchalterLK_SWITCH =
+                definiereInteraktion_Schalter_Regler(); // welches CONTROL-GATE steuert welchen
+                                                        // LK_SWITCH (LK_S,LK_IGBT,LK_THYR) an?
+        zuordnung_QuelleLK_signalCONTROL =
+                definiereInteraktion_SignalgesteuerteQuelle_Regler(
+                        nl); // welches allg. CONTROL-Signal steuert welche LK_QUELLE (LK_U, LK_I)
+                             // an?
+        zuordnung_QuelleTHERM_signalCONTROL =
+                definiereInteraktion_SignalgesteuerteQuelle_Regler(
+                        thermNL); // welches allg. CONTROL-Signal steuert welche THERM_QUELLE
+                                  // (LK_TEMP, LK_FLOW) an?
 
-        zuordnung_MaschineLK_LoadParameterInCONTROL = definiereInteraktion_MaschineLK_LoadParameterInCONTROL();  // Welcher CONTROL-Knoten definiert welche mechanischen Signale (zB. externes Moment) des Motors?
-        definiereInteraktion_TEMP_FLOW_THERM();  // wie messe ich thermischen Fluss und Temperatur-Differenzen im THERM mit CONTROL-FLOW bzw. CONTROL-TEMP?
+        zuordnung_MaschineLK_LoadParameterInCONTROL =
+                definiereInteraktion_MaschineLK_LoadParameterInCONTROL(); // Welcher CONTROL-Knoten
+                                                                          // definiert welche
+                                                                          // mechanischen Signale
+                                                                          // (zB. externes Moment)
+                                                                          // des Motors?
+        definiereInteraktion_TEMP_FLOW_THERM(); // wie messe ich thermischen Fluss und
+                                                // Temperatur-Differenzen im THERM mit CONTROL-FLOW
+                                                // bzw. CONTROL-TEMP?
         setControlledSourcesFromControlValue();
         setThermalControlledSourcesFromControlValues();
 
@@ -519,14 +765,15 @@ public class SimulationsKern implements ISimulationEngine {
         //
         // Leistungskreis:
         if (getAnfangsbedVomDialogfenster) {
-            lkmLK = new LKMatrices(MainWindow._solverSettings.SOLVER_TYPE.getValue());
-            lkmLK.initMatrizen(nl, getAnfangsbedVomDialogfenster, true, MainWindow._solverSettings.SOLVER_TYPE.getValue());  // pALT= new double[..];   iALT= new double[..];
+            SolverType solverType = solverTypeSupplier.get();
+            lkmLK = new LKMatrices(solverType);
+            lkmLK.initMatrizen(nl, getAnfangsbedVomDialogfenster, true, solverType);  // pALT= new double[..];   iALT= new double[..];
             lkmLK.schreibeMatrix_A(dt, tAktuell, false);
 
             //
             // thermischer Kreis:
-            lkmTHERM = new LKMatrices(MainWindow._solverSettings.SOLVER_TYPE.getValue());
-            lkmTHERM.initMatrizen((NetListLK) thermNL, getAnfangsbedVomDialogfenster, false, MainWindow._solverSettings.SOLVER_TYPE.getValue());
+            lkmTHERM = new LKMatrices(solverType);
+            lkmTHERM.initMatrizen((NetListLK) thermNL, getAnfangsbedVomDialogfenster, false, solverType);
             lkmTHERM.schreibeMatrix_A(dt, tAktuell, false);
         }
         //=============================
@@ -548,21 +795,11 @@ public class SimulationsKern implements ISimulationEngine {
         } else {
             simuliereRegelkreis = true;
         }
+        bindPresentation.accept(nlContainer);
     }
 
     public void setScopeMenuesStartStop() {
-        // ganz am Anfang sofort einmal auffrischen:
-        for (RegelBlock block : c) {
-            if (block instanceof ReglerOSZI) {
-                ReglerOSZI oszi = (ReglerOSZI) block;
-                if (oszi._scopeFrame != null) {
-                    oszi._scopeFrame.setScopeMenueEnabled(true);
-                }
-            }
-            if (block instanceof ReglerCISPR16) {
-                ((ReglerCISPR16) block).setTestReceiverCISPR16MenueEnabled(false);
-            }
-        }
+        notifyScopeActivity(true);
     }
 
     public void initialisiereCONTROLatSimulationStart(final double dt) {
@@ -583,8 +820,12 @@ public class SimulationsKern implements ISimulationEngine {
         for (int i = 0; i < allElements.length; i++) {
             AbstractCircuitBlockInterface element = allElements[i];
             if (element instanceof AbstractVoltageSource || element instanceof AbstractCurrentSource) {
-                if (element.getParameter()[0] == SourceType.QUELLE_SIGNALGESTEUERT_NEW || element.getParameter()[0] == SourceType.QUELLE_SIGNALGESTEUERT) {
-                    NetzlisteCONTROL.IndexConnection li = controlNL.getIndexConnection(element.getParentCircuitSheet(), element.getParameterString()[0]);
+                if (element.getParameter()[0] == SourceType.QUELLE_SIGNALGESTEUERT_NEW
+                        || element.getParameter()[0] == SourceType.QUELLE_SIGNALGESTEUERT) {
+                    NetzlisteCONTROL.IndexConnection li =
+                            controlNL.getIndexConnection(
+                                    element.getParentCircuitSheet(),
+                                    element.getParameterString()[0]);
                     if (li != null) { // this can happen when no control signal is selected/assigned!
                         zuordnung_QuelleLK_signalCONTROL[counter]
                                 = new int[]{i, li._elementIndex, li._inBlockIndex_outputIndex};
@@ -640,9 +881,14 @@ public class SimulationsKern implements ISimulationEngine {
         for (int iLK = 0; iLK < nl.elements.length; iLK++) {
             AbstractCircuitBlockInterface block = nl.elements[iLK];
             if (block instanceof AbstractMotor) {
-                NetzlisteCONTROL.IndexConnection li = controlNL.getIndexConnection(nl.elements[iLK].getParentCircuitSheet(), nl.elements[iLK].getParameterString()[0]);
+                NetzlisteCONTROL.IndexConnection li =
+                        controlNL.getIndexConnection(
+                                nl.elements[iLK].getParentCircuitSheet(),
+                                nl.elements[iLK].getParameterString()[0]);
                 if (li != null) {
-                    zuordnung_MaschineLK_LoadParameterInCONTROL[zuordnungANZAHL_MaschineLK_LoadParameterInCONTROL] = new int[]{iLK, li._elementIndex, li._inBlockIndex_outputIndex};
+                    zuordnung_MaschineLK_LoadParameterInCONTROL[
+                                    zuordnungANZAHL_MaschineLK_LoadParameterInCONTROL] =
+                            new int[] {iLK, li._elementIndex, li._inBlockIndex_outputIndex};
                     zuordnungANZAHL_MaschineLK_LoadParameterInCONTROL++;
                 }
             }
@@ -804,38 +1050,34 @@ public class SimulationsKern implements ISimulationEngine {
         System.arraycopy(zeigerACE, 0, zeigerAufControlElementTHERM, 0, jjZeiger);
     }
 
-    private void lastUpdateOfScope() {
-        this.lastUpdateOfScope(300);
+    private void notifyScopeActivity(boolean active) {
+        notifyPresentation(() -> scopeActivity.accept(active));
     }
 
-    private void lastUpdateOfScope(long sleep) {
+    private void notifyPresentation(Runnable action) {
         try {
-            Thread.sleep(sleep);
-        } catch (InterruptedException e) {
-            // ignored: interruption acceptable
-        }  // damit es nicht zu einer 'RacingCondition' mit einer eventuell noch laufenden Aktualisierung aus takteAuffrischungScope() kommt
-        //---------------------------
-        for (RegelBlock block : c) {
-            if (block instanceof ReglerOSZI) {
-                ScopeFrame sf = ((ReglerOSZI) block)._scopeFrame;
-                if (sf != null) {
-                    sf.setScopeMenueEnabled(false);
-                }
-            }
-            if (block instanceof ReglerCISPR16) {
-                ((ReglerCISPR16) block).setTestReceiverCISPR16MenueEnabled(true);
-            }
+            action.run();
+        } catch (RuntimeException error) {
+            LOGGER.log(Level.WARNING, "Could not update simulation presentation", error);
         }
     }
 
     // Externe SIMULINK-KOPPLUNG  -  Zugriff erfolgt ueber 'SimLE.java'
     //
     public void external_step(double time) {
-        t = time;
-        if (dt == 0) {
-            dt = 1e-6;  // passiert beim Start?
+        Runnable failureCompletion = captureScopeCompletion();
+        try {
+            synchronized (executionMonitor) {
+                t = time;
+                if (dt == 0) {
+                    dt = 1e-6;
+                }
+                simulateOneTimeStep();
+            }
+        } catch (Error error) {
+            notifyPresentation(failureCompletion);
+            throw error;
         }
-        simulateOneTimeStep();
     }
 
 //    public void external_step (double time, double[] input) {
@@ -872,16 +1114,7 @@ public class SimulationsKern implements ISimulationEngine {
     }
 
     public void external_end() {
-        _simulationStatus = SimulationStatus.FINISHED;
-        this.lastUpdateOfScope();  // die endgueltige Simulation wird sicherheitshalber noch einmal aktualisiert
-        //-------------------------------
-        // Speichern der letzten Loesung, um im Fall von CONTINUE korrekt weitermachen zu koennen -->
-        pLK_ALT = new double[lkmLK.p.length];
-        System.arraycopy(lkmLK.p, 0, pLK_ALT, 0, pLK_ALT.length);
-        pTHERM_ALT = new double[lkmTHERM.p.length];
-        System.arraycopy(lkmTHERM.p, 0, pTHERM_ALT, 0, pTHERM_ALT.length);
-        //-------------------------------
-        //System.out.println("\nexternal ended");
+        endSim();
     }
 
     public void tearDownOnPause() {

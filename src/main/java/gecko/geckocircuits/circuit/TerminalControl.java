@@ -49,50 +49,63 @@ public class TerminalControl extends TerminalRelativePosition implements Control
         final int CIRCLE_DIAMETER = 6;
         RegelBlock _parentRegler = (RegelBlock) _parentElement;
 
-        if(_parentRegler._calculator == null) {
+        if (_parentRegler._calculator == null) {
             return;
         }
         int index = _parentRegler.YOUT.indexOf(this);
         double value = 0;
-        if(index < 0) {
+        if (index < 0) {
             index = _parentRegler.XIN.indexOf(this);
             value = _parentRegler._calculator._inputSignal[index][0];
         } else {
             value = _parentRegler._calculator._outputSignal[index][0];
         }
-        if(index < 0) {
+        if (index < 0) {
             return;
         }
 
 
 
         final int dpix = AbstractCircuitSheetComponent.dpix;
-        if(value == 0) {
+        if (value == 0) {
             graphics.setColor(Color.LIGHT_GRAY);
-            graphics.fillOval(dpix * getPosition().x - CIRCLE_DIAMETER/2,
-                dpix * getPosition().y-CIRCLE_DIAMETER/2, CIRCLE_DIAMETER, CIRCLE_DIAMETER);
+            graphics.fillOval(
+                    dpix * getPosition().x - CIRCLE_DIAMETER / 2,
+                    dpix * getPosition().y - CIRCLE_DIAMETER / 2,
+                    CIRCLE_DIAMETER,
+                    CIRCLE_DIAMETER);
             graphics.setColor(Color.GRAY);
-            graphics.drawOval(dpix * getPosition().x - CIRCLE_DIAMETER/2,
-                dpix * getPosition().y-CIRCLE_DIAMETER/2, CIRCLE_DIAMETER, CIRCLE_DIAMETER);
-        } else if(value == 1) {
+            graphics.drawOval(
+                    dpix * getPosition().x - CIRCLE_DIAMETER / 2,
+                    dpix * getPosition().y - CIRCLE_DIAMETER / 2,
+                    CIRCLE_DIAMETER,
+                    CIRCLE_DIAMETER);
+        } else if (value == 1) {
             graphics.setColor(Color.BLUE);
-            graphics.fillOval(dpix * getPosition().x - CIRCLE_DIAMETER/2,
-                dpix * getPosition().y-CIRCLE_DIAMETER/2, CIRCLE_DIAMETER, CIRCLE_DIAMETER);
+            graphics.fillOval(
+                    dpix * getPosition().x - CIRCLE_DIAMETER / 2,
+                    dpix * getPosition().y - CIRCLE_DIAMETER / 2,
+                    CIRCLE_DIAMETER,
+                    CIRCLE_DIAMETER);
         } else {
 
             String valueString = "" + value;
-            if(value < 0) {
+            if (value < 0) {
                 valueString = valueString.substring(0, 2);
             } else {
                 valueString = valueString.substring(0, 1);
             }
-            //graphics.setColor(Color.GREEN);
-            graphics.fillOval(dpix * getPosition().x - CIRCLE_DIAMETER/2,
-                dpix * getPosition().y-2 * CIRCLE_DIAMETER/2, 2 * CIRCLE_DIAMETER, 2 * CIRCLE_DIAMETER);
+            // graphics.setColor(Color.GREEN);
+            graphics.fillOval(
+                    dpix * getPosition().x - CIRCLE_DIAMETER / 2,
+                    dpix * getPosition().y - 2 * CIRCLE_DIAMETER / 2,
+                    2 * CIRCLE_DIAMETER,
+                    2 * CIRCLE_DIAMETER);
             graphics.setColor(Color.WHITE);
             Font oldFont = graphics.getFont();
             graphics.setFont(new Font("Arial", Font.PLAIN, 10));
-            graphics.drawString(valueString, dpix * getPosition().x-1, dpix * getPosition().y+3);
+            graphics.drawString(
+                    valueString, dpix * getPosition().x - 1, dpix * getPosition().y + 3);
             graphics.setFont(oldFont);
         }
 

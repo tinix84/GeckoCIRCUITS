@@ -13,6 +13,8 @@
  */
 package gecko.geckocircuits.circuit;
 
+import java.util.List;
+
 import gecko.geckocircuits.allg.MainWindow;
 import gecko.core.allg.GeckoFile;
 import gecko.geckocircuits.allg.GeckoFileChooser;
@@ -132,22 +134,34 @@ public class NonLinearDialogPanel extends JPanel {
         jpCONDdataGes.add(table, BorderLayout.CENTER);
         JButton jbSaveAsFile = GuiFabric.getJButton(I18nKeys.SAVE);
         jbSaveAsFile.setPreferredSize(BUTTON_DIMENSION);
-        jbSaveAsFile.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent ae) {
-                GeckoFileChooser fileChooser = GeckoFileChooser.createSimpleSaveFileChooser(_extension, _parentDialog);
-                if (fileChooser.getUserResult() == GeckoFileChooser.FileChooserResult.CANCEL) {
-                    return;
-                }
-                try {
-                    savedExternalFile = AbstractNonLinearCircuitComponent.writeNonLinearCharacteristicToFile(data, fileChooser.getFileWithCheckedEnding());
-                } catch (java.io.IOException e) {
-                    final String errorMessage = "Error writing non-linear characteristic file " + fileChooser.getFileWithCheckedEnding() + "\n" + e.getMessage();
-                    final String errorTitle = "ERROR - I/O exception";
-                    JOptionPane.showMessageDialog(null, errorMessage, errorTitle, JOptionPane.ERROR_MESSAGE);
-                }
-            }
-        });
+        jbSaveAsFile.addActionListener(
+                new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent ae) {
+                        GeckoFileChooser fileChooser =
+                                GeckoFileChooser.createSimpleSaveFileChooser(
+                                        _extension, _parentDialog);
+                        if (fileChooser.getUserResult()
+                                == GeckoFileChooser.FileChooserResult.CANCEL) {
+                            return;
+                        }
+                        try {
+                            savedExternalFile =
+                                    AbstractNonLinearCircuitComponent
+                                            .writeNonLinearCharacteristicToFile(
+                                                    data, fileChooser.getFileWithCheckedEnding());
+                        } catch (java.io.IOException e) {
+                            final String errorMessage =
+                                    "Error writing non-linear characteristic file "
+                                            + fileChooser.getFileWithCheckedEnding()
+                                            + "\n"
+                                            + e.getMessage();
+                            final String errorTitle = "ERROR - I/O exception";
+                            JOptionPane.showMessageDialog(
+                                    null, errorMessage, errorTitle, JOptionPane.ERROR_MESSAGE);
+                        }
+                    }
+                });
         JButton jbLoadFromFile = GuiFabric.getJButton(I18nKeys.LOAD);
         jbLoadFromFile.setPreferredSize(BUTTON_DIMENSION);
         jbLoadFromFile.addActionListener(new ActionListener() {
@@ -187,97 +201,120 @@ public class NonLinearDialogPanel extends JPanel {
         //---------------
         _jbOK = GuiFabric.getJButton(I18nKeys.OK);
         _jbOK.setPreferredSize(BUTTON_DIMENSION);
-        _jbOK.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(final ActionEvent ae) {
-                if (loadedFile != null) {
-                    //here we don't need to do anything, since file is already set, but check anyway
-                    if (!loadedFile.equals(_nonlinearParent.getNonLinearFile())) {
-                        ArrayList<GeckoFile> newFile = new ArrayList<GeckoFile>();
-                        newFile.add(loadedFile);
-                        _nonlinearParent.addFiles(newFile);
-                    }
-                } else if (savedExternalFile != null) {
-                    //characteristic has been saved to an external file, and we should not attribute this to the circuit element
-                    try {
-                        GeckoFile newFileFromExternal = new GeckoFile(savedExternalFile, GeckoFile.StorageType.EXTERNAL, MainWindow.getOpenFileName());
-                        ArrayList<GeckoFile> newFile = new ArrayList<GeckoFile>();
-                        newFile.add(newFileFromExternal);
-                        _nonlinearParent.addFiles(newFile);
-                    } catch (java.io.FileNotFoundException e) {
-                        final String errorMessage = e.getMessage();
-                        final String errorTitle = "File Not Found";
-                        JOptionPane.showMessageDialog(null, errorMessage, errorTitle, JOptionPane.ERROR_MESSAGE);
-                    }
-                } else {
-                    GeckoFile existingNonLinFile = _nonlinearParent.getNonLinearFile();
-                    if (existingNonLinFile == null) {
-                        String internalFileName = getInternalFileName(_nonlinearParent.getStringID());
-                        if (internalFileName != null) {
-                            _nonlinearParent.setNonlinearCharacteristic(data, internalFileName);
-                        } else {
-                            return;
-                        }
-                    } else {
-                        if (existingNonLinFile.noOfUsers() > 1) {
-                            switch (overwriteOption(existingNonLinFile.getName())) {
-                                case -1: //ESC key
-                                    return;
-                                case 0: // overwrite data of existing file
-                                    _nonlinearParent.setNonlinearCharacteristic(data); //overwrite existing file
-                                    break;
-                                case 1: // save as new file
-                                    String newInternalFileName = getInternalFileName(_nonlinearParent.getStringID() + "new");
-                                    if (newInternalFileName != null) {
-                                        _nonlinearParent.setNonlinearCharacteristic(data, newInternalFileName);
-                                    } else {
-                                        return;
-                                    }
-                                    break;
+        _jbOK.addActionListener(
+                new ActionListener() {
+                    @Override
+                    public void actionPerformed(final ActionEvent ae) {
+                        if (loadedFile != null) {
+                            // here we don't need to do anything, since file is already set, but
+                            // check anyway
+                            if (!loadedFile.equals(_nonlinearParent.getNonLinearFile())) {
+                                List<GeckoFile> newFile = new ArrayList<GeckoFile>();
+                                newFile.add(loadedFile);
+                                _nonlinearParent.addFiles(newFile);
                             }
-                        } else if (existingNonLinFile.getStorageType() == GeckoFile.StorageType.EXTERNAL) {
-                            if (originalDataIsChanged(data, _nonlinearParent.nonlinearData)) {
-
-                                int overwrite = overwriteExternal(existingNonLinFile.getName());
-                                switch (overwrite) {
-                                    case -1: //ESC key
-                                        return;
-                                    case 0:
-                                        _nonlinearParent.setNonlinearCharacteristic(data); //overwrite existing file
-                                        break;
-                                    case 1:
-                                        String newInternalFileName = getInternalFileName(_nonlinearParent.getStringID() + "new");
-                                        if (newInternalFileName != null) {
-                                            _nonlinearParent.setNonlinearCharacteristic(data, newInternalFileName);
-                                        } else {
+                        } else if (savedExternalFile != null) {
+                            // characteristic has been saved to an external file, and we should not
+                            // attribute this to the circuit element
+                            try {
+                                GeckoFile newFileFromExternal =
+                                        new GeckoFile(
+                                                savedExternalFile,
+                                                GeckoFile.StorageType.EXTERNAL,
+                                                MainWindow.getOpenFileName());
+                                List<GeckoFile> newFile = new ArrayList<GeckoFile>();
+                                newFile.add(newFileFromExternal);
+                                _nonlinearParent.addFiles(newFile);
+                            } catch (java.io.FileNotFoundException e) {
+                                final String errorMessage = e.getMessage();
+                                final String errorTitle = "File Not Found";
+                                JOptionPane.showMessageDialog(
+                                        null, errorMessage, errorTitle, JOptionPane.ERROR_MESSAGE);
+                            }
+                        } else {
+                            GeckoFile existingNonLinFile = _nonlinearParent.getNonLinearFile();
+                            if (existingNonLinFile == null) {
+                                String internalFileName =
+                                        getInternalFileName(_nonlinearParent.getStringID());
+                                if (internalFileName != null) {
+                                    _nonlinearParent.setNonlinearCharacteristic(
+                                            data, internalFileName);
+                                } else {
+                                    return;
+                                }
+                            } else {
+                                if (existingNonLinFile.noOfUsers() > 1) {
+                                    switch (overwriteOption(existingNonLinFile.getName())) {
+                                        case -1: // ESC key
                                             return;
+                                        case 0: // overwrite data of existing file
+                                            _nonlinearParent.setNonlinearCharacteristic(
+                                                    data); // overwrite existing file
+                                            break;
+                                        case 1: // save as new file
+                                            String newInternalFileName =
+                                                    getInternalFileName(
+                                                            _nonlinearParent.getStringID() + "new");
+                                            if (newInternalFileName != null) {
+                                                _nonlinearParent.setNonlinearCharacteristic(
+                                                        data, newInternalFileName);
+                                            } else {
+                                                return;
+                                            }
+                                            break;
+                                    }
+                                } else if (existingNonLinFile.getStorageType()
+                                        == GeckoFile.StorageType.EXTERNAL) {
+                                    if (originalDataIsChanged(
+                                            data, _nonlinearParent.nonlinearData)) {
+
+                                        int overwrite =
+                                                overwriteExternal(existingNonLinFile.getName());
+                                        switch (overwrite) {
+                                            case -1: // ESC key
+                                                return;
+                                            case 0:
+                                                _nonlinearParent.setNonlinearCharacteristic(
+                                                        data); // overwrite existing file
+                                                break;
+                                            case 1:
+                                                String newInternalFileName =
+                                                        getInternalFileName(
+                                                                _nonlinearParent.getStringID()
+                                                                        + "new");
+                                                if (newInternalFileName != null) {
+                                                    _nonlinearParent.setNonlinearCharacteristic(
+                                                            data, newInternalFileName);
+                                                } else {
+                                                    return;
+                                                }
+                                                break;
                                         }
-                                        break;
+                                    }
+                                } else {
+                                    _nonlinearParent.setNonlinearCharacteristic(data);
                                 }
                             }
-                        } else {
-                            _nonlinearParent.setNonlinearCharacteristic(data);
                         }
+                        _parentDialog.dispose();
                     }
-                }
-                _parentDialog.dispose();
-            }
 
-            private boolean originalDataIsChanged(double[][] data, double[][] nonlinearData) {
-                if(data.length != nonlinearData.length) {
-                    return true;
-                }
-
-                for(int i = 0; i < data.length; i++) {
-                    for(int j = 0; j < data[0].length; j++) {
-                        if(data[i][j] != nonlinearData[i][j]) {
+                    private boolean originalDataIsChanged(
+                            double[][] data, double[][] nonlinearData) {
+                        if (data.length != nonlinearData.length) {
                             return true;
                         }
+
+                        for (int i = 0; i < data.length; i++) {
+                            for (int j = 0; j < data[0].length; j++) {
+                                if (data[i][j] != nonlinearData[i][j]) {
+                                    return true;
+                                }
+                            }
+                        }
+                        return false;
                     }
-                }
-                return false;
-            }
-        });
+                });
         lowerPanel.add(new JSeparator(SwingConstants.VERTICAL));
 
         lowerPanel.add(_jbOK);
@@ -285,9 +322,17 @@ public class NonLinearDialogPanel extends JPanel {
     }
 
     private String getInternalFileName(String blockName) {
-        String internalFileName = JOptionPane.showInputDialog(null, "Please select a non-linear characteristic identifier with extension *" + _extension + " (e.g. " + blockName.replace(".", "") + _extension + "):",
-                "Choose file name",
-                JOptionPane.PLAIN_MESSAGE);
+        String internalFileName =
+                JOptionPane.showInputDialog(
+                        null,
+                        "Please select a non-linear characteristic identifier with extension *"
+                                + _extension
+                                + " (e.g. "
+                                + blockName.replace(".", "")
+                                + _extension
+                                + "):",
+                        "Choose file name",
+                        JOptionPane.PLAIN_MESSAGE);
         if (internalFileName != null) {
             internalFileName = internalFileName.trim();
             if (!internalFileName.endsWith(_extension)) {
@@ -300,7 +345,8 @@ public class NonLinearDialogPanel extends JPanel {
     private int overwriteOption(String existingFileName) {
         Object[] options = {"Overwrite existing", "Create New"};
 
-        int selected = JOptionPane.showOptionDialog(null,
+
+        return JOptionPane.showOptionDialog(null,
                 "Non-linear characteristic " + existingFileName + " is also used by other circuit elements.\n"
                 + "Would you like to overwrite it (will affect all other elements that use it!)\n"
                 + "or create a new one from the input data?",
@@ -308,20 +354,19 @@ public class NonLinearDialogPanel extends JPanel {
                 JOptionPane.DEFAULT_OPTION,
                 JOptionPane.QUESTION_MESSAGE,
                 null, options, options[0]);
-        return selected;
     }
 
     private int overwriteExternal(String existingFileName) {
         Object[] options = {"Overwrite", "Create New"};
 
-        int selected = JOptionPane.showOptionDialog(null,
+
+        return JOptionPane.showOptionDialog(null,
                 "This element uses the external file " + existingFileName + " for its non-linear characteristic.\n"
                 + "Would you like to overwrite it or create a new internal file?",
                 "Overwrite external file?",
                 JOptionPane.DEFAULT_OPTION,
                 JOptionPane.QUESTION_MESSAGE,
                 null, options, options[0]);
-        return selected;
     }
 
     public void setCharacteristicLoadedFromFile(final GeckoFile file) {
@@ -331,7 +376,7 @@ public class NonLinearDialogPanel extends JPanel {
             data = new double[2][];
             data[0] = nonLin[0];
             data[1] = nonLin[1];
-            for(int i = 0; i < data[0].length; i++) {
+            for (int i = 0; i < data[0].length; i++) {
                 System.out.println("iii " + i + " " + data[0][i] + " " + data[1][i] + " " + (data[0][i] * data[1][i]));
             }
             table.setValues(data);

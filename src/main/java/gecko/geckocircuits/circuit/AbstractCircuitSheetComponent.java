@@ -103,7 +103,7 @@ public abstract class AbstractCircuitSheetComponent {
         if (this instanceof GeckoFileable) {
             List<GeckoFile> filesList = ((GeckoFileable)this).getFiles();
             if (filesList != null) {
-                final ArrayList<GeckoFile> extraFiles = new ArrayList<GeckoFile>(filesList);
+                final List<GeckoFile> extraFiles = new ArrayList<GeckoFile>(filesList);
                 if (extraFiles != null && !extraFiles.isEmpty()) {
                     ((GeckoFileable) this).removeLocalComponentFiles(extraFiles);
                 }
@@ -315,10 +315,10 @@ public abstract class AbstractCircuitSheetComponent {
     public abstract String getExportImportCharacters();
 
     public boolean allParentSubcircuitsEnabled() {
-        if(_parentCircuitSheet != null && _parentCircuitSheet instanceof SubCircuitSheet) {
+        if (_parentCircuitSheet instanceof SubCircuitSheet) {
             SubCircuitSheet subSheet = (SubCircuitSheet) _parentCircuitSheet;
             final SubcircuitBlock subBlock = subSheet._subBlock;
-            if(subBlock._isEnabled.getValue() != Enabled.ENABLED) {
+            if (subBlock._isEnabled.getValue() != Enabled.ENABLED) {
                 return false;
             }
         }

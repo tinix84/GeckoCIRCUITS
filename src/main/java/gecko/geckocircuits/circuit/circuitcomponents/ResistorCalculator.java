@@ -35,7 +35,7 @@ public final class ResistorCalculator extends CircuitComponent<AbstractResistor>
     }
 
     public void setResistance(final double resistance) {
-        if(_resistance < FAST_NULL_R) {
+        if (_resistance < FAST_NULL_R) {
             _resistance = FAST_NULL_R;
         } else {
             _resistance = resistance;

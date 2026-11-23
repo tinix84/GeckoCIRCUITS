@@ -30,7 +30,7 @@ public final class IDStringDialog {
 
     private final AbstractBlockInterface _parent;
     private String _idString;
-    private static Map<String, ArrayList<AbstractBlockInterface>> _allIDStrings = new HashMap<String, ArrayList<AbstractBlockInterface>>();
+    private static Map<String, List<AbstractBlockInterface>> _allIDStrings = new HashMap<String, List<AbstractBlockInterface>>();
     public static final Random rand = new Random(System.currentTimeMillis());
     public static final int MAX_SEARCH_NUMBER = 10000;
     final List<ActionListener> actionListeners = new ArrayList<ActionListener>();
@@ -72,7 +72,7 @@ public final class IDStringDialog {
             returnValue = new IDStringDialog(parent, newName);
         }
 
-        final ArrayList<AbstractBlockInterface> newList = new ArrayList<AbstractBlockInterface>();
+        final List<AbstractBlockInterface> newList = new ArrayList<AbstractBlockInterface>();
         newList.add(parent);
         _allIDStrings.put(returnValue.toString(), newList);
         return returnValue;
@@ -174,9 +174,9 @@ public final class IDStringDialog {
             if (newName.equals(_idString)) {
                 return;
             }
-            ArrayList<AbstractBlockInterface> insertList = null;
+            List<AbstractBlockInterface> insertList = null;
             if (_allIDStrings.containsKey(newName)) {
-                ArrayList<AbstractBlockInterface> possibleConflicts = _allIDStrings.get(newName);
+                List<AbstractBlockInterface> possibleConflicts = _allIDStrings.get(newName);
                 insertList = possibleConflicts;
                 for (AbstractBlockInterface candidate : possibleConflicts) {
                     if (candidate.getParentCircuitSheet() == null && _parent.getParentCircuitSheet() == null
@@ -229,7 +229,7 @@ public final class IDStringDialog {
 
     public void refreshNameList() {
 
-        ArrayList<AbstractBlockInterface> insertList = new ArrayList<AbstractBlockInterface>();
+        List<AbstractBlockInterface> insertList = new ArrayList<AbstractBlockInterface>();
         if (!_allIDStrings.containsKey(_idString)) {
             _allIDStrings.put(_idString, insertList);
         } else {

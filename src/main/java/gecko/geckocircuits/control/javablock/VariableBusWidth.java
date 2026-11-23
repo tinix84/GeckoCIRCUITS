@@ -61,7 +61,7 @@ class VariableBusWidth {
 
 
     final int getBusWidth(final int outputNumber) {
-        if(busMap.containsKey(outputNumber)) {
+        if (busMap.containsKey(outputNumber)) {
             return busMap.get(outputNumber);
         } else {
             return 1;
@@ -70,7 +70,7 @@ class VariableBusWidth {
     }
 
     final void setBusWidth(final int outputNumber, final int busWidth) {
-        if(busMap.containsKey(outputNumber)) {
+        if (busMap.containsKey(outputNumber)) {
             busMap.remove(outputNumber);
         }
 
@@ -82,7 +82,7 @@ class VariableBusWidth {
         int[] indicesList = new int[busMap.size()];
         int[] busWidth = new int[busMap.size()];
         int counter = 0;
-        for(Entry<Integer, Integer> entry : busMap.entrySet()) {
+        for (Entry<Integer, Integer> entry : busMap.entrySet()) {
             indicesList[counter] = entry.getKey();
             busWidth[counter] = entry.getValue();
             counter++;
@@ -96,12 +96,12 @@ class VariableBusWidth {
         int[] indices = new int[0];
         int[] values = new int[0];
 
-        if(tokenMap.containsToken("indicesBusWidth[]")) {
+        if (tokenMap.containsToken("indicesBusWidth[]")) {
             indices = tokenMap.readDataLine("indicesBusWidth[]", indices);
             values = tokenMap.readDataLine("valuesBusWidth[]", values);
         }
 
-        for(int i = 0; i < indices.length; i++) {
+        for (int i = 0; i < indices.length; i++) {
             busMap.put(indices[i], values[i]);
 
         }

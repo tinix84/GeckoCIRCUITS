@@ -102,8 +102,8 @@ public class SimpleGraferPanel extends javax.swing.JPanel {
                 .addContainerGap()));
     }// </editor-fold>
 
-    //CHECKSTYLE:ON
-    private void jButtonShowAllActionPerformed(java.awt.event.ActionEvent evt) {//NOPMD
+    // CHECKSTYLE:ON
+    private void jButtonShowAllActionPerformed(java.awt.event.ActionEvent evt) { // NOPMD
         _grafer.doZoomAutoFit();
     }
 

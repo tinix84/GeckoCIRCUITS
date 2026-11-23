@@ -23,7 +23,11 @@ public final class ReglerSPARSEMATRIX extends RegelBlock {
 
     private static final int X_POS_IN = -2;
     private static final int X_POS_OUT = 2;
-    public static final ControlTypeInfo tinfo = new ControlTypeInfo(ReglerSPARSEMATRIX.class, "SPARSEMATRIX", I18nKeys.SPARSE_MATRIX_CONVERTER_CONTROL);
+    public static final ControlTypeInfo tinfo =
+            new ControlTypeInfo(
+                    ReglerSPARSEMATRIX.class,
+                    "SPARSEMATRIX",
+                    I18nKeys.SPARSE_MATRIX_CONVERTER_CONTROL);
 
     public ReglerSPARSEMATRIX() {
         super();

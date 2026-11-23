@@ -32,8 +32,8 @@ final class StartFromBlocksWithoutSuccessorOrderer extends AbstractSinkControlOr
 
     private Set<ControlOrderNode> findBlocksWithoutSuccessors() {
         final Set<ControlOrderNode> returnValue = new LinkedHashSet<ControlOrderNode>();
-        for(ControlOrderNode node : _transferList) {
-            if(node.getAllDirectOutputs().isEmpty()) {
+        for (ControlOrderNode node : _transferList) {
+            if (node.getAllDirectOutputs().isEmpty()) {
                 returnValue.add(node);
             }
         }

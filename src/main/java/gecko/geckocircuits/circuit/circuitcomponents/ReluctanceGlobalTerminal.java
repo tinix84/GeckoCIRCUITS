@@ -16,8 +16,10 @@ package gecko.geckocircuits.circuit.circuitcomponents;
 import gecko.geckocircuits.circuit.AbstractTypeInfo;
 import gecko.i18n.resources.I18nKeys;
 
-class ReluctanceGlobalTerminal extends AbstractCircuitGlobalTerminal{
-    public static final AbstractTypeInfo TYPE_INFO = new ReluctanceTypeInfo(ReluctanceGlobalTerminal.class, "REL_GLOBAL", I18nKeys.GLOBAL_RELUCTANCE_TERMINAL);
-
-
+class ReluctanceGlobalTerminal extends AbstractCircuitGlobalTerminal {
+    public static final AbstractTypeInfo TYPE_INFO =
+            new ReluctanceTypeInfo(
+                    ReluctanceGlobalTerminal.class,
+                    "REL_GLOBAL",
+                    I18nKeys.GLOBAL_RELUCTANCE_TERMINAL);
 }

@@ -19,13 +19,13 @@ import java.awt.Graphics2D;
  *
  * @author andy
  */
-class CurveLabelSignal extends CurveLabel{
-  public CurveLabelSignal(final AbstractCurve curve){
+class CurveLabelSignal extends CurveLabel {
+    public CurveLabelSignal(final AbstractCurve curve) {
     super(curve);
   }
 
-  @Override
-  public void drawLabel(final Graphics2D g2d){
+    @Override
+    public void drawLabel(final Graphics2D g2d) {
     super.drawLabel(g2d);
     final String name = _curve.getCurveName();
     final String onOffString = _slider.getLabelString(_curve);

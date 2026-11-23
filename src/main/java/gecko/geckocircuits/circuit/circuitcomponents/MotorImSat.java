@@ -26,7 +26,12 @@ import java.util.List;
 
 // Saettigbare Asynchronmaschine
 public final class MotorImSat extends AbstractMotorIMCommon {
-    public static final AbstractTypeInfo TYPE_INFO = new CircuitTypeInfo(MotorImSat.class, "IM-SAT", I18nKeys.IM_SAT, I18nKeys.SATURABLE_INDUCTION_MACHINE);
+    public static final AbstractTypeInfo TYPE_INFO =
+            new CircuitTypeInfo(
+                    MotorImSat.class,
+                    "IM-SAT",
+                    I18nKeys.IM_SAT,
+                    I18nKeys.SATURABLE_INDUCTION_MACHINE);
 
     final UserParameter<Double> _unsaturatedMagnetizingInductance = UserParameter.Builder.
             <Double>start("unsaturatedMagnetizingInductance", 0.05).
@@ -163,16 +168,42 @@ public final class MotorImSat extends AbstractMotorIMCommon {
         if (psim < 0.001 * psiT) {
             psim = 0.001 * psiT;
         }
-        double inv_Lm = (Mf - Mi) / Math.PI * ((psim - psiT) * Math.atan(tauT * (psim - psiT)) - psiT * Math.atan(tauT * psiT)
-                + 0.5 / tauT * (Math.log(1 + tauT * psiT * tauT * psiT) - Math.log(1 + tauT * tauT * (psim - psiT) * (psim - psiT)))) / psim + 0.5 * (Mf + Mi);
+        double inv_Lm =
+                (Mf - Mi)
+                                / Math.PI
+                                * ((psim - psiT) * Math.atan(tauT * (psim - psiT))
+                                        - psiT * Math.atan(tauT * psiT)
+                                        + 0.5
+                                                / tauT
+                                                * (Math.log(1 + tauT * psiT * tauT * psiT)
+                                                        - Math.log(
+                                                                1
+                                                                        + tauT
+                                                                                * tauT
+                                                                                * (psim - psiT)
+                                                                                * (psim - psiT))))
+                                / psim
+                        + 0.5 * (Mf + Mi);
         // Block 'vrdq':
         double urd = 2.0 / 3.0 * (urab * Math.cos(_thetaElectric) - urbc * Math.cos(_thetaElectric - 2 * Math.PI / 3));
         double urq = 2.0 / 3.0 * (urab * Math.sin(_thetaElectric) - urbc * Math.sin(_thetaElectric - 2 * Math.PI / 3));
         // Block 'isdq,psimdq':
-        double ddt_psimd = ((Rr / Llr - _statorResistance / Lls) * isd + isq * _omegaElectric - Rr * inv_Lm / Llr * psimd - _omegaElectric * psimq * (inv_Lm + 1 / Llr)
-                + usd / Lls + urd / Llr) / (inv_Lm + 1 / Lls + 1 / Llr);
-        double ddt_psimq = (-_omegaElectric * isd + (Rr / Llr - _statorResistance / Lls) * isq + _omegaElectric * (inv_Lm + 1 / Llr) * psimd - Rr * inv_Lm / Llr * psimq
-                + usq / Lls + urq / Llr) / (inv_Lm + 1 / Lls + 1 / Llr);
+        double ddt_psimd =
+                ((Rr / Llr - _statorResistance / Lls) * isd
+                                + isq * _omegaElectric
+                                - Rr * inv_Lm / Llr * psimd
+                                - _omegaElectric * psimq * (inv_Lm + 1 / Llr)
+                                + usd / Lls
+                                + urd / Llr)
+                        / (inv_Lm + 1 / Lls + 1 / Llr);
+        double ddt_psimq =
+                (-_omegaElectric * isd
+                                + (Rr / Llr - _statorResistance / Lls) * isq
+                                + _omegaElectric * (inv_Lm + 1 / Llr) * psimd
+                                - Rr * inv_Lm / Llr * psimq
+                                + usq / Lls
+                                + urq / Llr)
+                        / (inv_Lm + 1 / Lls + 1 / Llr);
         double ddt_isd = (-_statorResistance * isd + usd - ddt_psimd) / Lls;
         double ddt_isq = (-_statorResistance * isq + usq - ddt_psimq) / Lls;
         psimd = psimd0 + ddt_psimd * deltaT;

@@ -82,7 +82,7 @@ public final class SlidingDFTCalculator extends AbstractControlCalculatable
         final double deltaReal = _newestDataReal - _oldestDataReal;
         for (int i : _frequencyIndicesSet) {
             final int index = i * _idx % _size;
-            final double argument = -Math.PI *2* index / ((double) _size);
+            final double argument = -Math.PI * 2 * index / ((double) _size);
             _freqsReal[i] += deltaReal * Math.cos(argument);
             _freqsImag[i] += deltaReal * Math.sin(argument);
         }

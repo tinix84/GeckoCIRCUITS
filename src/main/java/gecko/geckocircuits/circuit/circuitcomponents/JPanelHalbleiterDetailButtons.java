@@ -60,7 +60,7 @@ final class JPanelHalbleiterDetailButtons extends JPanel {
             }
         });
         //--------------
-        final Window parentWindow = SwingUtilities.getWindowAncestor(JPanelHalbleiterDetailButtons.this);
+        final Window parentWindow = SwingUtilities.getWindowAncestor(this);
         jbS2edit.setMaximumSize(new Dimension(BUTTON_WIDTH, 25));
         jbS2edit.addActionListener(new ActionListener() {
             @Override
@@ -106,7 +106,11 @@ final class JPanelHalbleiterDetailButtons extends JPanel {
     }
 
     private void checkFileLink() {
-        final boolean isFileLinkOK = _detailedLosses.pruefeLinkAufHalbleiterDatei();  // ist die Datei mit der Verlustbeschreibung ueberhaupt vorhanden?
+        final boolean isFileLinkOK =
+                _detailedLosses
+                        .pruefeLinkAufHalbleiterDatei(); // ist die Datei mit der
+                                                         // Verlustbeschreibung ueberhaupt
+                                                         // vorhanden?
         //
         if (isFileLinkOK) {  // Datei vorhanden und OK
 

@@ -17,7 +17,7 @@ public final class EqualCalculatorTwoInputs extends AbstractTwoInputsOneOutputCa
 
     @Override
     public void berechneYOUT(final double deltaT) {
-        if(_inputSignal[0][0] == _inputSignal[1][0]) {
+        if (_inputSignal[0][0] == _inputSignal[1][0]) {
             _outputSignal[0][0] = 1;
         } else {
             _outputSignal[0][0] = 0;

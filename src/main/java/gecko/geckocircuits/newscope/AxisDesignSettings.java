@@ -20,28 +20,28 @@ import gecko.core.circuit.TokenMap;
  *
  * @author andy
  */
-public final class AxisDesignSettings implements LineSettable{
+public final class AxisDesignSettings implements LineSettable {
   private GeckoColor _axisColor = GeckoColor.BLACK;
   private GeckoLineStyle _axisStyle = GeckoLineStyle.SOLID_PLAIN;
   private String _axisCaption = "";
   public static final GeckoLineStyle ZERO_LINE_STYLE = GeckoLineStyle.SOLID_THIN;
   public static final GeckoColor ZERO_LINE_COL = GeckoColor.LIGHTGRAY;
 
-  public String getAchseBeschriftung(){
+    public String getAchseBeschriftung() {
     return _axisCaption;
   }
 
-  public void setAchseBeschriftung(final String newName){
+    public void setAchseBeschriftung(final String newName) {
     _axisCaption = newName;
   }
 
-  @Override
-  public void setStroke(final GeckoLineStyle stroke){
+    @Override
+    public void setStroke(final GeckoLineStyle stroke) {
     _axisStyle = stroke;
   }
 
-  @Override
-  public GeckoLineStyle getStroke(){
+    @Override
+    public GeckoLineStyle getStroke() {
     return _axisStyle;
   }
 
@@ -50,28 +50,28 @@ public final class AxisDesignSettings implements LineSettable{
     // Axis transparency cannot be set
   }
 
-  @Override
-  public float getTransparency(){
+    @Override
+    public float getTransparency() {
     return 1f;
   }
 
-  @Override
-  public GeckoColor getColor(){
+    @Override
+    public GeckoColor getColor() {
     return _axisColor;
   }
 
-  @Override
-  public void setColor(final GeckoColor color){
+    @Override
+    public void setColor(final GeckoColor color) {
     _axisColor = color;
   }
 
-  void importASCII(final TokenMap axisMap){
+    void importASCII(final TokenMap axisMap) {
     _axisColor = GeckoColor.getFromCode(axisMap.readDataLine("axisColor", _axisColor.code()));
     _axisStyle = GeckoLineStyle.getFromCode(axisMap.readDataLine("axisStroke", _axisStyle.code()));
     _axisCaption = axisMap.readDataLine("axisCaption", _axisCaption);
   }
 
-  void exportIndividualCONTROL(final StringBuffer ascii){
+    void exportIndividualCONTROL(final StringBuffer ascii) {
     ProjectData.appendAsString(ascii.append("\naxisColor"), _axisColor.code());
     ProjectData.appendAsString(ascii.append("\naxisStroke"), _axisStyle.code());
     ProjectData.appendAsString(ascii.append("\naxisCaption"), _axisCaption);

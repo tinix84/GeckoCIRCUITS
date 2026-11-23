@@ -45,15 +45,16 @@ public final class ReglerSlidingDFT extends AbstractReglerVariableInputs {
             showInTextInfo(TextInfoType.SHOW_WHEN_DISPLAYPARAMETERS).
             arrayIndex(this, -1).
             build();
-    transient List<FrequencyData> _data = new ArrayList<FrequencyData>() {
+    transient List<FrequencyData> _data =
+            new ArrayList<FrequencyData>() {
 
-        @Override
-        public void clear() {
-            for(int i = 0, size = _data.size(); i < size; i++) {
-                removeLastFrequencyData();
-            }
-        }
-    };
+                @Override
+                public void clear() {
+                    for (int i = 0, size = _data.size(); i < size; i++) {
+                        removeLastFrequencyData();
+                    }
+                }
+            };
 
     public ReglerSlidingDFT() {
         super(1);
@@ -66,7 +67,7 @@ public final class ReglerSlidingDFT extends AbstractReglerVariableInputs {
 
     public void setFrequencyDataWithUndoCheck(final List<FrequencyData> newList) {
 
-        if(isUndoRequired(_data, newList)) {
+        if (isUndoRequired(_data, newList)) {
             final FrequencyDataUndoableEdit edit = new FrequencyDataUndoableEdit(_data, newList);
             AbstractUndoGenericModel.undoManager.addEdit(edit);
         }
@@ -81,11 +82,11 @@ public final class ReglerSlidingDFT extends AbstractReglerVariableInputs {
     }
 
     private boolean isUndoRequired(final List<FrequencyData> oldList, final List<FrequencyData> newList) {
-        if(oldList.size() != newList.size()) {
+        if (oldList.size() != newList.size()) {
             return true;
         }
-        for(int i = 0; i < oldList.size(); i++) {
-            if(!oldList.get(i).equals(newList.get(i))) {
+        for (int i = 0; i < oldList.size(); i++) {
+            if (!oldList.get(i).equals(newList.get(i))) {
                 return true;
             }
         }
@@ -96,7 +97,7 @@ public final class ReglerSlidingDFT extends AbstractReglerVariableInputs {
     public void copyAdditionalParameters(AbstractBlockInterface originalBlock) {
         super.copyAdditionalParameters(originalBlock);
         _data.clear();
-        for(FrequencyData dat : ((ReglerSlidingDFT) originalBlock)._data) {
+        for (FrequencyData dat : ((ReglerSlidingDFT) originalBlock)._data) {
             _data.add(new FrequencyData(dat._frequency.getValue(), dat._outputData));
         }
     }
@@ -108,12 +109,12 @@ public final class ReglerSlidingDFT extends AbstractReglerVariableInputs {
     }
 
     void addDataPoint() {
-        final double newFrequencyValue = _data.get(_data.size()-1)._frequency.getDoubleValue();
+        final double newFrequencyValue = _data.get(_data.size() - 1)._frequency.getDoubleValue();
         _data.add(new FrequencyData(newFrequencyValue * 2, OutputData.ABS));
     }
 
     void removeLastFrequencyData() {
-        FrequencyData removed = _data.remove(_data.size()-1);
+        FrequencyData removed = _data.remove(_data.size() - 1);
         unregisterParameter(removed._frequency);
     }
 
@@ -159,7 +160,7 @@ public final class ReglerSlidingDFT extends AbstractReglerVariableInputs {
         public OutputData _outputData;
 
         public FrequencyData(final double frequency, final OutputData outputData) {
-            final int stepNumber = _data.size()+1;
+            final int stepNumber = _data.size() + 1;
             _outputData = outputData;
             _frequency = UserParameter.Builder.<Double>start("freq_" + stepNumber, frequency).
             longName(I18nKeys.SDFT_FREQUENCY).
@@ -225,11 +226,11 @@ public final class ReglerSlidingDFT extends AbstractReglerVariableInputs {
 
         final double[] outputFrequencies = tokenMap.readDataLine("outputFrequencies[]", new double[]{DEFAULT_FREQENCY});
         String[] outputFreqNameOpt = new String[outputFrequencies.length];
-        for(int i = 0; i < outputFreqNameOpt.length; i++) {
+        for (int i = 0; i < outputFreqNameOpt.length; i++) {
             outputFreqNameOpt[i] = "";
         }
         final int[] outputTypes = tokenMap.readDataLine("outputTypes[]", new int[]{1});
-        if(tokenMap.containsToken("frequenciesNameOpt[]")) {
+        if (tokenMap.containsToken("frequenciesNameOpt[]")) {
             outputFreqNameOpt = tokenMap.readDataLine("frequenciesNameOpt[]", outputFreqNameOpt);
         }
 
@@ -237,7 +238,7 @@ public final class ReglerSlidingDFT extends AbstractReglerVariableInputs {
 
         for (int i = 0; i < outputFrequencies.length; i++) {
             FrequencyData data = new FrequencyData(outputFrequencies[i], OutputData.getFromIntCode(outputTypes[i]));
-            if(i < outputFreqNameOpt.length && !outputFreqNameOpt[i].isEmpty()) {
+            if (i < outputFreqNameOpt.length && !outputFreqNameOpt[i].isEmpty()) {
                 data._frequency.setNameOpt(outputFreqNameOpt[i]);
             }
             _data.add(data);

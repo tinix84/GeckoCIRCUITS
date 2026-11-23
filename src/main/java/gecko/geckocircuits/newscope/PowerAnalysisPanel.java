@@ -50,7 +50,7 @@ public final class PowerAnalysisPanel extends JPanel {
         super();
         JPanel[] pUIa = new JPanel[3];
         final String[] titles = new String[]{"A", "B", "C"};
-        for(int i = 0; i < pUIa.length; i++) {
+        for (int i = 0; i < pUIa.length; i++) {
             pUIa[i] = new JPanel();
             pUIa[i].setLayout(new GridBagLayout());
             pUIa[i].setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), titles[i],
@@ -58,11 +58,11 @@ public final class PowerAnalysisPanel extends JPanel {
         }
 
         //
-        signalListe = new String[worksheet.getRowLength()+1];
+        signalListe = new String[worksheet.getRowLength() + 1];
         signalListe[0] = "deactivated";
 
-        for(int i = 0; i < worksheet.getRowLength(); i++) {
-            signalListe[i+1] = worksheet.getSignalName(i);
+        for (int i = 0; i < worksheet.getRowLength(); i++) {
+            signalListe[i + 1] = worksheet.getSignalName(i);
         }
 
         setComboUIActions(powerAnalSettings);
@@ -148,7 +148,7 @@ public final class PowerAnalysisPanel extends JPanel {
 
 
         setLayout(new GridLayout(3, 1));
-        for(int i = 0; i < 3; i++) {
+        for (int i = 0; i < 3; i++) {
             add(pUIa[i]);
         }
 

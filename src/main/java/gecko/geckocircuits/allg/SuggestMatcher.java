@@ -13,8 +13,6 @@
  */
 package gecko.geckocircuits.allg;
 
-
-public interface SuggestMatcher
-{
+public interface SuggestMatcher {
   boolean matches(String paramString1, String paramString2);
 }

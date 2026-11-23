@@ -54,36 +54,54 @@ public class GeckoStatusBar extends JPanel {
 
     GeckoStatusBar(String ti_ReadySim, final MainWindow fenster) {
         _fenster = fenster;
-        TimerTask task = new TimerTask() {
-            @Override
-            public void run() {
-                try {
-                    _portLabelButton.setVisible(GeckoRemoteRegistry.isRemoteEnabled());
+        TimerTask task =
+                new TimerTask() {
+                    @Override
+                    public void run() {
+                        try {
+                            _portLabelButton.setVisible(GeckoRemoteRegistry.isRemoteEnabled());
 
-                    if (GeckoRemoteRegistry.isRemoteEnabled()) {
-                        String pong = GeckoCustomRemote.pingRemoteClient();
-                        if (pong != null) {
-                            _portLabelButton.setText(I18nKeys.CONNECTED.getTranslation() + " : " + GeckoRemoteRegistry.getRemoteAccessPort());
-                            _portLabelButton.setToolTipText(pong);
-                            _portLabelButton.setForeground(GlobalColors.farbeGecko);
-                        } else {
-                            if (GeckoCustomRemote.clients == null || GeckoCustomRemote.clients.isEmpty()) {
-                                _portLabelButton.setText(I18nKeys.LISTENING_AT_PORT.getTranslation() + " : " + GeckoRemoteRegistry.getRemoteAccessPort());
-                                _portLabelButton.setForeground(Color.ORANGE);
-                                _portLabelButton.setToolTipText("GeckoREMOTE " + I18nKeys.LISTENING_AT_PORT + " " + GeckoRemoteRegistry.getRemoteAccessPort());
-                            } else {
-                                _portLabelButton.setText(I18nKeys.LISTENING_AT_PORT.getTranslation() + " : " + GeckoRemoteRegistry.getRemoteAccessPort());
-                                _portLabelButton.setForeground(Color.RED);
+                            if (GeckoRemoteRegistry.isRemoteEnabled()) {
+                                String pong = GeckoCustomRemote.pingRemoteClient();
+                                if (pong != null) {
+                                    _portLabelButton.setText(
+                                            I18nKeys.CONNECTED.getTranslation()
+                                                    + " : "
+                                                    + GeckoRemoteRegistry.getRemoteAccessPort());
+                                    _portLabelButton.setToolTipText(pong);
+                                    _portLabelButton.setForeground(GlobalColors.farbeGecko);
+                                } else {
+                                    if (GeckoCustomRemote.clients == null
+                                            || GeckoCustomRemote.clients.isEmpty()) {
+                                        _portLabelButton.setText(
+                                                I18nKeys.LISTENING_AT_PORT.getTranslation()
+                                                        + " : "
+                                                        + GeckoRemoteRegistry
+                                                                .getRemoteAccessPort());
+                                        _portLabelButton.setForeground(Color.ORANGE);
+                                        _portLabelButton.setToolTipText(
+                                                "GeckoREMOTE "
+                                                        + I18nKeys.LISTENING_AT_PORT
+                                                        + " "
+                                                        + GeckoRemoteRegistry
+                                                                .getRemoteAccessPort());
+                                    } else {
+                                        _portLabelButton.setText(
+                                                I18nKeys.LISTENING_AT_PORT.getTranslation()
+                                                        + " : "
+                                                        + GeckoRemoteRegistry
+                                                                .getRemoteAccessPort());
+                                        _portLabelButton.setForeground(Color.RED);
+                                    }
+                                }
                             }
+
+                            repaint();
+                        } catch (Throwable error) {
+                            error.printStackTrace();
                         }
                     }
-
-                    repaint();
-                } catch (Throwable error) {
-                    error.printStackTrace();
-                }
-            }
-        };
+                };
         Timer timer = new Timer();
         timer.schedule(task, 0, 2000);
         setLayout(new BorderLayout());

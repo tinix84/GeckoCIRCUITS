@@ -38,9 +38,9 @@ public class UniqueObjectIdentifer {
     }
 
     public void importASCII(TokenMap tokenMap) {
-        if(tokenMap.containsToken("uniqueObjectIdentifier")) {
+        if (tokenMap.containsToken("uniqueObjectIdentifier")) {
             identifier = tokenMap.readDataLine("uniqueObjectIdentifier", identifier);
-            if(identifier == 0) {
+            if (identifier == 0) {
                 identifier = this.hashCode() + generator.nextInt();
             }
         } else {

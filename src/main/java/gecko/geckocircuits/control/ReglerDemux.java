@@ -67,13 +67,18 @@ public final class ReglerDemux extends RegelBlock implements VariableTerminalNum
 
     @Override
     public I18nKeys[] getOutputDescription() {
-        return new I18nKeys[]{I18nKeys.DEMUXED_VECTOR_SIGNAL, I18nKeys.DEMUXED_VECTOR_SIGNAL, I18nKeys.DEMUXED_VECTOR_SIGNAL, I18nKeys.DEMUXED_VECTOR_SIGNAL};
+        return new I18nKeys[] {
+            I18nKeys.DEMUXED_VECTOR_SIGNAL,
+            I18nKeys.DEMUXED_VECTOR_SIGNAL,
+            I18nKeys.DEMUXED_VECTOR_SIGNAL,
+            I18nKeys.DEMUXED_VECTOR_SIGNAL
+        };
     }
 
     @Override
     void setInputSignal(int inputIndex, RegelBlock outputBlock, int outputIndex) {
         super.setInputSignal(inputIndex, outputBlock, outputIndex); //To change body of generated methods, choose Tools | Templates.
-        if(outputBlock instanceof ReglerJavaFunction) {
+        if (outputBlock instanceof ReglerJavaFunction) {
             _connectedJavaBlock = (ReglerJavaFunction) outputBlock;
             _connectedJavaOutputIndex = outputIndex;
         } else {
@@ -101,9 +106,9 @@ public final class ReglerDemux extends RegelBlock implements VariableTerminalNum
             YOUT.add(new TerminalControlOutput(this, 1, -YOUT.size()));
         }
 
-        if(_outputTerminalNumber != null) {
+        if (_outputTerminalNumber != null) {
             int newsize = YOUT.size();
-            if(_outputTerminalNumber.getValue() != newsize) {
+            if (_outputTerminalNumber.getValue() != newsize) {
                 _outputTerminalNumber.setUserValue(newsize);
             }
         }
