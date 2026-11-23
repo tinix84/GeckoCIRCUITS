@@ -113,10 +113,10 @@ public final class SimulationRunner {
         try {
             synchronized (preparationMonitor) {
                 preparation = beginPreparation(expected, requireCurrent, takeLogger, settings);
-                if (preparation == null) return null;
-                if (preparation.previous() != null) preparation.previous().ticket().supersede();
+                if (preparation == null) { return null; }
+                if (preparation.previous() != null) { preparation.previous().ticket().supersede(); }
                 Execution initialized = initialize.apply(preparation);
-                if (initialized == null) clearPreCalculationMode(preparation.token(), settings);
+                if (initialized == null) { clearPreCalculationMode(preparation.token(), settings); }
                 return initialized;
             }
         } catch (RuntimeException | Error error) {
@@ -276,9 +276,9 @@ public final class SimulationRunner {
 
     /** Stops the captured execution without pausing a replacement started by its completion callbacks. */
     public void endSimulation() {
-        if (controller.endAsync()) return;
+        if (controller.endAsync()) { return; }
         Execution owner = execution;
-        if (owner == null || !owner.ticket().endSimulation()) return;
+        if (owner == null || !owner.ticket().endSimulation()) { return; }
         if (owner.ticket().pause()) {
             commitStatus(owner, ContainerStatus.PAUSED);
             updatePresentation(owner,
@@ -288,7 +288,7 @@ public final class SimulationRunner {
     }
 
     public void pauseSimulation() {
-        if (controller.pauseAsync()) return;
+        if (controller.pauseAsync()) { return; }
         Execution current = execution;
         if (current != null && current.ticket().pause()) {
             commitStatus(current, ContainerStatus.PAUSED);
@@ -375,8 +375,8 @@ public final class SimulationRunner {
     }
 
     public void external_end() {
-        if (controller.hasCoreExecution()) controller.endAsync();
-        else simKern.external_end();
+        if (controller.hasCoreExecution()) { controller.endAsync(); }
+        else { simKern.external_end(); }
     }
 
     private void initializeScript(SolverSettings settings, double end, double dt, boolean usePreCalculation) {

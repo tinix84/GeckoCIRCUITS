@@ -36,7 +36,7 @@ public final class EditorCircuitCapture {
         for (var element : elements) {
             ascii.append('\n').append(element.getExportImportCharacters()).append('\n');
             element.exportASCII(ascii);
-            if (element instanceof AbstractBlockInterface block) blocks.add(block);
+            if (element instanceof AbstractBlockInterface block) { blocks.add(block); }
         }
         ProjectData.appendAsString(ascii.append("\noptimizerName"), optimizer.getNameOpt());
         ProjectData.appendAsString(ascii.append("\noptimizerValue"), optimizer.getValueOpt());
@@ -45,7 +45,7 @@ public final class EditorCircuitCapture {
         section(ascii, "scripterDeclarations", scripts.declarations());
         section(ascii, "extraScriptSourceFiles", scripts.extraFiles());
         ascii.append("\nGeckoFileManager\n<GeckoFileManager>");
-        for (var file : files._allAvailableFiles) appendOwnedFile(ascii, file);
+        for (var file : files._allAvailableFiles) { appendOwnedFile(ascii, file); }
         ascii.append("\n<\\GeckoFileManager>");
         ascii.append("\ntDURATION ").append(settings._tDURATION.getValue());
         ascii.append("\ndt ").append(settings.dt.getValue());

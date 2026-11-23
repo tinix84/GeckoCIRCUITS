@@ -109,7 +109,7 @@ public final class DesktopSimulationController {
 
     double getCurrentTime() {
         SessionHost host = currentHost;
-        if (host == null) return completedTime;
+        if (host == null) { return completedTime; }
         SimulationSession.Status status = host.status();
         return scriptExecution == null ? status.time() : status.nextTime();
     }
@@ -120,10 +120,10 @@ public final class DesktopSimulationController {
     boolean initializeScript(SolverSettings settings, double dt, double end) throws Exception {
         Backend backend = Backend.valueOf(System.getProperty("gecko.backend", "auto")
                 .trim().toUpperCase(Locale.ROOT));
-        if (backend == Backend.LEGACY) return false;
+        if (backend == Backend.LEGACY) { return false; }
         Route route = route(editor, settings);
         String circuit = route.circuit();
-        if (!route.core()) return fallback(backend, circuit, route.fallback());
+        if (!route.core()) { return fallback(backend, circuit, route.fallback()); }
         if (SwingUtilities.isEventDispatchThread()) {
             throw new IllegalStateException("Script simulation initialization must run outside the Swing event thread");
         }
@@ -136,7 +136,7 @@ public final class DesktopSimulationController {
             Consumer<ContainerStatus> origin = NetzlisteCONTROL.globalData.captureStatusUpdater();
             int[] rows = new int[NetzlisteCONTROL.globalData.getRowLength()];
             String missingSignal = unmappedSignal(coreRows(host, true), rows);
-            if (missingSignal != null) return fallback(backend, circuit, "SIGNAL_MAP:" + missingSignal);
+            if (missingSignal != null) { return fallback(backend, circuit, "SIGNAL_MAP:" + missingSignal); }
             netlist._nlControl.doMemorInits(dt);
             LegacySimulationFrontend presentation = new LegacySimulationFrontend(() -> true);
             presentation.prepare(netlist, () -> true, true).run();
@@ -152,7 +152,7 @@ public final class DesktopSimulationController {
         } finally {
             if (!published) {
                 host.close();
-                if (netlist != null) cancelExporters(netlist);
+                if (netlist != null) { cancelExporters(netlist); }
             }
         }
     }
@@ -169,14 +169,14 @@ public final class DesktopSimulationController {
 
     double externalStepWidth() {
         CoreScriptExecution execution = scriptExecution;
-        if (execution == null) throw new IllegalStateException("No core external simulation is active");
+        if (execution == null) { throw new IllegalStateException("No core external simulation is active"); }
         return execution.dt;
     }
 
     void externalStep(double time) throws Exception {
         requireOffEventThread();
         CoreScriptExecution execution = scriptExecution;
-        if (execution == null) throw new IllegalStateException("No core external simulation is active");
+        if (execution == null) { throw new IllegalStateException("No core external simulation is active"); }
         SessionHost host = execution.host;
         if (!execution.warnedExternalTime && Math.abs(time - host.status().nextTime()) > execution.dt / 2) {
             execution.warnedExternalTime = true;
@@ -227,7 +227,7 @@ public final class DesktopSimulationController {
     void scriptStep(double dt, double end) throws Exception {
         requireOffEventThread();
         CoreScriptExecution execution = scriptExecution;
-        if (execution == null) throw new IllegalStateException("No core script simulation is active");
+        if (execution == null) { throw new IllegalStateException("No core script simulation is active"); }
         double current = execution.host.status().nextTime();
         if (current + dt > end) {
             throw new Exception("Specified end of simulation reached! Cannot simulate another step.");
@@ -239,7 +239,7 @@ public final class DesktopSimulationController {
     void scriptRunUntil(double target) throws Exception {
         requireOffEventThread();
         CoreScriptExecution execution = scriptExecution;
-        if (execution == null) throw new IllegalStateException("No core script simulation is active");
+        if (execution == null) { throw new IllegalStateException("No core script simulation is active"); }
         SimulationSession.Status status = execution.host.status();
         while (status.nextTime() <= target && status.state() != SimulationSession.State.COMPLETED) {
             if (status.state() == SimulationSession.State.FAILED) {
@@ -275,8 +275,8 @@ public final class DesktopSimulationController {
             throw new IllegalStateException("Timed out waiting for the core script simulation command", timeout);
         } catch (ExecutionException failure) {
             Throwable cause = failure.getCause();
-            if (cause instanceof Exception exception) throw exception;
-            if (cause instanceof Error error) throw error;
+            if (cause instanceof Exception exception) { throw exception; }
+            if (cause instanceof Error error) { throw error; }
             throw new IllegalStateException("Core script simulation command failed", cause);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
@@ -288,14 +288,14 @@ public final class DesktopSimulationController {
         execution.host.drainSamples(sample -> {
             float[] sourceValues = sample.values();
             float[] values = new float[execution.rows.length];
-            for (int row = 0; row < execution.rows.length; row++) values[row] = sourceValues[execution.rows[row]];
+            for (int row = 0; row < execution.rows.length; row++) { values[row] = sourceValues[execution.rows[row]]; }
             NetzlisteCONTROL.globalData.insertValuesAtEnd(values, sample.time());
         });
     }
 
     private void retireScriptForReplacement() {
         CoreScriptExecution execution = scriptExecution;
-        if (execution == null) return;
+        if (execution == null) { return; }
         scriptExecution = null;
         execution.host.close();
         drainScriptSamples(execution);
@@ -310,7 +310,7 @@ public final class DesktopSimulationController {
 
     SimulationSession.Status getCoreStatus() {
         CoreAsyncExecution run = asyncExecution;
-        if (run != null) return run.host.status();
+        if (run != null) { return run.host.status(); }
         CoreScriptExecution script = scriptExecution;
         return script == null ? null : script.host.status();
     }
@@ -319,10 +319,10 @@ public final class DesktopSimulationController {
     boolean startAsync(SolverSettings settings) throws Exception {
         Backend backend = Backend.valueOf(System.getProperty("gecko.backend", "auto")
                 .trim().toUpperCase(Locale.ROOT));
-        if (backend == Backend.LEGACY) return false;
+        if (backend == Backend.LEGACY) { return false; }
         Route route = route(editor, settings);
         String circuit = route.circuit();
-        if (!route.core()) return fallback(backend, circuit, route.fallback());
+        if (!route.core()) { return fallback(backend, circuit, route.fallback()); }
 
         SessionHost host = SessionHost.open(route.ready().execution(), ExecutionOptions.defaults());
         NetListContainer netlist = null;
@@ -364,8 +364,8 @@ public final class DesktopSimulationController {
             return true;
         } finally {
             if (!published) {
-                if (host.status().state() != SimulationSession.State.CLOSED) host.close();
-                if (netlist != null) cancelExporters(netlist);
+                if (host.status().state() != SimulationSession.State.CLOSED) { host.close(); }
+                if (netlist != null) { cancelExporters(netlist); }
                 if (statusStarted && origin != null) {
                     Consumer<ContainerStatus> capturedOrigin = origin;
                     LegacySimulationFrontend.onEventThread(() -> capturedOrigin.accept(ContainerStatus.DELETED));
@@ -379,20 +379,20 @@ public final class DesktopSimulationController {
 
     boolean pauseAsync() {
         CoreAsyncExecution run = asyncExecution;
-        if (run == null) return false;
+        if (run == null) { return false; }
         SimulationSession.State state = run.host.status().state();
-        if (state == SimulationSession.State.RUNNING || state == SimulationSession.State.READY) run.host.pause();
+        if (state == SimulationSession.State.RUNNING || state == SimulationSession.State.READY) { run.host.pause(); }
         return true;
     }
 
     boolean continueAsync(SolverSettings settings) {
         CoreAsyncExecution run = asyncExecution;
-        if (run == null) return false;
+        if (run == null) { return false; }
         SimulationSession.Status status = run.host.status();
         if (status.state() == SimulationSession.State.CLOSED || status.state() == SimulationSession.State.FAILED) {
             return true;
         }
-        if (status.state() == SimulationSession.State.RUNNING) return true;
+        if (status.state() == SimulationSession.State.RUNNING) { return true; }
 
         double end = status.endTime();
         boolean reachedEnd = status.state() == SimulationSession.State.COMPLETED || status.time() >= end;
@@ -412,7 +412,7 @@ public final class DesktopSimulationController {
             run.origin.accept(ContainerStatus.RUNNING);
             run.presentation.accept(true);
             window.setMenuDuringSimulation(true, false);
-            if (!run.timer.isRunning()) run.timer.start();
+            if (!run.timer.isRunning()) { run.timer.start(); }
         });
         return true;
     }
@@ -433,23 +433,23 @@ public final class DesktopSimulationController {
             return true;
         }
         CoreAsyncExecution run = asyncExecution;
-        if (run == null) return false;
+        if (run == null) { return false; }
         run.ending = true;
-        if (run.runFuture != null && !run.runFuture.isDone()) run.host.pause();
+        if (run.runFuture != null && !run.runFuture.isDone()) { run.host.pause(); }
         LegacySimulationFrontend.onEventThread(() -> {
-            if (run.runFuture == null || run.runFuture.isDone()) finishEnd(run);
-            else if (run.timer != null && !run.timer.isRunning()) run.timer.start();
+            if (run.runFuture == null || run.runFuture.isDone()) { finishEnd(run); }
+            else if (run.timer != null && !run.timer.isRunning()) { run.timer.start(); }
         });
         return true;
     }
 
     private void retireAsyncForReplacement() {
         CoreAsyncExecution run = asyncExecution;
-        if (run == null) return;
+        if (run == null) { return; }
         asyncExecution = null;
         run.host.close();
         LegacySimulationFrontend.onEventThread(() -> {
-            if (run.timer != null) run.timer.stop();
+            if (run.timer != null) { run.timer.stop(); }
             cancelExporters(run.netlist);
             run.origin.accept(ContainerStatus.DELETED);
             run.presentation.accept(false);
@@ -457,9 +457,9 @@ public final class DesktopSimulationController {
     }
 
     private void finishEnd(CoreAsyncExecution run) {
-        if (asyncExecution != run) return;
-        if (run.runFuture != null && !run.runFuture.isDone()) return;
-        if (run.timer != null) run.timer.stop();
+        if (asyncExecution != run) { return; }
+        if (run.runFuture != null && !run.runFuture.isDone()) { return; }
+        if (run.timer != null) { run.timer.stop(); }
         SimulationSession.Status terminalStatus = run.host.status();
         double finalTime = terminalStatus.time();
         run.host.close();
@@ -488,18 +488,18 @@ public final class DesktopSimulationController {
         }
         SimulationSession.Status status = run.host.status();
         if (run.ending) {
-            if (run.runFuture == null || run.runFuture.isDone()) finishEnd(run);
+            if (run.runFuture == null || run.runFuture.isDone()) { finishEnd(run); }
             return;
         }
         if (run.awaitingRunAdmission) {
             if (run.runFuture != null && !run.runFuture.isDone()
-                    && status.state() != SimulationSession.State.RUNNING) return;
+                    && status.state() != SimulationSession.State.RUNNING) { return; }
             run.awaitingRunAdmission = false;
         }
         drainSamples(run);
         SimulationSession.State state = status.state();
         if (state != SimulationSession.State.PAUSED && state != SimulationSession.State.COMPLETED
-                && state != SimulationSession.State.FAILED) return;
+                && state != SimulationSession.State.FAILED) { return; }
 
         drainSamples(run);
         run.timer.stop();
@@ -529,14 +529,14 @@ public final class DesktopSimulationController {
     private static void insertSample(CoreAsyncExecution run, SimulationSession.Sample sample) {
         float[] sourceValues = sample.values();
         float[] values = new float[run.rows.length];
-        for (int row = 0; row < run.rows.length; row++) values[row] = sourceValues[run.rows[row]];
+        for (int row = 0; row < run.rows.length; row++) { values[row] = sourceValues[run.rows[row]]; }
         NetzlisteCONTROL.globalData.insertValuesAtEnd(values, sample.time());
     }
 
     private static void setScopeBoundaries(NetListContainer netlist, double start, double end) {
         LegacySimulationFrontend.onEventThread(() -> {
             for (var block : netlist._nlControl._orderedControlBlocks) {
-                if (block instanceof ReglerOSZI scope) scope.setSimulationTimeBoundaries(start, end);
+                if (block instanceof ReglerOSZI scope) { scope.setSimulationTimeBoundaries(start, end); }
             }
         });
     }
@@ -544,7 +544,7 @@ public final class DesktopSimulationController {
     private static void cancelExporters(NetListContainer netlist) {
         LegacySimulationFrontend.onEventThread(() -> {
             for (var block : netlist._nlControl._orderedControlBlocks) {
-                if (block instanceof ReglerSaveData exporter) exporter.cancelSimulationExport();
+                if (block instanceof ReglerSaveData exporter) { exporter.cancelSimulationExport(); }
             }
         });
     }
@@ -553,10 +553,10 @@ public final class DesktopSimulationController {
     boolean start(SolverSettings settings) throws Exception {
         Backend backend = Backend.valueOf(System.getProperty("gecko.backend", "auto")
                 .trim().toUpperCase(Locale.ROOT));
-        if (backend == Backend.LEGACY) return false;
+        if (backend == Backend.LEGACY) { return false; }
         Route route = route(editor, settings);
         String circuit = route.circuit();
-        if (!route.core()) return fallback(backend, circuit, route.fallback());
+        if (!route.core()) { return fallback(backend, circuit, route.fallback()); }
         if (SwingUtilities.isEventDispatchThread()) {
             throw new IllegalStateException("Run synchronous core calculations outside the Swing event thread");
         }
@@ -571,7 +571,7 @@ public final class DesktopSimulationController {
                 // Retire unused preparation resources before the legacy factory creates their replacements.
                 LegacySimulationFrontend.onEventThread(() -> {
                     for (var block : netlist._nlControl._orderedControlBlocks) {
-                        if (block instanceof ReglerSaveData exporter) exporter.cancelSimulationExport();
+                        if (block instanceof ReglerSaveData exporter) { exporter.cancelSimulationExport(); }
                     }
                 });
                 return fallback(backend, circuit, "SIGNAL_MAP:" + missingSignal);
@@ -579,7 +579,7 @@ public final class DesktopSimulationController {
             boolean completed = false;
             Throwable failure = null;
             try {
-                if (missingSignal != null) return fallback(backend, circuit, "SIGNAL_MAP:" + missingSignal);
+                if (missingSignal != null) { return fallback(backend, circuit, "SIGNAL_MAP:" + missingSignal); }
                 netlist._nlControl.doMemorInits(settings.dt.getValue());
                 presentation.prepare(netlist, () -> true, true).run();
                 LegacySimulationFrontend.onEventThread(() -> {
@@ -595,8 +595,8 @@ public final class DesktopSimulationController {
                 try {
                     host.run().get();
                 } catch (ExecutionException error) {
-                    if (error.getCause() instanceof Error cause) throw cause;
-                    if (error.getCause() instanceof RuntimeException cause) throw cause;
+                    if (error.getCause() instanceof Error cause) { throw cause; }
+                    if (error.getCause() instanceof RuntimeException cause) { throw cause; }
                     throw new IllegalStateException("Core calculation failed", error.getCause());
                 } catch (InterruptedException error) {
                     Thread.currentThread().interrupt();
@@ -605,7 +605,7 @@ public final class DesktopSimulationController {
                 host.drainSamples(sample -> {
                     float[] sourceValues = sample.values();
                     float[] values = new float[rows.length];
-                    for (int row = 0; row < rows.length; row++) values[row] = sourceValues[rows[row]];
+                    for (int row = 0; row < rows.length; row++) { values[row] = sourceValues[rows[row]]; }
                     NetzlisteCONTROL.globalData.insertValuesAtEnd(values, sample.time());
                 });
                 completed = true;
@@ -624,7 +624,7 @@ public final class DesktopSimulationController {
                         host.close();
                         LegacySimulationFrontend.onEventThread(() -> {
                             for (var block : netlist._nlControl._orderedControlBlocks) {
-                                if (block instanceof ReglerSaveData exporter) exporter.cancelSimulationExport();
+                                if (block instanceof ReglerSaveData exporter) { exporter.cancelSimulationExport(); }
                             }
                             origin.accept(ContainerStatus.DELETED);
                         });
@@ -632,12 +632,12 @@ public final class DesktopSimulationController {
                     presentation.accept(false);
                     boolean successful = completed;
                     LegacySimulationFrontend.onEventThread(() -> {
-                        if (successful) window.setMenuDuringSimulation(false, true);
-                        else window.setMenusAfterSimulationFailure();
+                        if (successful) { window.setMenuDuringSimulation(false, true); }
+                        else { window.setMenusAfterSimulationFailure(); }
                     });
                 } catch (RuntimeException | Error cleanupError) {
-                    if (failure == null) throw cleanupError;
-                    if (failure != cleanupError) failure.addSuppressed(cleanupError);
+                    if (failure == null) { throw cleanupError; }
+                    if (failure != cleanupError) { failure.addSuppressed(cleanupError); }
                 }
             }
         }
@@ -655,15 +655,15 @@ public final class DesktopSimulationController {
     public static Route route(SchematicEditor2 editor, SolverSettings settings) throws Exception {
         String source = MainWindow.getOpenFileName();
         String circuit = new File(source).getName().replaceFirst("\\.ipes$", "");
-        if (settings._T_pre.getValue() > 0) return new Route(circuit, null, "PRECALC");
-        if (settings._tPAUSE.getValue() >= 0) return new Route(circuit, null, "PAUSE_TIME");
+        if (settings._T_pre.getValue() > 0) { return new Route(circuit, null, "PRECALC"); }
+        if (settings._tPAUSE.getValue() >= 0) { return new Route(circuit, null, "PAUSE_TIME"); }
         var scripts = MainWindow._scripter;
         var sources = new EditorCircuitCapture.ScriptSources(scripts.getScriptCode(), scripts.getImportCode(),
                 scripts.getDeclarationCode(), scripts.getExtraFilesHashes());
         var snapshot = new EditorCircuitCapture().capture(editor._circuitSheet.getAllElements(), settings,
                 MainWindow.optimizerParameterData, MainWindow._fileManager, sources, source);
         var preparation = new CircuitPreparation().prepare(snapshot, PreparationRequest.defaults());
-        if (preparation instanceof PreparationResult.Ready ready) return new Route(circuit, ready, null);
+        if (preparation instanceof PreparationResult.Ready ready) { return new Route(circuit, ready, null); }
         return new Route(circuit, null, preparation.report().diagnostics().stream()
                 .map(diagnostic -> diagnostic.code().toString()).distinct().collect(Collectors.joining(",")));
     }
@@ -672,9 +672,9 @@ public final class DesktopSimulationController {
     public static Map<String, Integer> coreRows(SessionHost host, boolean withScopeChannels) {
         Map<String, Integer> rowBySignal = new HashMap<>();
         String[] names = host.signalNames();
-        for (int row = 0; row < names.length; row++) rowBySignal.putIfAbsent(names[row], row);
+        for (int row = 0; row < names.length; row++) { rowBySignal.putIfAbsent(names[row], row); }
         if (withScopeChannels) {
-            for (var channel : host.scopeChannels()) rowBySignal.putIfAbsent(channel.signalName(), channel.row());
+            for (var channel : host.scopeChannels()) { rowBySignal.putIfAbsent(channel.signalName(), channel.row()); }
         }
         return rowBySignal;
     }
@@ -684,13 +684,13 @@ public final class DesktopSimulationController {
         for (int row = 0; row < rows.length; row++) {
             String name = NetzlisteCONTROL.globalData.getSignalName(row);
             rows[row] = coreRows.getOrDefault(name, -1);
-            if (rows[row] < 0) return name;
+            if (rows[row] < 0) { return name; }
         }
         return null;
     }
 
     private static boolean fallback(Backend backend, String circuit, String reason) {
-        if (backend == Backend.CORE) throw new IllegalStateException("Core cannot run " + circuit + ": " + reason);
+        if (backend == Backend.CORE) { throw new IllegalStateException("Core cannot run " + circuit + ": " + reason); }
         FALLBACK.info(circuit + ": " + reason);
         return false;
     }

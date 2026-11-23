@@ -254,7 +254,7 @@ public final class ReglerSaveData extends RegelBlock implements Operationable {
 
     /** Cancels the export owned by this execution without reporting successful completion. */
     public void cancelSimulationExport() {
-        if (_dataSaver != null) _dataSaver.cancelSimulationExport();
+        if (_dataSaver != null) { _dataSaver.cancelSimulationExport(); }
         _statusTxt = "Cancelled";
     }
 
