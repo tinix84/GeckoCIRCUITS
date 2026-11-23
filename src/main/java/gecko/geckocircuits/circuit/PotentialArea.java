@@ -499,11 +499,11 @@ public final class PotentialArea {
     }
 
     private boolean validateMemoryOptimization() {
-        if(_memoryOptimization.length != _potentialTerminals.size()) {
+        if (_memoryOptimization.length != _potentialTerminals.size()) {
             return false;
         }
         for (SubCircuitTerminable terminal : _memoryOptimization) {
-            if(!_potentialTerminals.contains(terminal)) {
+            if (!_potentialTerminals.contains(terminal)) {
                 assert false : _potentialTerminals.contains(terminal);
                 return false;
             }

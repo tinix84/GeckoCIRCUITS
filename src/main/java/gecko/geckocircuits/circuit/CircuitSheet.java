@@ -81,7 +81,7 @@ public class CircuitSheet extends JPanel {
      */
     public void drawCircuitSheet(Graphics2D g2d) {
         final JViewport viewport = (JViewport) this.getParent().getParent();
-        if(g2d instanceof SVGGraphics2D) {
+        if (g2d instanceof SVGGraphics2D) {
             return; // don't paint the pixels points for exporting to images!
         }
         Rectangle visibleRect = viewport.getViewRect();
@@ -252,7 +252,7 @@ public class CircuitSheet extends JPanel {
 
     public void updateNetListForLabels(ConnectorType connectorType) {
         // zur Aktualisierung eventuell neu angeschlossener Labels:
-        switch(connectorType) {
+        switch (connectorType) {
             case CONTROL:
                 NetzlisteAllg.fabricNetzlistComplete(getConnection(ConnectorType.CONTROL), allElements.getClassFromContainer(RegelBlock.class));
                 break;
@@ -268,7 +268,10 @@ public class CircuitSheet extends JPanel {
 
     }
 
-    private Set<String> findElementInterface(Collection<? extends AbstractCircuitSheetComponent> elements, final String searchString, final boolean ignoreCase,
+    private Set<String> findElementInterface(
+            Collection<? extends AbstractCircuitSheetComponent> elements,
+            final String searchString,
+            final boolean ignoreCase,
             final boolean startsWith) {
         Set<String> foundStrings = new HashSet<String>();
         for (AbstractCircuitSheetComponent elem : elements) {
@@ -289,7 +292,13 @@ public class CircuitSheet extends JPanel {
                             Point sheetPos = endTerm.getPosition();
                             _findNodesInternal.add(sheetPos);
                             if (elem instanceof AbstractBlockInterface) {
-                                foundStrings.add("Label of: " + ((AbstractBlockInterface) elem).getStringID() + " x=" + sheetPos.x + " y=" + sheetPos.y);
+                                foundStrings.add(
+                                        "Label of: "
+                                                + ((AbstractBlockInterface) elem).getStringID()
+                                                + " x="
+                                                + sheetPos.x
+                                                + " y="
+                                                + sheetPos.y);
                             } else if (elem instanceof Verbindung) {
                                 foundStrings.add("Connection label: " + ((Verbindung) elem).getLabel());
                             }
@@ -529,8 +538,11 @@ public class CircuitSheet extends JPanel {
         for (AbstractCircuitSheetComponent search : getAllElements()) {
             if (search instanceof PotentialCoupable) {
                 final PotentialCoupling potCoup = ((PotentialCoupable) search).getPotentialCoupling();
-                if (potCoup.getLinkType() == renamedLabelType || renamedLabelType == ConnectorType.LK && potCoup.getLinkType() == ConnectorType.LK_AND_RELUCTANCE
-                        || renamedLabelType == ConnectorType.LK_AND_RELUCTANCE && potCoup.getLinkType() == ConnectorType.LK) {
+                if (potCoup.getLinkType() == renamedLabelType
+                        || renamedLabelType == ConnectorType.LK
+                                && potCoup.getLinkType() == ConnectorType.LK_AND_RELUCTANCE
+                        || renamedLabelType == ConnectorType.LK_AND_RELUCTANCE
+                                && potCoup.getLinkType() == ConnectorType.LK) {
                     potCoup.renameUpdate(originalLabel, neuerLabel);
                 }
             }
@@ -565,7 +577,9 @@ public class CircuitSheet extends JPanel {
         returnValue.addAll(allComponents);
         for (AbstractBlockInterface remove : allComponents) {
             if (connectorType == connectorType.RELUCTANCE || connectorType == ConnectorType.LK || connectorType == ConnectorType.LK_AND_RELUCTANCE) {
-                if (remove.getSimulationDomain() != ConnectorType.LK && remove.getSimulationDomain() != ConnectorType.LK_AND_RELUCTANCE && remove.getSimulationDomain() != ConnectorType.RELUCTANCE) {
+                if (remove.getSimulationDomain() != ConnectorType.LK
+                        && remove.getSimulationDomain() != ConnectorType.LK_AND_RELUCTANCE
+                        && remove.getSimulationDomain() != ConnectorType.RELUCTANCE) {
                     returnValue.remove(remove);
                 }
             } else {

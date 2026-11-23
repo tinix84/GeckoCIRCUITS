@@ -113,7 +113,7 @@ public final class ComponentCoupling {
             return;
         }
 
-        if(element != null) {
+        if (element != null) {
             removeWithSingleReference(element, index); // this is for removing Gate connections that
             // already exist. Could be done in a nicer way, e.g. creating a sub-class of ComponentCouling...!
         }
@@ -199,8 +199,8 @@ public final class ComponentCoupling {
 
         String[] parameterString = _parentElement.getParameterString();
         List<AbstractBlockInterface> allElements = new ArrayList<AbstractBlockInterface>();
-        for(AbstractCircuitSheetComponent comp : allSheetElements) {
-            if(comp instanceof AbstractBlockInterface) {
+        for (AbstractCircuitSheetComponent comp : allSheetElements) {
+            if (comp instanceof AbstractBlockInterface) {
                 allElements.add((AbstractBlockInterface) comp);
             }
         }
@@ -311,20 +311,21 @@ public final class ComponentCoupling {
     }
 
     void shiftCopyCouplingIDsFrom(final ComponentCoupling oldCoupling, final long shiftValue) {
-        for(int i = 0; i < oldCoupling._coupledIdentifiers.length; i++) {
+        for (int i = 0; i < oldCoupling._coupledIdentifiers.length; i++) {
             _coupledIdentifiers[i] = oldCoupling._coupledIdentifiers[i] + shiftValue;
         }
     }
 
     void refreshCouplingReferences() {
-        for(int i = 0; i < _coupledElements.length; i++) {
+        for (int i = 0; i < _coupledElements.length; i++) {
             setNewCouplingElement(i, _coupledElements[i]);
         }
     }
 
     private void removeWithSingleReference(final AbstractBlockInterface partner, final int index) {
-        for(ComponentCoupling otherCoup : partner._isReferencedBy.toArray(new ComponentCoupling[0])) {
-            if(otherCoup._parentElement instanceof ReglerGate
+        for (ComponentCoupling otherCoup :
+                partner._isReferencedBy.toArray(new ComponentCoupling[0])) {
+            if (otherCoup._parentElement instanceof ReglerGate
                     && _parentElement instanceof ReglerGate) {
                 otherCoup.setNewCouplingElementUndoable(index, null);
             }
@@ -380,7 +381,7 @@ public final class ComponentCoupling {
         Operationable.OperationInterface op0 = new SetOperation(0);
         returnValue.add(op0);
 
-        if(_coupledElements.length == 2) {
+        if (_coupledElements.length == 2) {
             Operationable.OperationInterface op1 = new SetOperation(1);
             returnValue.add(op1);
         }
@@ -476,8 +477,8 @@ public final class ComponentCoupling {
     }
 
     void shiftReferenceIDs(final long shiftValue) {
-        for(int i = 0; i < _coupledIdentifiers.length; i++) {
-            if(_coupledIdentifiers[i] != 0) {
+        for (int i = 0; i < _coupledIdentifiers.length; i++) {
+            if (_coupledIdentifiers[i] != 0) {
                 _coupledIdentifiers[i] += shiftValue;
             }
         }

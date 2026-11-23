@@ -30,10 +30,10 @@ public class CircuitLabel {
     }
 
     public void setLabel(final String newLabel) {
-        if(newLabel.equals(_label)) {
+        if (newLabel.equals(_label)) {
             return;
         }
-        if(!_label.equals(newLabel)) {
+        if (!_label.equals(newLabel)) {
             RenameLabelUndoableEdit undoEdit = new RenameLabelUndoableEdit(_label, newLabel, false);
             AbstractUndoGenericModel.undoManager.addEdit(new GeckoUndoableEditAdapter(undoEdit));
         }
@@ -68,7 +68,7 @@ public class CircuitLabel {
 
     public void setLabelFromUserDialog(final String newLabel) {
         _labelPriority = LabelPriority.FORCE_NAME;
-        if(newLabel.equals(_label)) {
+        if (newLabel.equals(_label)) {
             return;
         }
         RenameLabelUndoableEdit undoEdit = new RenameLabelUndoableEdit(_label, newLabel, true);

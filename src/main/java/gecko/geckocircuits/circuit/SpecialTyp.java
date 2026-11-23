@@ -24,8 +24,8 @@ public enum SpecialTyp implements AbstractComponentTyp {
     TEXTFIELD(70, TextFieldBlock.tInfo);
 
     public static SpecialTyp getFromIntNumber(final int intNumber) {
-        for(SpecialTyp compare : values()) {
-            if(compare.getTypeNumber() == intNumber) {
+        for (SpecialTyp compare : values()) {
+            if (compare.getTypeNumber() == intNumber) {
                 return compare;
             }
         }

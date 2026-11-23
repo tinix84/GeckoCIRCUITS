@@ -31,54 +31,65 @@ public class KnotenLabel implements Serializable {
     private int xTxt, yTxt;      // Pixel-Koord. vom Text
     private int xAnker, yAnker;  // ScematicEntry-Koord. vom Ankerpunkt, d.h. wohin die graue Linie zielt
     private int x1click, y1click, x2click, y2click;  // definiert Klickbereich in Pixel
-    private boolean visible=false;
-    //----------------------------------
+    private boolean visible = false;
 
+    // ----------------------------------
 
-    public void setKoordTxt (int xT, int yT) { this.xTxt=xT;   this.yTxt=yT; }
-    public void setKoordAnker (int xA, int yA) { this.xAnker=xA;   this.yAnker=yA; }
-    public void setText (String txt) { this.labelTxt=txt; }
-    public void setVisible (boolean visible) { this.visible=visible; }
+    public void setKoordTxt(int xT, int yT) {
+        this.xTxt = xT;
+        this.yTxt = yT;
+    }
 
+    public void setKoordAnker(int xA, int yA) {
+        this.xAnker = xA;
+        this.yAnker = yA;
+    }
 
+    public void setText(String txt) {
+        this.labelTxt = txt;
+    }
 
-    public KnotenLabel () { /* no-op */ }
+    public void setVisible(boolean visible) {
+        this.visible = visible;
+    }
 
-    public KnotenLabel (String[] ascii) {
+    public KnotenLabel() {
+        /* no-op */
+    }
+
+    public KnotenLabel(String[] ascii) {
         this.importASCII(ascii);
     }
 
-
-    public boolean istAngeklickt (int xPix, int yPix) {
-        return (x1click<xPix)&&(xPix<x2click)&&(y1click<yPix)&&(yPix<y2click);
+    public boolean istAngeklickt(int xPix, int yPix) {
+        return (x1click < xPix) && (xPix < x2click) && (y1click < yPix) && (yPix < y2click);
     }
 
-
-    public void zeichne (Graphics g, Color f1, int dpix) {
-        if (!visible) { return; }
+    public void zeichne(Graphics g, Color f1, int dpix) {
+        if (!visible) {
+            return;
+        }
         //-----
         //g.setFont(font);
         g.setColor(f1);
         g.drawString(labelTxt, xTxt,yTxt);
         g.setColor(Color.lightGray);
-        g.drawLine((int)(dpix*xAnker), (int)(dpix*yAnker), xTxt, yTxt);
-        //-----
-        FontRenderContext frc= ((Graphics2D)g).getFontRenderContext();
-        Rectangle rect= g.getFont().getStringBounds(labelTxt, frc).getBounds();
-        x1click= xTxt+rect.x;
-        y1click= yTxt+rect.y;
-        x2click= x1click +rect.width;
-        y2click= y1click +rect.height;
+        g.drawLine((int) (dpix * xAnker), (int) (dpix * yAnker), xTxt, yTxt);
+        // -----
+        FontRenderContext frc = ((Graphics2D) g).getFontRenderContext();
+        Rectangle rect = g.getFont().getStringBounds(labelTxt, frc).getBounds();
+        x1click = xTxt + rect.x;
+        y1click = yTxt + rect.y;
+        x2click = x1click + rect.width;
+        y2click = y1click + rect.height;
         //System.out.println(x1click+"   "+x2click+"   "+y1click+"   "+y2click);
         g.setColor(Color.magenta);
-        g.drawRect(x1click,y1click, x2click-x1click,y2click-y1click);
+        g.drawRect(x1click, y1click, x2click - x1click, y2click - y1click);
         //-----
     }
 
-
-
     // zum Speichern im ASCII-Format (anstatt als Object-Stream) -->
-    public void exportASCII (StringBuffer ascii) {
+    public void exportASCII(StringBuffer ascii) {
         ascii.append("<Verbindung>");
         //------------------
         /*
@@ -91,16 +102,10 @@ public class KnotenLabel implements Serializable {
         //------------------
     }
 
-
-
-
-    public void importASCII (final String[] ascii) {
+    public void importASCII(final String[] ascii) {
 
         // no-op
     }
-
-
-
 }
 
 

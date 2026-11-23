@@ -50,7 +50,7 @@ public class Verbindung extends AbstractCircuitSheetComponent implements Compone
     public Verbindung(final ConnectorType connectorType, final CircuitSheet parentSheet) {
         super();
         _connectorType = connectorType;
-        if(! (this instanceof VerbindungShortConnector)) {
+        if (!(this instanceof VerbindungShortConnector)) {
             setParentCircuitSheet(parentSheet);
         }
     }
@@ -118,7 +118,7 @@ public class Verbindung extends AbstractCircuitSheetComponent implements Compone
 
     @Override
     public final void absetzenElement() {
-        if(_isInitialized) {
+        if (_isInitialized) {
             MoveVerbindungUndoAction undoAction = new MoveVerbindungUndoAction(_pointsBeforeMove, _connectorPoints);
             AbstractUndoGenericModel.undoManager.addEdit(undoAction);
         }

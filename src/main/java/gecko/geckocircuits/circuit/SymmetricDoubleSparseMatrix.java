@@ -78,7 +78,7 @@ public final class SymmetricDoubleSparseMatrix {
 
     void removeZeroEntry(int row, int column) {
 
-        if (row == column) {// in symmetric matrices, the diagonal value MUST be present,
+        if (row == column) { // in symmetric matrices, the diagonal value MUST be present,
                 // even if it is "0".
                 return;
         }

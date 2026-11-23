@@ -35,13 +35,13 @@ class MyTableComparator implements Comparator<List<Double>>, Serializable {
         Double d1 = o1.get(0);
         Double d2 = o2.get(0);
 
-        if(d1 == null && d2 == null) {
+        if (d1 == null && d2 == null) {
             return 0;
         }
-        if(d1 == null) {
+        if (d1 == null) {
             return 1;
         }
-        if(d2 == null) {
+        if (d2 == null) {
             return -1;
         }
 

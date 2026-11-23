@@ -201,7 +201,7 @@ public class DataTablePanel extends JPanel {
         }
 
         private void sortWithFirstRow() {
-            if(_sortingDisabled) {
+            if (_sortingDisabled) {
                 return;
             }
             long oldHash = calculateTableHash();

@@ -33,8 +33,10 @@ import java.util.Set;
         justification = "Abstract class - subclasses are final or properly designed to handle constructor exceptions")
 public abstract class AbstractTypeInfo extends TypeInfoCore {
 
-    static Map<Class<? extends AbstractBlockInterface>, AbstractComponentTyp> _classEnumMap = new HashMap<Class<? extends AbstractBlockInterface>, AbstractComponentTyp>();
-    static Map<Class<? extends AbstractBlockInterface>, AbstractTypeInfo> _classTypeMap = new HashMap<Class<? extends AbstractBlockInterface>, AbstractTypeInfo>();
+    static Map<Class<? extends AbstractBlockInterface>, AbstractComponentTyp> _classEnumMap =
+            new HashMap<Class<? extends AbstractBlockInterface>, AbstractComponentTyp>();
+    static Map<Class<? extends AbstractBlockInterface>, AbstractTypeInfo> _classTypeMap =
+            new HashMap<Class<? extends AbstractBlockInterface>, AbstractTypeInfo>();
     static Map<String, AbstractTypeInfo> _stringTypeMap = new HashMap<String, AbstractTypeInfo>();
     static Map<AbstractComponentTyp, AbstractTypeInfo> _enumTypeMap = new HashMap<AbstractComponentTyp, AbstractTypeInfo>();
 
@@ -58,7 +60,7 @@ public abstract class AbstractTypeInfo extends TypeInfoCore {
     }
 
     public static AbstractTypeInfo getFromComponentName(String elementType) {
-        if(_stringTypeMap.containsKey(elementType)) {
+        if (_stringTypeMap.containsKey(elementType)) {
             return _stringTypeMap.get(elementType);
         } else {
             throw new RuntimeException("Error: a component with type \"" + elementType + "\" does not exist!");
@@ -68,7 +70,11 @@ public abstract class AbstractTypeInfo extends TypeInfoCore {
     public final I18nKeys _typeDescription;
     public final I18nKeys _typeDescriptionVerbose;
 
-    public AbstractTypeInfo(final Class<? extends AbstractBlockInterface> typeClass, final String idString, final I18nKeys typeDescription, final I18nKeys typeDescriptionVerbose) {
+    public AbstractTypeInfo(
+            final Class<? extends AbstractBlockInterface> typeClass,
+            final String idString,
+            final I18nKeys typeDescription,
+            final I18nKeys typeDescriptionVerbose) {
         super(typeClass, idString);
         _typeDescription = typeDescription;
         _typeDescriptionVerbose = typeDescriptionVerbose;
@@ -104,13 +110,13 @@ public abstract class AbstractTypeInfo extends TypeInfoCore {
         _parentType = parentType;
         _classEnumMap.put(_typeClass, parentType);
         _enumTypeMap.put(parentType, this);
-        if(!_exportImportEnumMap.containsKey(this.getExportImportCharacters())) {
+        if (!_exportImportEnumMap.containsKey(this.getExportImportCharacters())) {
             _exportImportEnumMap.put(this.getExportImportCharacters(), parentType);
         }
     }
 
     public static AbstractTypeInfo getTypeFromString(final String elementType) {
-        if(_stringTypeMap.containsKey(elementType)) {
+        if (_stringTypeMap.containsKey(elementType)) {
             return _stringTypeMap.get(elementType);
         } else {
             throw new IllegalArgumentException("String type " + elementType + " could not be found!");

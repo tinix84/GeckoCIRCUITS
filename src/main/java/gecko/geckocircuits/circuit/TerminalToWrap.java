@@ -84,8 +84,16 @@ public final class TerminalToWrap {
                 && !((SubCircuitSheet) _parentComponent.getParentCircuitSheet())._subBlock.areTerminalPositionsOK()) {
             String problematicList = "";
 
-            for(SubCircuitTerminable term : ((SubCircuitSheet) _parentComponent.getParentCircuitSheet())._subBlock.getTerminalsWithWrongPosition()) {
-                problematicList += term.getStringID() + " position (" + term.getBlockTerminal().getRelativeX() + " " + term.getBlockTerminal().getRelativeY() + ")\n";
+            for (SubCircuitTerminable term :
+                    ((SubCircuitSheet) _parentComponent.getParentCircuitSheet())
+                            ._subBlock.getTerminalsWithWrongPosition()) {
+                problematicList +=
+                        term.getStringID()
+                                + " position ("
+                                + term.getBlockTerminal().getRelativeX()
+                                + " "
+                                + term.getBlockTerminal().getRelativeY()
+                                + ")\n";
             }
 
             JOptionPane.showMessageDialog(null,
@@ -124,8 +132,9 @@ public final class TerminalToWrap {
             final SubcircuitBlock subBlock = ((SubCircuitSheet) _parentComponent.getParentCircuitSheet())._subBlock;
             AffineTransform newtransform = new AffineTransform(oldTrans);
             graphics.setTransform(newtransform);
-            graphics.translate((- subBlock.getSheetPosition().x - getBlockTerminal().getRelativeX()) * dpix,
-                    (- subBlock.getSheetPosition().y - getBlockTerminal().getRelativeY()) * dpix);
+            graphics.translate(
+                    (-subBlock.getSheetPosition().x - getBlockTerminal().getRelativeX()) * dpix,
+                    (-subBlock.getSheetPosition().y - getBlockTerminal().getRelativeY()) * dpix);
             subBlock.paintGeckoComponent(graphics);
             graphics.setTransform(oldTrans);
         }

@@ -24,8 +24,8 @@ public enum EnumTerminalLocation {
     BOTTOM;
 
     public static EnumTerminalLocation getFromOrdinal(final int ordinal) {
-        for(EnumTerminalLocation val : values()) {
-            if(val.ordinal() == ordinal) {
+        for (EnumTerminalLocation val : values()) {
+            if (val.ordinal() == ordinal) {
                 return val;
             }
         }

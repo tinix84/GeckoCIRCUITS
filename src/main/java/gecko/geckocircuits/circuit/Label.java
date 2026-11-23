@@ -44,7 +44,10 @@ public class Label {
             return false;
         }
         final Label other = (Label) obj;
-        return this._connectorType == other._connectorType && !((this._labelString == null) ? (other._labelString != null) : !this._labelString.equals(other._labelString));
+        return this._connectorType == other._connectorType
+                && !((this._labelString == null)
+                        ? (other._labelString != null)
+                        : !this._labelString.equals(other._labelString));
     }
 
 

@@ -29,12 +29,16 @@ import java.util.*;
         justification = "Performance-critical netlist class with direct field access for simulation speed")
 public final class NetListLK {
 
-    public int knotenMAX, spgQuelleMAX;  // knotenMAX ... Gesamt-Knotenanzahl minus 'Ground';  spgQuelleMAX ... Summe der SpgQuellen plus LKOP2-Elemente
+    public int knotenMAX,
+            spgQuelleMAX; // knotenMAX ... Gesamt-Knotenanzahl minus 'Ground';  spgQuelleMAX ...
+                          // Summe der SpgQuellen plus LKOP2-Elemente
     public CircuitTyp[] typ;
     public int[] knotenX, knotenY;
     public int[][] nodePairDirVoltContSrc;
     public double[][] parameter;  // Bauteilwert; Typus 'sinus', 'dreieck', ... bei Strom/Spg-Quelle; init-Werte iL_ALT und uC_ALT; ...
-    public int[] spgQuelleNr;  // zaehlt nicht nur die SpgQuellen von 1 beginnend aufsteigen, sondern auch die LKOP2-Elemente, wobei Durchmischung mit den SpgQuellen moeglich ist
+    public int[]
+            spgQuelleNr; // zaehlt nicht nur die SpgQuellen von 1 beginnend aufsteigen, sondern auch
+                         // die LKOP2-Elemente, wobei Durchmischung mit den SpgQuellen moeglich ist
     public Verbindung[] v;
     public int verbindungANZAHL;
     public AbstractCircuitBlockInterface[] elements, eLKneu;
@@ -393,7 +397,19 @@ public final class NetListLK {
                         i_typ[i1] = CircuitTyp.LK_U;
                         i_knotenX[i1] = nl.knotenX[i1];
                         i_knotenY[i1] = nl.knotenY[i1];
-                        i_parameter[i1] = new double[]{SourceType.QUELLE_DC_NEW, nl.parameter[i1][1], -1, -1, -1, -1, 0, 0, 0, 0};   // TypQuelle - uNmax - frequ - offset - phase - tastverh.
+                        i_parameter[i1] =
+                                new double[] {
+                                    SourceType.QUELLE_DC_NEW,
+                                    nl.parameter[i1][1],
+                                    -1,
+                                    -1,
+                                    -1,
+                                    -1,
+                                    0,
+                                    0,
+                                    0,
+                                    0
+                                }; // TypQuelle - uNmax - frequ - offset - phase - tastverh.
                         i_spgQuelleNr[i1] = spgQuelleZaehler;
                         spgQuelleZaehler++;
                     } else {
@@ -415,7 +431,19 @@ public final class NetListLK {
                         i_typ[i1] = CircuitTyp.TH_TEMP;
                         i_knotenX[i1] = nl.knotenX[i1];
                         i_knotenY[i1] = nl.knotenY[i1];
-                        i_parameter[i1] = new double[]{SourceType.QUELLE_DC_NEW, nl.parameter[i1][1], -1, -1, -1, -1, 0, 0, 0, 0};   // TypQuelle - uNmax - frequ - offset - phase - tastverh.
+                        i_parameter[i1] =
+                                new double[] {
+                                    SourceType.QUELLE_DC_NEW,
+                                    nl.parameter[i1][1],
+                                    -1,
+                                    -1,
+                                    -1,
+                                    -1,
+                                    0,
+                                    0,
+                                    0,
+                                    0
+                                }; // TypQuelle - uNmax - frequ - offset - phase - tastverh.
                         i_spgQuelleNr[i1] = spgQuelleZaehler;
                         spgQuelleZaehler++;
                     } else {
@@ -457,8 +485,14 @@ public final class NetListLK {
 
     private void definiere_magnetischeKopplungen_im_LK() {
 
-        // M -->   []{ k - xL1(Koord.) - yL1(Koord.) - xL2(Koord.) - yL2(Koord.) - ID-Nr_L1 - ID-Nr_L2 {
-        List<AbstractMap.SimpleEntry<AbstractCircuitBlockInterface, AbstractCircuitBlockInterface>> kLc = new ArrayList<AbstractMap.SimpleEntry<AbstractCircuitBlockInterface, AbstractCircuitBlockInterface>>();
+        // M -->   []{ k - xL1(Koord.) - yL1(Koord.) - xL2(Koord.) - yL2(Koord.) - ID-Nr_L1 -
+        // ID-Nr_L2 {
+        List<AbstractMap.SimpleEntry<AbstractCircuitBlockInterface, AbstractCircuitBlockInterface>>
+                kLc =
+                        new ArrayList<
+                                AbstractMap.SimpleEntry<
+                                        AbstractCircuitBlockInterface,
+                                        AbstractCircuitBlockInterface>>();
         List<Double> kM = new ArrayList<Double>();
 
         // (1) Einlesen aller gekoppelten LK-Lc-Paare -->
