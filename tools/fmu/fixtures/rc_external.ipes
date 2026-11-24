@@ -1,0 +1,82 @@
+dt 2e-6
+tDURATION 0.003
+e (1)
+<ElementLK>
+typ 4
+idStringDialog Vs
+orientierung 503
+parameterString[] /vin
+parameter[] 400 0
+labelAnfangsKnoten[] /1
+labelEndKnoten[] /0
+<\ElementLK>
+e (2)
+<ElementLK>
+typ 1
+idStringDialog R1
+orientierung 503
+parameter[] 500
+labelAnfangsKnoten[] /1
+labelEndKnoten[] /2
+<\ElementLK>
+e (3)
+<ElementLK>
+typ 3
+idStringDialog C1
+orientierung 503
+parameter[] 1e-6 0
+labelAnfangsKnoten[] /2
+labelEndKnoten[] /0
+<\ElementLK>
+c (1)
+<ElementCONTROL>
+typ 23
+tn 1
+torder 0
+idStringDialog Source
+labelEndKnoten[] /vin
+x 0
+y 0
+orientierung 503
+parameter[]
+parameterString[]
+labelAnfangsKnoten[]
+<\ElementCONTROL>
+c (2)
+<ElementCONTROL>
+typ 1
+idStringDialog Probe
+parameterString[] /2/0
+labelEndKnoten[] /vc
+x 0
+y 0
+orientierung 503
+parameter[]
+labelAnfangsKnoten[]
+<\ElementCONTROL>
+c (3)
+<ElementCONTROL>
+typ 5
+idStringDialog SCOPE.1
+labelAnfangsKnoten[] /vc
+x 0
+y 0
+orientierung 503
+parameter[]
+parameterString[]
+labelEndKnoten[]
+<\ElementCONTROL>
+c (4)
+<ElementCONTROL>
+typ 22
+idStringDialog ExternalOutput
+anzXIN 1
+torder 0
+labelAnfangsKnoten[] /vc
+x 0
+y 0
+orientierung 503
+parameter[]
+parameterString[]
+labelEndKnoten[]
+<\ElementCONTROL>
