@@ -133,3 +133,4 @@ Never run `python -m venv`, `uv venv`, or `virtualenv`.
 | 2026-11-12 | [ADR-0010: Pull-based frontend and single-owner session](docs/adr/ADR-0010-pull-based-frontend-single-owner-session.md) |
 | 2026-11-13 | [ADR-0011: Numerical reference compatibility](docs/adr/ADR-0011-numerical-reference-compatibility.md) |
 | 2026-11-17 | [ADR-0012: Isolated electrical groups](docs/adr/ADR-0012-isolated-electrical-groups.md) |
+| 2026-11-23 | [ADR-0015: Independent release trace provenance](docs/adr/0015-independent-release-trace-provenance.md) |

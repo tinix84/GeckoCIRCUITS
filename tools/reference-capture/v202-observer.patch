@@ -1,0 +1,20 @@
+diff --git a/src/main/java/ch/technokrat/gecko/geckocircuits/circuit/SimulationsKern.java b/src/main/java/ch/technokrat/gecko/geckocircuits/circuit/SimulationsKern.java
+index 2f6c7298..0eb69114 100644
+--- a/src/main/java/ch/technokrat/gecko/geckocircuits/circuit/SimulationsKern.java
++++ b/src/main/java/ch/technokrat/gecko/geckocircuits/circuit/SimulationsKern.java
+@@ -146,6 +146,7 @@ public class SimulationsKern {
+         }
+ 
+         //lkmLK.schreibeRechendatenNachEinemZeitschritt(t);
++        V202TraceCapture.step(t, nl, lkmLK);
+         //
+         // Pause wird zu bestimmtem Zeitpunkt erzwungen -->
+         if ((t - dt / 2 <= tPAUSE) && (tPAUSE <= t + dt / 2)) {
+@@ -281,6 +282,7 @@ public class SimulationsKern {
+             double schaltSignal = sortedCalculators[zuordnung_SchalterLK_SWITCH[i1][0]]._inputSignal[0][0];
+             AbstractCircuitBlockInterface e = nl.elements[zuordnung_SchalterLK_SWITCH[i1][1]];
+             final double[] par = e.parameter;
++            V202TraceCapture.gate(e, schaltSignal);
+             switch (e.getCircuitTyp()) {
+                 case LK_S:
+                     // rDS(t) - rDS,on - rDS,off - i(t) - u(t) - uDSon[V] - k_on[Ws] - k_off[Ws]    -->

@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main, dev ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, dev ]
 
 jobs:
   build:
@@ -39,6 +39,7 @@ jobs:
       - name: Verify tests and coverage (all modules)
         run: |
           python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+          python3 -m unittest discover -s tools/reference-capture -p 'test_analyze.py' -v
           bash scripts/verify-ci.sh
 
       - name: Verify application traces

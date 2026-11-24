@@ -37,15 +37,19 @@ class SemiconductorStepContractTest {
     }
 
     static void assertSeriesCurrent(CircuitNetlist netlist, double expected) {
+        assertCurrents(netlist, expected, expected);
+    }
+
+    static void assertCurrents(CircuitNetlist netlist, double expectedBranch, double expectedReported) {
         double[] currents = netlist.getLastComponentCurrents();
-        assertEquals(expected, currents[2], 1e-10, "Switch current agrees with the worked circuit");
-        assertEquals(currents[1], currents[2], 1e-10, "Series resistor and switch must carry the same current");
+        assertEquals(expectedReported, currents[2], 1e-10, "The reported device current follows the release equation");
+        assertEquals(expectedBranch, currents[1], 1e-10, "The resistor carries the worked MNA branch current");
         assertEquals(-currents[1], currents[0], 1e-10, "The source supplies the same branch current");
     }
 
     @ParameterizedTest
     @MethodSource("operatingPoints")
-    void actualTimestepPreservesKclInBlockingAndConductingStates(
+    void actualTimestepPreservesBranchKclAndReleaseDeviceReporting(
             CircuitTypCore type, SolverType method, boolean initiallyOn, double voltage) {
         CircuitNetlist netlist = circuit(type, initiallyOn, voltage);
         ElectricalTimeStep step = new ElectricalTimeStep(netlist, method);
@@ -54,10 +58,15 @@ class SemiconductorStepContractTest {
         // Rload + Ron = 2 ohms. The 1.5 V drop gives 2.25 A; MOSFET gives +/-3 A.
         double expected = conducting ? (type == CircuitTypCore.LK_MOSFET ? voltage / 2 : 2.25)
                 : voltage / 1000001.75;
-        assertSeriesCurrent(netlist, expected);
+        boolean transition = initiallyOn && !conducting && type != CircuitTypCore.LK_MOSFET;
+        double branch = transition ? (voltage - 1.5) / 1000001.75 : expected;
+        double reported = !conducting && !transition && type != CircuitTypCore.LK_MOSFET
+                ? branch - 1.5 / 1e6 : branch;
+        assertCurrents(netlist, branch, reported);
         assertEquals(conducting ? 0.25 : 1e6, netlist.getParameter(2)[0]);
         step.advance(0.001, 0.001, null);
-        assertSeriesCurrent(netlist, expected);
+        reported = !conducting && type != CircuitTypCore.LK_MOSFET ? expected - 1.5 / 1e6 : expected;
+        assertCurrents(netlist, expected, reported);
     }
 
     @Test
@@ -66,7 +75,9 @@ class SemiconductorStepContractTest {
         ElectricalTimeStep step = new ElectricalTimeStep(netlist, SolverType.SOLVER_BE);
         netlist.getParameter(2)[8] = 1;
         step.advance(0.001, 0, null);
-        assertSeriesCurrent(netlist, 2.25);
+        // The release subtracts the old Uf/Roff term during the OFF-to-ON incremental correction.
+        double branch = (6 - 1.5 + 1.5 * .25 / 1e6) / 2;
+        assertCurrents(netlist, branch, branch - 1.5 / 1e6);
         netlist.getParameter(2)[8] = 0;
         step.advance(0.001, 0.001, null);
         assertSeriesCurrent(netlist, 2.25);

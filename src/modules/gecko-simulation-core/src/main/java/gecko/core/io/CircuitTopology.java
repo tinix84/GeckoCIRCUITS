@@ -1,5 +1,6 @@
 package gecko.core.io;
 
+import gecko.core.simulation.ControlBlockDescriptor;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -136,6 +137,7 @@ public final class CircuitTopology {
             addComponents(block.domain(), List.of(block.component()), identities, ports, active, structural, sheets, true,
                     electricalGeometry && block.domain().equals("LK"));
         }
+        recoverUnlabelledControlGeometry(model, identities, ports);
         int[] parent = new int[ports.size() + wires.size()];
         for (int i = 0; i < parent.length; i++) parent[i] = i;
         var aliases = new LinkedHashMap<Alias, Integer>();
@@ -503,6 +505,65 @@ public final class CircuitTopology {
     public Group externalOutputGroup(CircuitModel.ComponentData component, int port) {
         Integer group = externalOutputGroups.get(new TerminalIdentity(identities.get(component), Side.INPUT, port));
         return group == null ? null : groups.get(group);
+    }
+
+    /** Recovers anonymous saved CONTROL connections. Captured terminal positions take precedence. */
+    private static void recoverUnlabelledControlGeometry(CircuitModel model,
+            Map<CircuitModel.ComponentData, ComponentIdentity> identities, List<Port> ports) {
+        var candidates = new LinkedHashMap<TerminalIdentity, CircuitModel.TerminalData>();
+        var anonymousPositions = new HashSet<Position>();
+        Set<TerminalIdentity> admitted = ports.stream().map(Port::id).collect(Collectors.toSet());
+        for (Port port : ports) {
+            var geometry = port.geometry();
+            if (port.domain().equals("CONTROL") && port.label().isEmpty() && geometry != null && geometry.geometric()) {
+                anonymousPositions.add(new Position(port.domain(), port.sheet(), geometry.x(), geometry.y()));
+            }
+        }
+        for (var component : model.getControlComponents()) {
+            var saved = component.getSavedBlock();
+            if (saved == null || !component.getTerminalData().isEmpty()) continue;
+            int type = component.getType();
+            // RegelBlock and AbstractReglerVariableInputs use these standard terminal layouts.
+            if (!Set.of(1, 2, 3, 4, 5, 6, 7, 11, 12, 13, 14, 18, 19, 21, 25, 64).contains(type)) continue;
+            var descriptor = ControlBlockDescriptor.find(type);
+            for (Side side : Side.values()) {
+                String[] labels = portLabels(component, side);
+                int count;
+                try { count = side == Side.INPUT ? descriptor.inputs(component) : descriptor.outputs(component); }
+                catch (IllegalArgumentException invalidMode) { continue; } // Readiness reports invalid saved modes separately.
+                for (int port = 0; port < Math.min(labels.length, count); port++) {
+                    var terminal = new TerminalIdentity(identities.get(component), side, port);
+                    if (!admitted.contains(terminal)) continue;
+                    int dx = side == Side.INPUT ? -2 : type <= 4 ? 2 : 1;
+                    int dy = -port;
+                    // Expanded SIGNAL inputs are below the source, as in ReglerSignalSource.setExpanded().
+                    if (type == 4 && side == Side.INPUT) { dx = -1; dy = -port - 2; }
+                    // Expanded HYS has one threshold input below its ordinary signal input.
+                    if (type == 11 && side == Side.INPUT && port == 1) { dx = -1; dy = -2; }
+                    int x = component.getPosition()[0];
+                    int y = component.getPosition()[1];
+                    switch (component.getOrientation()) {
+                        case 501 -> { x -= dx; y += dy; }
+                        case 502 -> { x -= dy; y -= dx; }
+                        case 504 -> { x += dy; y += dx; }
+                        default -> { x += dx; y -= dy; }
+                    }
+                    var geometry = new CircuitModel.TerminalData("CONTROL", saved.parentSheetIdentifier(), side, port, x, y, true);
+                    candidates.put(terminal, geometry);
+                    if (normalizeLabel(labels[port]).isEmpty()) {
+                        anonymousPositions.add(new Position("CONTROL", geometry.sheetIdentifier(), x, y));
+                    }
+                }
+            }
+        }
+        for (int index = 0; index < ports.size(); index++) {
+            Port port = ports.get(index);
+            var geometry = candidates.get(port.id());
+            if (port.geometry() != null || geometry == null || !anonymousPositions.contains(
+                    new Position("CONTROL", geometry.sheetIdentifier(), geometry.x(), geometry.y()))) continue;
+            ports.set(index, new Port(port.id(), port.domain(), port.sheet(), port.label(), port.producer(),
+                    geometry, port.externalInput(), port.componentOrder()));
+        }
     }
 
     private static void addComponents(String domain, List<CircuitModel.ComponentData> components,
