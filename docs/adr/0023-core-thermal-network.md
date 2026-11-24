@@ -35,7 +35,7 @@ A step change rebuilds the thermal matrix, like the legacy continuation [C, High
 Loss sources port the legacy SIMPLE, DETAILED and resistor algorithms unchanged, including the initial history of -1 and the current threshold of 0.01 A. A contract test compares them with the legacy classes.
 
 Readiness accepts thermal circuits that the core can execute. It reports a capability diagnostic, and the desktop runs the legacy kernel, for a power module element, a loss source on a MOSFET, a DETAILED model without its loss file, an unresolved loss coupling and unsupported source modes.
-The periodic steady-state search and AC analysis reject thermal elements. The search exports and compares only electrical and CONTROL state, so it has no thermal state or residual. A slow thermal constant, like the 0.8 s of the acceptance circuit against a 25 kHz carrier, would also make a drift test slow, but that alone does not show that a thermal search is impossible [E, Medium].
+The periodic steady-state search and AC analysis reject thermal elements. The search exports and compares only electrical and CONTROL state, so it has no thermal state or loss history to converge.
 
 ## Consequences
 
