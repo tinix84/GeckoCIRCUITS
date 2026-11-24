@@ -1,0 +1,8 @@
+vin_max_v: 400
+iout_a: 3
+fsw_hz: 20000
+ambient_c: 25
+output_power_w: 900
+efficiency_target: 0.95
+gate_drive_current_a: 1.5
+conduction_fraction: 0.3

@@ -3,10 +3,11 @@
 import argparse
 from contextlib import ExitStack
 from dataclasses import dataclass
+import math
 from pathlib import Path
 
 from .catalog import Device, load_catalog, load_spec
-from .curves import VendorCurves, loss_client
+from .curves import VendorCurves, detailed_losses, loss_client
 
 
 VOLTAGE_FRACTION = 0.80
@@ -31,9 +32,15 @@ def fallback(device, spec):
     current = spec.iout_a
     drop = device.vce_sat_v if device.vce_sat_v is not None else current * device.rds_on_ohm
     conduction = spec.conduction_fraction * current * drop
+    if device.qg_c is None:
+        return conduction, None
     transition = device.qg_c / spec.gate_drive_current_a
     switching = 0.5 * spec.vin_max_v * current * transition * spec.fsw_hz
     return conduction, switching
+
+
+class TemperatureEstimateError(ValueError):
+    """The temperature iteration did not converge."""
 
 
 def temperature_and_losses(device, spec, estimate):
@@ -46,7 +53,15 @@ def temperature_and_losses(device, spec, estimate):
         if result >= device.tj_max_c:
             return result, conduction, switching
         junction = result
-    raise ValueError("The loss estimate did not converge to a junction temperature.")
+    raise TemperatureEstimateError("The loss estimate did not converge to a junction temperature.")
+
+
+def estimate_at(api, spec, temperature, curves, static):
+    if not any(curves.values()):
+        return static
+    detailed = detailed_losses(api, spec, temperature, curves)
+    return tuple(fallback if value is None else value
+                 for value, fallback in zip(detailed, static, strict=True))
 
 
 def rank(spec, devices):
@@ -73,19 +88,34 @@ def rank(spec, devices):
     with ExitStack() as stack:
         api = None
         thermal_survivors = 0
+        loss_survivors = 0
         for part in survivors:
-            estimate = lambda _temperature, device=part: fallback(device, spec)
-            method = "static catalog values and the gate charge estimate"
-            if part.curve_file:
-                curves = VendorCurves(part.curve_file, spec.vin_max_v)
-                if curves.covers_current(spec.iout_a):
-                    if api is None:
-                        api = stack.enter_context(loss_client())
-                    estimate = lambda junction: curves.estimate(api, spec, junction)
-                    method = "vendor loss curves"
-                else:
-                    method += " because the current is outside the vendor curves"
-            junction, conduction, switching = temperature_and_losses(part, spec, estimate)
+            static = fallback(part, spec)
+            curves = (VendorCurves(part.curve_file, spec.vin_max_v).at_current(spec.iout_a)
+                      if part.curve_file else {"conduction": [], "switching": []})
+            if static[1] is None and not curves["switching"]:
+                rejected.append((part.name, "loss data (no switching curve at this current)"))
+                continue
+            loss_survivors += 1
+            sources = ", ".join(
+                f"{kind} from {'vendor curves' if curves[kind] else fallback_method}"
+                for kind, fallback_method in (
+                    ("conduction", "the static catalog value"),
+                    ("switching", "the gate charge estimate"),
+                )
+            )
+            if api is None and any(curves.values()):
+                api = stack.enter_context(loss_client())
+            if spec.ambient_c >= part.tj_max_c:
+                rejected.append((part.name, f"thermal limit (ambient ≥ {part.tj_max_c:g} °C)"))
+                continue
+            try:
+                junction, conduction, switching = temperature_and_losses(
+                    part, spec, lambda temperature: estimate_at(api, spec, temperature, curves, static),
+                )
+            except TemperatureEstimateError as error:
+                rejected.append((part.name, f"thermal limit ({error})"))
+                continue
             if junction >= part.tj_max_c:
                 rejected.append((part.name, f"thermal limit ({junction:.2f} °C ≥ {part.tj_max_c:g} °C)"))
                 continue
@@ -102,11 +132,18 @@ def rank(spec, devices):
                 "efficiency budget": 1 - total / spec.loss_budget_w,
             }
             binding = min(margins, key=margins.get)
-            candidates.append(Candidate(part, conduction, switching, junction, method, binding))
+            candidates.append(Candidate(part, conduction, switching, junction, sources, binding))
         if survivors and not candidates:
-            eliminated_by = "efficiency budget" if thermal_survivors else "thermal limit"
+            if thermal_survivors:
+                eliminated_by = "efficiency budget"
+            else:
+                eliminated_by = "thermal limit" if loss_survivors else "loss data"
 
-    candidates.sort(key=lambda item: (item.total_w, item.device.price, item.device.name))
+    def sort_key(item):
+        price = item.device.price
+        return item.total_w, math.inf if price is None else price, item.device.name
+
+    candidates.sort(key=sort_key)
     return candidates, rejected, eliminated_by
 
 
@@ -119,11 +156,12 @@ def main():
     candidates, rejected, eliminated_by = rank(spec, load_catalog(args.catalog))
     for position, item in enumerate(candidates, 1):
         device = item.device
+        price = "unavailable" if device.price is None else f"{device.price:.2f}"
         print(f"{position}. {device.name} ({device.package}). Estimated loss {item.total_w:.3f} W "
               f"from {item.conduction_w:.3f} W conduction and {item.switching_w:.3f} W switching. "
-              f"The calculation uses {item.method}. Estimated junction temperature "
+              f"The estimate uses {item.method}. Estimated junction temperature "
               f"{item.junction_c:.2f} °C with a {device.tj_max_c:g} °C limit. "
-              f"Closest constraint is {item.binding}. Catalog price {device.price:.2f}.")
+              f"Closest constraint is {item.binding}. Catalog price {price}.")
     if not candidates:
         reason = f"{eliminated_by} eliminated the last candidates" if eliminated_by else "empty catalog"
         print(f"No candidates. {reason}.")

@@ -38,9 +38,9 @@ class Device(StrictModel):
     current_rating_a: Positive
     rds_on_ohm: Positive | None = None
     vce_sat_v: Positive | None = None
-    qg_c: Positive
+    qg_c: Positive | None = None
     package: str = Field(min_length=1)
-    price: Nonnegative
+    price: Nonnegative | None = None
     rth_c_per_w: Positive
     tj_max_c: Temperature
     curve_file: Path | None = None
@@ -49,6 +49,8 @@ class Device(StrictModel):
     def require_one_conduction_model(self):
         if (self.rds_on_ohm is None) == (self.vce_sat_v is None):
             raise ValueError("Enter either rds_on_ohm or vce_sat_v.")
+        if self.qg_c is None and self.curve_file is None:
+            raise ValueError("Enter gate charge or a vendor loss file.")
         return self
 
 

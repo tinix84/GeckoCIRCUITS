@@ -4,7 +4,6 @@ from collections import defaultdict
 from contextlib import contextmanager
 import csv
 import math
-import os
 
 
 VENDOR_HEADER = [
@@ -14,16 +13,11 @@ VENDOR_HEADER = [
 
 @contextmanager
 def loss_client():
-    from gecko_client import ApiClient, Configuration
     from gecko_client.api.loss_calculation_api import LossCalculationApi
 
-    url = os.getenv("GECKO_API_BASE_URL", "http://localhost:8080/gecko")
-    config = Configuration(host=url.rstrip("/"))
-    if key := os.getenv("GECKO_API_KEY"):
-        config.api_key["ApiKey"] = key
-    if token := os.getenv("GECKO_ACCESS_TOKEN"):
-        config.access_token = token
-    with ApiClient(config) as client:
+    from tools.optimize.batch import connect
+
+    with connect() as client:
         yield LossCalculationApi(client)
 
 
@@ -59,43 +53,55 @@ class VendorCurves:
                 if kind == "conduction" and point[0] * point[1] < 0:
                     raise ValueError(f"Use matching current and voltage signs in {path}.")
                 grouped[kind, tj].append(point)
-        self.conduction = []
-        self.switching = []
-        self.current_limits = []
+        self.samples = {"conduction": [], "switching": []}
         for (kind, temperature), points in sorted(grouped.items()):
             points.sort()
             if len(points) < 2 or len({point[0] for point in points}) != len(points):
                 raise ValueError(f"Use at least two distinct current samples per curve in {path}.")
-            self.current_limits.append((points[0][0], points[-1][0]))
             if kind == "conduction":
                 if any(a[1] >= b[1] for a, b in zip(points, points[1:])):
                     raise ValueError(f"Increase conduction voltage as current increases in {path}.")
-                self.conduction.append(LossCurveData(
-                    temperature=temperature, data=[list(column) for column in
-                                                   zip(*((v, i) for i, v in points))],
-                ))
+                curve = LossCurveData(
+                    temperature=temperature,
+                    data=[[point[1] for point in points], [point[0] for point in points]],
+                )
             else:
-                self.switching.append(LossCurveData(
+                curve = LossCurveData(
                     temperature=temperature, blocking_voltage=voltage,
                     data=[list(column) for column in zip(*points)],
-                ))
-        if not self.conduction or not self.switching:
-            raise ValueError(f"Supply conduction and switching curves in {path}.")
+                )
+            self.samples[kind].append((points[0][0], points[-1][0], curve))
+        if not grouped:
+            raise ValueError(f"Supply at least one curve in {path}.")
 
-    def covers_current(self, current):
-        return all(low <= current <= high for low, high in self.current_limits)
+    def at_current(self, current):
+        return {
+            kind: [curve for low, high, curve in samples if low <= current <= high]
+            for kind, samples in self.samples.items()
+        }
 
-    def estimate(self, api, spec, junction):
-        from gecko_client.models.detailed_loss_request import DetailedLossRequest
 
-        result = api.calculate_detailed_loss(DetailedLossRequest(
-            current=spec.iout_a, temperature=junction,
-            conduction_curves=self.conduction, switching_curves=self.switching,
-        ), _request_timeout=20.0)
-        losses = (
-            result.conduction_loss * spec.conduction_fraction,
-            result.switching_loss * spec.fsw_hz,
-        )
-        if not all(math.isfinite(value) and value >= 0 for value in losses):
-            raise ValueError("The loss curves returned an invalid power estimate.")
-        return losses
+def detailed_losses(api, spec, junction, curves):
+    from gecko_client.models.detailed_loss_request import DetailedLossRequest
+    from gecko_client.models.loss_curve_data import LossCurveData
+
+    # The API requires both curve types. Use an in-range placeholder for an unused result.
+    current = spec.iout_a
+    conduction = curves["conduction"] or [LossCurveData(
+        temperature=junction, data=[[0.0, 1.0], [0.0, 2 * current]],
+    )]
+    switching = curves["switching"] or [LossCurveData(
+        temperature=junction, blocking_voltage=spec.vin_max_v,
+        data=[[0.0, 2 * current], [0.0, 0.0], [0.0, 0.0]],
+    )]
+    result = api.calculate_detailed_loss(DetailedLossRequest(
+        current=current, temperature=junction,
+        conduction_curves=conduction, switching_curves=switching,
+    ), _request_timeout=20.0)
+    losses = (
+        result.conduction_loss * spec.conduction_fraction if curves["conduction"] else None,
+        result.switching_loss * spec.fsw_hz if curves["switching"] else None,
+    )
+    if not all(value is None or math.isfinite(value) and value >= 0 for value in losses):
+        raise ValueError("The loss curves returned an invalid power estimate.")
+    return losses
