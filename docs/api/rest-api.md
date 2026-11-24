@@ -363,6 +363,32 @@ Request:
 - `trapezoidal` - Implicit 2nd order (balanced accuracy/stability)
 - `gear-shichman` - Variable order (best for variable dynamics)
 
+**Periodic steady state** (optional, off when omitted)
+
+Add `periodicSteadyState` to the request to skip the startup transient:
+
+```json
+{
+  "simulationTime": 3e-5,
+  "timeStep": 1e-6,
+  "periodicSteadyState": { "period": 3e-5, "tolerance": 1e-4, "maxPeriods": 1000 }
+}
+```
+
+| Field | Unit | Default | Rule |
+|-------|------|---------|------|
+| `period` | s | none, required | A whole number of time steps, at least 2. A whole multiple of the CONTROL sample period if one is set. |
+| `tolerance` | relative | `1e-4` | Above 0, at most 0.1. |
+| `maxPeriods` | periods | `1000` | From 3 to 1000000. |
+
+The search runs period by period from the DC operating point and records nothing. The job then records `simulationTime` seconds from the converged state.
+A CONTROL carrier that clamps per step has a simulated period of a whole number of steps. A 35 kHz carrier at a 1 µs step has a period of 30 µs, not 28.57 µs.
+A pre-calculation time cannot combine with the search. Circuits with random sources are rejected. Batch requests do not accept the field.
+
+The response has a `steadyState` object with `converged`, `periods`, `residual` and `startTime`. `residual` is null when it is not finite.
+When the search reaches `maxPeriods`, the job has status `FAILED`, `steadyState.converged` is `false` and the job has no results.
+An invalid period returns HTTP 400 with the parameter path `periodicSteadyState.period`.
+
 **Get Simulation Status and Results**
 
 ```bash
