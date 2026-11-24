@@ -1,6 +1,13 @@
 package gecko.rest.service;
 
 import gecko.core.allg.PeriodicSteadyStateSettings;
+import gecko.core.io.CircuitFileParser;
+import gecko.core.io.CircuitFileWriter;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeoutException;
 import gecko.core.allg.SolverType;
 import gecko.core.preparation.*;
 import gecko.core.simulation.HeadlessSimulationEngine;
@@ -129,10 +136,13 @@ public class SimulationService {
      * @throws ResponseStatusException when capacity prevents admission.
      */
     public SimulationResponse submitSimulation(SimulationRequest request) {
-        PreparedCircuit circuit = prepare(request, circuitFiles.resolveSource(request.getCircuitId(), request.getCircuitFile()));
+        request = new SimulationRequest(request);
+        var source = circuitFiles.resolveSource(request.getCircuitId(), request.getCircuitFile());
+        PreparedCircuit circuit = prepare(request, source);
+        var bundleInput = new BundleInput(source.snapshot(), request);
         synchronized (admissionMonitor) {
             requireCapacity(1, false);
-            SimulationJob job = createJob(circuit, null);
+            SimulationJob job = createJob(circuit, null, bundleInput);
             if (!dispatch(job) && !executorService.isShutdown()) {
                 jobs.remove(job.response.getSimulationId(), job);
                 throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Simulation queue is full");
@@ -140,6 +150,61 @@ public class SimulationService {
             return snapshot(job);
         }
     }
+
+    BundleData bundleData(String simulationId, String owner, boolean administrator) throws IOException {
+        SimulationJob job = jobs.get(simulationId);
+        if (job == null || (!administrator && (owner == null || !owner.equals(job.owner)))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Simulation not found");
+        }
+        SimulationResponse result = snapshot(job);
+        if (result.getStatus() != SimulationStatus.COMPLETED) {
+            throw new ResponseStatusException(HttpStatus.TOO_EARLY, "Simulation is not complete");
+        }
+        byte[] ipes = new CircuitFileWriter().write(job.bundleInput.source().toModel());
+        return new BundleData(ipes, job.bundleInput.request(), result.getResults());
+    }
+
+    Map<String, double[]> replayBundle(byte[] circuit, SimulationRequest request) {
+        var parser = new CircuitFileParser();
+        CircuitSnapshot source;
+        try {
+            source = preparation.capture(parser.parse(new ByteArrayInputStream(circuit), "circuit.ipes"));
+        } catch (CircuitFileParser.CircuitParseException | IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot parse the bundle circuit", e);
+        }
+        PreparedCircuit prepared = prepare(request, new CircuitFileService.ResolvedSource(source, true));
+        var replay = new FutureTask<>(() ->
+                engineFactory.get().runSimulation(prepared, ExecutionOptions.defaults(),
+                        () -> Thread.currentThread().isInterrupted()));
+        try {
+            executorService.execute(replay);
+        } catch (RejectedExecutionException e) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Simulation queue is full", e);
+        }
+        try {
+            SimulationResult result = replay.get(60, TimeUnit.SECONDS);
+            if (!result.isSuccess()) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Bundle simulation failed");
+            }
+            SimulationResponse response = new SimulationResponse("replay");
+            applySuccessfulResult(response, result);
+            return response.getResults();
+        } catch (TimeoutException e) {
+            throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "Bundle simulation timed out", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Bundle simulation was interrupted", e);
+        } catch (ExecutionException e) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Bundle simulation failed", e);
+        } finally {
+            if (replay.cancel(true) && executorService instanceof ThreadPoolExecutor pool) {
+                pool.remove(replay);
+            }
+        }
+    }
+
+    record BundleData(byte[] circuit, SimulationRequest request, Map<String, double[]> results) {}
+    private record BundleInput(CircuitSnapshot source, SimulationRequest request) {}
 
     private void requireCapacity(int requestedJobs, boolean batch) {
         if (requestedJobs > limits.getRetained() - jobs.size()
@@ -178,9 +243,9 @@ public class SimulationService {
                 Double.isFinite(report.residual()) ? report.residual() : null, report.startTime());
     }
 
-    private SimulationJob createJob(PreparedCircuit circuit, BatchJob batch) {
+    private SimulationJob createJob(PreparedCircuit circuit, BatchJob batch, BundleInput bundleInput) {
         var principal = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        SimulationJob job = new SimulationJob(circuit, batch, deliveryExecutor,
+        SimulationJob job = new SimulationJob(circuit, batch, bundleInput, deliveryExecutor,
                 principal == null || !principal.isAuthenticated() ? null : principal.getName());
         jobs.put(job.response.getSimulationId(), job);
         return job;
@@ -663,19 +728,21 @@ public class SimulationService {
         }
         List<Map<String, Double>> parameterSets = expandParameterSets(request);
         List<PreparedCircuit> prepared = new ArrayList<>();
+        List<BundleInput> bundleInputs = new ArrayList<>();
         for (Map<String, Double> parameters : parameterSets) {
             SimulationRequest child = new SimulationRequest(request.getCircuitFile(), duration, dt);
             child.setCircuitId(request.getCircuitId());
             child.setParameters(parameters);
             child.setSolverType(settings == null ? null : settings.getSolverType());
             prepared.add(prepare(child, source));
+            bundleInputs.add(new BundleInput(source.snapshot(), child));
         }
         BatchJob batch = new BatchJob(requestedLimit);
         synchronized (admissionMonitor) {
             requireCapacity(prepared.size(), true);
             List<String> ids = new ArrayList<>();
-            for (PreparedCircuit circuit : prepared) {
-                SimulationJob job = createJob(circuit, batch);
+            for (int index = 0; index < prepared.size(); index++) {
+                SimulationJob job = createJob(prepared.get(index), batch, bundleInputs.get(index));
                 batch.pending.add(job);
                 ids.add(job.response.getSimulationId());
             }
@@ -795,6 +862,7 @@ public class SimulationService {
     private static final class SimulationJob {
         private final String owner;
         private final PreparedCircuit circuit;
+        private final BundleInput bundleInput;
         private final ExecutionOptions options = ExecutionOptions.defaults();
         private final BatchJob batch;
         private final SimulationResponse response;
@@ -803,8 +871,10 @@ public class SimulationService {
         private boolean terminalPublished;
         private final ProgressMailbox mailbox;
 
-        private SimulationJob(PreparedCircuit circuit, BatchJob batch, Executor deliveryExecutor, String owner) {
+        private SimulationJob(PreparedCircuit circuit, BatchJob batch, BundleInput bundleInput,
+                              Executor deliveryExecutor, String owner) {
             this.owner = owner;
+            this.bundleInput = bundleInput;
             mailbox = new ProgressMailbox(deliveryExecutor);
             this.circuit = circuit;
             this.batch = batch;

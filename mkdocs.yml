@@ -249,6 +249,7 @@ nav:
       - Matrix Stampers: api/core/matrix-stampers.md
       - Control Calculators: api/core/calculators.md
     - Remote Interface: api/remote-interface.md
+    - Research Bundles: api/research-bundles.md
     - REST API: api/rest-api.md
     - GeckoSCRIPT Reference: api/geckoscript-ref.md
 
