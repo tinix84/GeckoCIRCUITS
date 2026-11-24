@@ -107,7 +107,7 @@ def rank(spec, devices):
             if api is None and any(curves.values()):
                 api = stack.enter_context(loss_client())
             if spec.ambient_c >= part.tj_max_c:
-                rejected.append((part.name, f"thermal limit (ambient ≥ {part.tj_max_c:g} °C)"))
+                rejected.append((part.name, f"thermal limit (ambient reaches or exceeds {part.tj_max_c:g} deg C)"))
                 continue
             try:
                 junction, conduction, switching = temperature_and_losses(
@@ -117,7 +117,7 @@ def rank(spec, devices):
                 rejected.append((part.name, f"thermal limit ({error})"))
                 continue
             if junction >= part.tj_max_c:
-                rejected.append((part.name, f"thermal limit ({junction:.2f} °C ≥ {part.tj_max_c:g} °C)"))
+                rejected.append((part.name, f"thermal limit ({junction:.2f} deg C reaches or exceeds {part.tj_max_c:g} deg C)"))
                 continue
             thermal_survivors += 1
             total = conduction + switching
@@ -160,7 +160,7 @@ def main():
         print(f"{position}. {device.name} ({device.package}). Estimated loss {item.total_w:.3f} W "
               f"from {item.conduction_w:.3f} W conduction and {item.switching_w:.3f} W switching. "
               f"The estimate uses {item.method}. Estimated junction temperature "
-              f"{item.junction_c:.2f} °C with a {device.tj_max_c:g} °C limit. "
+              f"{item.junction_c:.2f} deg C with a {device.tj_max_c:g} deg C limit. "
               f"Closest constraint is {item.binding}. Catalog price {price}.")
     if not candidates:
         reason = f"{eliminated_by} eliminated the last candidates" if eliminated_by else "empty catalog"

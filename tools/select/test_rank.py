@@ -25,7 +25,7 @@ def test_catalog_ranks_by_loss_then_price_and_reports_derating():
     ranks = [line.split()[1] for line in output.splitlines() if line[:1].isdigit()]
     assert ranks == ["A", "B", "D", "C", "E"]
     assert "Estimated loss 1.240 W from 1.000 W conduction and 0.240 W switching" in output
-    assert "Estimated junction temperature 44.96 °C" in output
+    assert "Estimated junction temperature 44.96 deg C" in output
     assert "low_voltage. voltage derating" in output
     assert "low_current. current derating" in output
     assert "hot. thermal limit" in output
