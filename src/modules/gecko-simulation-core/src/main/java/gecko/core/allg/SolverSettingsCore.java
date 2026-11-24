@@ -38,7 +38,7 @@ public final class SolverSettingsCore {
     private boolean dcOperatingPoint;  // seed the first step from a solved DC operating point; off by default
     private PeriodicSteadyStateSettings periodicSteadyState; // periodic steady-state search; null means off
     private AdaptiveStepSettings adaptiveStep; // adaptive electrical sub-step inside the fixed grid; null means off
-    private SparseSolverSettings sparseSolver; // sparse LU selection; null means the dense LU
+    private SparseSolverSettings sparseSolver; // sparse LU selection, where null means the dense LU
 
     // State tracking
     private boolean inPreCalculationMode;

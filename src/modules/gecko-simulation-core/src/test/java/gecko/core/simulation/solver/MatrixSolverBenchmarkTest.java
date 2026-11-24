@@ -53,14 +53,10 @@ class MatrixSolverBenchmarkTest {
             Result sparse = measure("sparse-forced", SIZES[s], s, () -> new MatrixSolver(SolverType.SOLVER_BE,
                     new SparseSolverSettings(SparseSolverSettings.Mode.SPARSE)));
             print(sparse, s);
-            double difference = 0;
-            double scale = 0;
-            for (int i = 0; i < dense.finalPotentials.length; i++) {
-                scale = Math.max(scale, Math.abs(dense.finalPotentials[i]));
-                difference = Math.max(difference, Math.abs(dense.finalPotentials[i] - sparse.finalPotentials[i]));
-            }
-            System.out.printf("BENCH check nodes=%d relative_difference=%.3e%n", SIZES[s], difference / scale);
-            assertTrue(difference <= 1e-9 * scale, "the benchmarked solvers must agree");
+            var norms = SparseMatrixSolverTest.assertUnits("benchmarked solvers, " + SIZES[s] + " nodes",
+                    dense.finalPotentials, sparse.finalPotentials, SIZES[s]);
+            System.out.printf("BENCH check nodes=%d potentials_relative=%.3e source_current_relative=%.3e%n", SIZES[s],
+                    norms[0].relative(), norms[1].relative());
             if (SIZES[s] == 1000) {
                 // Timing claim of the issue, checked only here, under the benchmark tag.
                 assertTrue(sparse.transientMs < dense.transientMs, "sparse " + sparse.transientMs + " ms vs dense "
@@ -73,7 +69,7 @@ class MatrixSolverBenchmarkTest {
         System.out.printf("BENCH variant=%s nodes=%d order=%d warmup(assemble/factor/cached/transient)=%s reps=%s"
                 + " assemble_us=%.2f factor_solve_us=%.2f cached_solve_us=%.2f transient_steps=%d"
                 + " transient_ms=%.3f transient_us_per_step=%.2f stored_coefficients=%d factor_nonzeros=%d"
-                + " numeric_storage_bytes=%d factor_requests=%d factorizations_in_factor_column=%d"
+                + " numeric_storage_estimate_bytes=%d factor_requests=%d factorizations_in_factor_column=%d"
                 + " factorizations_in_transient=%d factorization=%s%n",
                 r.variant, r.nodes, r.order, Arrays.toString(WARMUP[sizeIndex]), Arrays.toString(REPS[sizeIndex]),
                 r.assembleUs, r.factorSolveUs, r.cachedSolveUs, r.steps, r.transientMs,

@@ -10,7 +10,7 @@ public interface MatrixCoefficients {
      *
      * @param row row index
      * @param col column index
-     * @param value the amount to add; a subtraction passes the negated amount
+     * @param value the amount to add, where a subtraction passes the negated amount
      */
     void add(int row, int col, double value);
 

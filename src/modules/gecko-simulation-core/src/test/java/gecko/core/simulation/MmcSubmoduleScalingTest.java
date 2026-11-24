@@ -65,7 +65,7 @@ class MmcSubmoduleScalingTest {
         assertTrue(report.storedCoefficients() < 12 * order, "stored " + report.storedCoefficients() + " for order " + order);
         assertTrue(report.factorizations() > 1, "diode state changes refactor");
         System.out.printf("MMC-100 order=%d elements=%d steps=%d switchedInFirstStep=%d laterTransitionSteps=%d sparseMs=%.1f denseMs=%.1f "
-                + "sparseFactorizations=%d storedCoefficients=%d numericStorageBytes=%d (dense %d)%n",
+                + "sparseFactorizations=%d storedCoefficients=%d numericStorageEstimateBytes=%d (dense %d)%n",
                 order, sparseNet.getElementCount(), steps, switchedInFirstStep, transitions, sparseNanos / 1e6, denseNanos / 1e6,
                 report.factorizations(), report.storedCoefficients(), report.storageBytes(),
                 dense.linearSolverReport().storageBytes());

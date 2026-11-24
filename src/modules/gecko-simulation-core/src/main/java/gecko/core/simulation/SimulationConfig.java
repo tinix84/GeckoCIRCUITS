@@ -15,6 +15,7 @@ package gecko.core.simulation;
 
 import gecko.core.allg.SolverSettingsCore;
 import gecko.core.allg.SolverType;
+import gecko.core.allg.SparseSolverSettings;
 import gecko.core.io.CircuitModel;
 import gecko.core.preparation.SolverFeatures;
 import gecko.core.preparation.SolverOverrides;
@@ -258,7 +259,7 @@ public final class SimulationConfig {
          * @param settings the mode and threshold, or null for the dense default
          * @return this builder
          */
-        public Builder sparseSolver(gecko.core.allg.SparseSolverSettings settings) {
+        public Builder sparseSolver(SparseSolverSettings settings) {
             this.solverSettings.withSparseSolver(settings);
             return this;
         }

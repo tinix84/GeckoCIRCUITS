@@ -12,10 +12,10 @@ import java.util.Arrays;
 
 /**
  * Sparse storage of the MNA matrix plus a retained EJML sparse LU. Memory is proportional to the number of
- * stored coefficients; no order-by-order dense array exists.
+ * stored coefficients, and no order-by-order dense array exists.
  *
  * <p>The complete pinned matrix is factored with node 0 permuted last. Its row and column touch every grounded
- * element, so eliminating it first would fill the factors; last it adds no fill. The permutation keeps every
+ * element, so eliminating it first would fill the factors, while last it adds no fill. The permutation keeps every
  * coefficient, so the solution is that of the same system. Only the wire-reference mode excludes row and column 0.
  *
  * <p>Coefficients accumulate in a coordinate store with a hash index, so repeated stamps and later patches
@@ -47,7 +47,7 @@ final class SparseSystem implements MatrixCoefficients {
     /**
      * @param order the matrix order
      * @param legacyOrderEligible true when a wire-reference system may use {@link LegacyOrderSparseLu}, which repeats the
-     *        dense LU's arithmetic; false keeps EJML for every system
+     *        dense LU's arithmetic, and false keeps EJML for every system
      */
     SparseSystem(int order, boolean legacyOrderEligible) {
         this.order = order;
@@ -144,7 +144,11 @@ final class SparseSystem implements MatrixCoefficients {
         return (long) decomposition.getLower(null).nz_length + decomposition.getUpper(null).nz_length;
     }
 
-    /** @return bytes held by the coefficient store, the hash index, the CSC copy, the LU factors and the vectors */
+    /**
+     * @return an estimate of the primitive-array bytes of the coefficient store, the hash index, the CSC copy, the LU
+     *         factors and the vectors. EJML factors count as 12 bytes per nonzero. This is neither retained capacity nor
+     *         total heap, and it excludes JVM object overhead.
+     */
     long storageBytes() {
         long bytes = 4L * (rows.length + cols.length + table.length) + 8L * values.length + 8L * factoredValues.length;
         bytes += 4L * (csc.nz_rows.length + csc.col_idx.length) + 8L * csc.nz_values.length;

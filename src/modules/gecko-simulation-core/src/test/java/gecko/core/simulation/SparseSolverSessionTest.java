@@ -230,7 +230,8 @@ class SparseSolverSessionTest {
         double grid = 1e-5;
         var sparseFeatures = new SolverFeatures(0, true, true, null, new AdaptiveStepSettings(1e-3, 1e-8, Double.NaN),
                 new SparseSolverSettings());
-        var denseFeatures = new SolverFeatures(0, true, true, null, new AdaptiveStepSettings(1e-3, 1e-8, Double.NaN));
+        var denseFeatures = new SolverFeatures(0, true, true, null, new AdaptiveStepSettings(1e-3, 1e-8, Double.NaN),
+                new SparseSolverSettings(Mode.DENSE));
         CircuitNetlist sparseNetlist = ladder();
         CircuitNetlist denseNetlist = ladder();
         var sparse = new ElectricalTimeStep(sparseNetlist, method, sparseFeatures);
@@ -260,9 +261,7 @@ class SparseSolverSessionTest {
             sparseTrace.add(index * grid, sparseNetlist.getLastNodeVoltages(), sparseNetlist.getLastComponentCurrents(),
                     sparseNetlist);
         }
-        // The DC seed leaves about 1e-12 A of rounding noise from the 1e15 reference pin that differs between the LU
-        // variants. Beside the 1 mA signal that is 1e-9, so currents also accept 1e-11 A absolute; potentials stay relative.
-        PhysicalTrace.assertEquivalent(denseTrace, sparseTrace, method.toString(), TOLERANCE, 1e-11);
+        PhysicalTrace.assertEquivalent(denseTrace, sparseTrace, method.toString(), TOLERANCE);
         var after = sparse.linearSolverReport();
         assertEquals(MatrixSolver.SparseFactorization.EJML, after.factorization(), "a large pinned system keeps EJML");
         assertEquals(MatrixSolver.SparseFactorization.EJML, after.companionFactorization());

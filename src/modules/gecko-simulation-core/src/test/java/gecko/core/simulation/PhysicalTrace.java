@@ -55,16 +55,6 @@ final class PhysicalTrace {
      * the currents each within the tolerance as complete-trace max norms.
      */
     static void assertEquivalent(PhysicalTrace expected, PhysicalTrace actual, String label, double tolerance) {
-        assertEquivalent(expected, actual, label, tolerance, 0);
-    }
-
-    /**
-     * As {@link #assertEquivalent(PhysicalTrace, PhysicalTrace, String, double)}, but a current block also passes when
-     * its largest absolute difference is at most {@code currentAbsoluteAmperes}. Only a test whose first values are a
-     * DC seed with rounding noise from the 1e15 reference pin may use it, and it must say so; it is not a relative bound.
-     */
-    static void assertEquivalent(PhysicalTrace expected, PhysicalTrace actual, String label, double tolerance,
-            double currentAbsoluteAmperes) {
         assertEquals(expected.times.size(), actual.times.size(), label + " step count");
         assertFalse(expected.times.isEmpty(), label);
         assertEquals(expected.times, actual.times, label + " electrical time grid");
@@ -72,15 +62,32 @@ final class PhysicalTrace {
             assertArrayEquals(expected.switchStates.get(i), actual.switchStates.get(i),
                     label + " switch and limit states must agree exactly, step " + i);
         }
-        TraceEquivalence.assertWithin(label + " node potentials [V]", TraceEquivalence.norm(expected.potentials,
-                actual.potentials, 0, Integer.MAX_VALUE), tolerance);
-        assertCurrents(label + " source branch currents [A]", TraceEquivalence.norm(
-                expected.sourceCurrents, actual.sourceCurrents, 0, Integer.MAX_VALUE), tolerance, currentAbsoluteAmperes);
-        assertCurrents(label + " component currents [A]", TraceEquivalence.norm(
-                expected.componentCurrents, actual.componentCurrents, 0, Integer.MAX_VALUE), tolerance, currentAbsoluteAmperes);
+        var potentials = TraceEquivalence.norm(expected.potentials, actual.potentials, 0, Integer.MAX_VALUE);
+        var sources = TraceEquivalence.norm(expected.sourceCurrents, actual.sourceCurrents, 0, Integer.MAX_VALUE);
+        var currents = TraceEquivalence.norm(expected.componentCurrents, actual.componentCurrents, 0, Integer.MAX_VALUE);
+        System.out.printf("SPARSE-NORM %s potentials=%.3e (scale %.3e V) sourceCurrents=%.3e (scale %.3e A) "
+                + "componentCurrents=%.3e (scale %.3e A, largest difference at %s)%n", label, potentials.relative(),
+                potentials.scale(), sources.relative(), sources.scale(), currents.relative(), currents.scale(),
+                largestDifference(expected.componentCurrents, actual.componentCurrents));
+        TraceEquivalence.assertWithin(label + " node potentials [V]", potentials, tolerance);
+        TraceEquivalence.assertWithin(label + " source branch currents [A]", sources, tolerance);
+        TraceEquivalence.assertWithin(label + " component currents [A]", currents, tolerance);
     }
 
-    private static void assertCurrents(String label, TraceEquivalence.Norm norm, double tolerance, double absolute) {
-        if (norm.difference() > absolute) TraceEquivalence.assertWithin(label, norm, tolerance);
+    /** @return the step, channel and both values where two traces differ most, for failure diagnosis */
+    private static String largestDifference(List<double[]> expected, List<double[]> actual) {
+        double worst = -1;
+        String where = "none";
+        for (int step = 0; step < expected.size(); step++) {
+            for (int channel = 0; channel < expected.get(step).length; channel++) {
+                double difference = Math.abs(expected.get(step)[channel] - actual.get(step)[channel]);
+                if (difference > worst) {
+                    worst = difference;
+                    where = "step " + step + " channel " + channel + " dense " + expected.get(step)[channel] + " sparse "
+                            + actual.get(step)[channel];
+                }
+            }
+        }
+        return where;
     }
 }

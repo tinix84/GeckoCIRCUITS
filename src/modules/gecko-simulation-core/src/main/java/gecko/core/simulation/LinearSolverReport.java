@@ -8,7 +8,7 @@ import gecko.core.simulation.solver.MatrixSolver;
  * @param backend the main MNA solver's backend
  * @param matrixOrder the order of the MNA matrix
  * @param storedCoefficients coefficient slots held by the main solver: order squared when dense
- * @param storageBytes bytes held by the main solver's coefficient storage
+ * @param storageBytes estimated primitive-array bytes of the main solver's coefficient storage, not total heap
  * @param factorizations LU computations of the main solver so far
  * @param companionBackend the adaptive companion solver's backend, or null when no companion exists
  * @param companionStoredCoefficients coefficient slots of the companion, or 0 when none exists

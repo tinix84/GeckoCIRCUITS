@@ -7,6 +7,8 @@ import gecko.core.circuit.matrix.ResistorStamper;
 import gecko.core.circuit.netlist.CircuitNetlist;
 import gecko.core.simulation.solver.MatrixSolver.Backend;
 import gecko.core.testutil.SyntheticCircuitBuilder;
+import gecko.core.testutil.TraceEquivalence;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -36,15 +38,29 @@ class SparseMatrixSolverTest {
         solver.shiftHistory();
     }
 
-    /** Max-norm relative difference of two vectors, scaled by the larger vector's max-norm. */
-    private static double relativeDifference(double[] expected, double[] actual, int from, int to) {
-        double scale = 0;
-        double difference = 0;
-        for (int i = from; i < to; i++) {
-            scale = Math.max(scale, Math.abs(expected[i]));
-            difference = Math.max(difference, Math.abs(expected[i] - actual[i]));
-        }
-        return scale == 0 ? difference : difference / scale;
+    /**
+     * Compares one solution vector in its two physical units, each as a max norm against its own scale: the node
+     * potentials at indices 0 to {@code nodes} in volts, then the source branch currents in amperes. A block whose
+     * expected values are all numerically zero uses the absolute bound of {@link TraceEquivalence}.
+     *
+     * @return the potential norm and the current norm
+     */
+    static TraceEquivalence.Norm[] assertUnits(String label, double[] expected, double[] actual, int nodes) {
+        TraceEquivalence.Norm volts = TraceEquivalence.norm(List.of(expected), List.of(actual), 0, nodes + 1);
+        TraceEquivalence.Norm amperes = TraceEquivalence.norm(List.of(expected), List.of(actual), nodes + 1, expected.length);
+        TraceEquivalence.assertWithin(label + " node potentials [V]", volts, TOLERANCE);
+        TraceEquivalence.assertWithin(label + " source currents [A]", amperes, TOLERANCE);
+        return new TraceEquivalence.Norm[] {volts, amperes};
+    }
+
+    @Test
+    void aCurrentErrorCannotHideBehindTheVoltageScale() {
+        // 1 V and 1 mA with the current off by 5e-7 relative: a mixed max norm sees 5e-10 of 1 V and would pass.
+        double[] expected = {1.0, 1e-3};
+        double[] actual = {1.0, 1.0000005e-3};
+        assertThrows(AssertionError.class, () -> assertUnits("mixed", expected, actual, 0));
+        assertUnits("exact", expected, expected.clone(), 0);
+        assertThrows(AssertionError.class, () -> assertUnits("voltage", expected, new double[] {1.000001, 1e-3}, 0));
     }
 
     @Test
@@ -91,11 +107,7 @@ class SparseMatrixSolverTest {
             for (int stepIndex = 0; stepIndex < 25; stepIndex++) {
                 step(dense, netlist, stepIndex * DT);
                 step(sparse, netlist, stepIndex * DT);
-                int order = dense.getMatrixSize();
-                assertTrue(relativeDifference(dense.getP(), sparse.getP(), 0, nodes + 1) <= TOLERANCE,
-                        nodes + " nodes, node potentials, step " + stepIndex);
-                assertTrue(relativeDifference(dense.getP(), sparse.getP(), nodes + 1, order) <= TOLERANCE,
-                        nodes + " nodes, source current, step " + stepIndex);
+                assertUnits(nodes + " nodes, step " + stepIndex, dense.getP(), sparse.getP(), nodes);
             }
         }
     }
@@ -110,7 +122,9 @@ class SparseMatrixSolverTest {
             step(dense, netlist, stepIndex * DT);
             step(sparse, netlist, stepIndex * DT);
         }
-        assertTrue(relativeDifference(dense.getP(), sparse.getP(), 0, dense.getMatrixSize()) <= TOLERANCE);
+        TraceEquivalence.Norm[] norms = assertUnits("1000 nodes", dense.getP(), sparse.getP(), 1000);
+        System.out.printf("SPARSE-LADDER1000 potentials=%.3e sourceCurrent=%.3e (relative, per unit)%n",
+                norms[0].relative(), norms[1].relative());
     }
 
     @Test
@@ -124,7 +138,7 @@ class SparseMatrixSolverTest {
             step(sparse, netlist, stepIndex * DT);
         }
         assertEquals(0.0, sparse.getP()[0]);
-        assertTrue(relativeDifference(dense.getP(), sparse.getP(), 0, dense.getMatrixSize()) <= TOLERANCE);
+        assertUnits("wired 120 nodes", dense.getP(), sparse.getP(), 120);
     }
 
     @Test
@@ -238,7 +252,7 @@ class SparseMatrixSolverTest {
         MatrixSolver sparse = solver(netlist, new SparseSolverSettings(Mode.SPARSE));
         step(sparse, netlist, 0);
         assertTrue(dense.getCoefficientStorageBytes() > 10 * sparse.getCoefficientStorageBytes(),
-                "numeric-storage estimate (array capacities, not JVM heap): dense "
+                "numeric-storage estimate (primitive arrays, no JVM overhead, not total heap): dense "
                         + dense.getCoefficientStorageBytes() + " bytes, sparse " + sparse.getCoefficientStorageBytes());
     }
 
@@ -419,7 +433,7 @@ class SparseMatrixSolverTest {
             each.solve();
         }
         assertEquals(0.0, solver.getP()[0]);
-        assertTrue(relativeDifference(dense.getP(), solver.getP(), 0, dense.getMatrixSize()) <= TOLERANCE);
+        assertUnits("wired 2 nodes", dense.getP(), solver.getP(), 2);
         // Switching reference mode on the same solver must refactor rather than reuse the other mode's factors.
         netlist.setWireReference(false);
         solver.initializeMatrices(netlist.getNodeMax(), netlist.getVoltageSourceMax(), netlist.getElementCount());
@@ -531,5 +545,144 @@ class SparseMatrixSolverTest {
         }
         assertEquals(messages[0], messages[1]);
         assertTrue(messages[0].contains("singular"), messages[0]);
+    }
+
+    private static MatrixSolver solverOf(CircuitNetlist netlist, SolverType method, SparseSolverSettings settings) {
+        MatrixSolver solver = new MatrixSolver(method, settings);
+        solver.initializeMatrices(netlist.getNodeMax(), netlist.getVoltageSourceMax(), netlist.getElementCount());
+        return solver;
+    }
+
+    private static void assertSameBits(double[] expected, double[] actual, String label) {
+        for (int i = 0; i < expected.length; i++) {
+            assertEquals(Double.doubleToRawLongBits(expected[i]), Double.doubleToRawLongBits(actual[i]), label + " entry " + i);
+        }
+    }
+
+    @Test
+    void enabledDenseOnAPinnedLadderSolvesTheSameSystemAsSparseIncludingTheSourceBranch() {
+        CircuitNetlist netlist = ladder(50);
+        MatrixSolver dense = solver(netlist, new SparseSolverSettings(Mode.DENSE));
+        MatrixSolver sparse = solver(netlist, new SparseSolverSettings(Mode.SPARSE));
+        step(dense, netlist, 0);
+        step(sparse, netlist, 0);
+        assertEquals(Backend.DENSE, dense.getBackend());
+        assertEquals(MatrixSolver.SparseFactorization.EJML, sparse.getSparseFactorization());
+        assertUnits("pinned 50 nodes", dense.getP(), sparse.getP(), 50);
+        assertEquals(1.0, dense.getP()[1], 1e-12, "the source node sits at the input");
+    }
+
+    @Test
+    void enabledDenseOnAWiredLadderEqualsTheNullPathBitForBitForEveryMethod() {
+        for (SolverType method : SolverType.values()) {
+            CircuitNetlist netlist = wired(40);
+            MatrixSolver legacy = solverOf(netlist, method, null);
+            MatrixSolver enabled = solverOf(netlist, method, new SparseSolverSettings(Mode.DENSE));
+            for (int stepIndex = 0; stepIndex < 20; stepIndex++) {
+                for (MatrixSolver each : new MatrixSolver[] {legacy, enabled}) {
+                    each.buildMatrixA(netlist, DT, stepIndex * DT, false);
+                    each.buildVectorB(netlist, DT, stepIndex * DT, false);
+                    each.solve();
+                    each.shiftHistory();
+                }
+                assertSameBits(legacy.getP(), enabled.getP(), method + " step " + stepIndex);
+            }
+            assertEquals(8L * enabled.getMatrixSize() * enabled.getMatrixSize(), enabled.getCoefficientStorageBytes(),
+                    "a wired solve never allocates the node-0-last copy");
+        }
+    }
+
+    @Test
+    void theNullPinnedPathStillFactorsTheGroundFirstMatrixOfTheDenseReference() {
+        CircuitNetlist netlist = ladder(100);
+        MatrixSolver legacy = solverOf(netlist, SolverType.SOLVER_BE, null);
+        legacy.buildMatrixA(netlist, DT, 0, false);
+        legacy.buildVectorB(netlist, DT, 0, false);
+        int order = legacy.getMatrixSize();
+        double[][] copy = new double[order][];
+        for (int i = 0; i < order; i++) copy[i] = legacy.getSystemMatrix()[i].clone();
+        double[][] rhs = new double[order][1];
+        for (int i = 0; i < order; i++) rhs[i][0] = legacy.getb()[i];
+        double[][] expected = new gecko.core.math.Matrix(copy).solve(new gecko.core.math.Matrix(rhs)).getArray();
+        legacy.solve();
+        for (int i = 0; i < order; i++) {
+            assertEquals(Double.doubleToRawLongBits(expected[i][0]), Double.doubleToRawLongBits(legacy.getP()[i]),
+                    "null settings must keep the legacy ground-first order, entry " + i);
+        }
+        assertEquals(8L * order * order, legacy.getCoefficientStorageBytes());
+    }
+
+    @Test
+    void enabledDensePinnedKeepsTheLiveArrayAndRefactorsOnlyWhenFlagged() {
+        CircuitNetlist netlist = ladder(30);
+        SparseSolverSettings enabled = new SparseSolverSettings(Mode.DENSE);
+        MatrixSolver solver = solverOf(netlist, SolverType.SOLVER_BE, enabled);
+        solver.buildMatrixA(netlist, DT, 0, false);
+        solver.buildVectorB(netlist, DT, 0, false);
+        solver.solve();
+        double[][] live = solver.getSystemMatrix();
+        assertSame(live, solver.getSystemMatrix(), "the matrix stays the same live array");
+        assertTrue(live[0][0] >= 1e15, "and keeps the original order, with the pin at index 0");
+        double[] first = solver.getP().clone();
+        assertEquals(1, solver.getFactorizationCount());
+
+        solver.addCoefficient(4, 4, 0.5);
+        solver.solve();
+        assertSameBits(first, solver.getP(), "an unflagged patch keeps the cached factors");
+        assertEquals(1, solver.getFactorizationCount());
+
+        solver.addCoefficient(7, 7, 0.25);
+        solver.setMatrixChanged();
+        solver.solve();
+        assertEquals(2, solver.getFactorizationCount());
+        MatrixSolver fresh = solverOf(netlist, SolverType.SOLVER_BE, enabled);
+        fresh.buildMatrixA(netlist, DT, 0, false);
+        fresh.buildVectorB(netlist, DT, 0, false);
+        fresh.addCoefficient(4, 4, 0.5);
+        fresh.addCoefficient(7, 7, 0.25);
+        fresh.solve();
+        assertSameBits(fresh.getP(), solver.getP(), "a flagged patch equals a fresh solver with the same patch");
+
+        solver.getSystemMatrix()[7][7] -= 0.25;
+        solver.setMatrixChanged();
+        solver.solve();
+        assertEquals(3, solver.getFactorizationCount());
+        MatrixSolver onlyFirstPatch = solverOf(netlist, SolverType.SOLVER_BE, enabled);
+        onlyFirstPatch.buildMatrixA(netlist, DT, 0, false);
+        onlyFirstPatch.buildVectorB(netlist, DT, 0, false);
+        onlyFirstPatch.addCoefficient(4, 4, 0.5);
+        onlyFirstPatch.solve();
+        assertUnits("a flagged write to the live array refactors", onlyFirstPatch.getP(), solver.getP(), 30);
+    }
+
+    @Test
+    void automaticSelectionBelowTheThresholdUsesTheEnabledDenseOrderOnPinnedSystems() {
+        CircuitNetlist netlist = ladder(60);
+        MatrixSolver auto = solver(netlist, AUTO);
+        MatrixSolver enabled = solver(netlist, new SparseSolverSettings(Mode.DENSE));
+        assertEquals(Backend.DENSE, auto.getBackend());
+        for (int stepIndex = 0; stepIndex < 10; stepIndex++) {
+            step(auto, netlist, stepIndex * DT);
+            step(enabled, netlist, stepIndex * DT);
+            assertSameBits(enabled.getP(), auto.getP(), "step " + stepIndex);
+        }
+    }
+
+    @Test
+    void theStorageEstimateCountsTheNodeZeroLastCopyOnlyForEnabledPinnedDenseSolves() {
+        CircuitNetlist netlist = ladder(20);
+        MatrixSolver enabled = solver(netlist, new SparseSolverSettings(Mode.DENSE));
+        MatrixSolver legacy = solver(netlist, null);
+        long square = (long) enabled.getMatrixSize() * enabled.getMatrixSize();
+        assertEquals(8L * square, enabled.getCoefficientStorageBytes(), "nothing is allocated before the first solve");
+        step(enabled, netlist, 0);
+        step(legacy, netlist, 0);
+        assertEquals(16L * square, enabled.getCoefficientStorageBytes());
+        assertEquals(8L * square, legacy.getCoefficientStorageBytes());
+        enabled.initializeMatrices(netlist.getNodeMax(), netlist.getVoltageSourceMax(), netlist.getElementCount());
+        assertEquals(8L * square, enabled.getCoefficientStorageBytes(), "reinitializing drops the copy");
+        MatrixSolver sparse = solver(netlist, new SparseSolverSettings(Mode.SPARSE));
+        step(sparse, netlist, 0);
+        assertTrue(sparse.getCoefficientStorageBytes() < 8L * square * 2);
     }
 }

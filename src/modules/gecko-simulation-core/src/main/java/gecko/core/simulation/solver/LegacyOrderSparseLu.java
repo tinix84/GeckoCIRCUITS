@@ -11,7 +11,7 @@ import org.ejml.data.DMatrixSparseCSC;
  * forced-sparse run of a small circuit follows the dense trace numerically exactly.
  *
  * <p>L is kept by rows, U by columns, and no order-by-order array exists. Only products with an exact zero factor
- * are skipped; that changes at most the sign of a zero. Nothing is reordered, fused or compensated.
+ * are skipped, which changes at most the sign of a zero. Nothing is reordered, fused or compensated.
  */
 final class LegacyOrderSparseLu {
     private final int n;
@@ -116,7 +116,7 @@ final class LegacyOrderSparseLu {
         return count;
     }
 
-    /** @return bytes of every array this factorization holds */
+    /** @return an estimate of the primitive-array bytes of this factorization, without JVM object overhead */
     long storageBytes() {
         long bytes = 4L * (uRow.length + uStart.length + perm.length) + 8L * (uVal.length + diag.length + column.length);
         for (int i = 0; i < n; i++) bytes += 12L * lCols[i].length;

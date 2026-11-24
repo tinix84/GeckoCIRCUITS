@@ -50,6 +50,8 @@ public class MatrixSolver {
     private double[] sparseSolution;  // reusable solve result for the sparse backend
     private MatrixCoefficients coefficients; // write seam over a or sparse
     private int denseFactorizations;
+    private double[][] permuted;      // node-0-last copy of a for enabled dense pinned solves, null until first used
+    private boolean wrapperReferenceLast; // true when matrixSolverA wraps the permuted copy
     private double[] bVector;         // Right-hand side vector b
     private double[] p;               // Current node potentials
     private double[] pALT;            // Previous time-step node potentials
@@ -122,6 +124,8 @@ public class MatrixSolver {
             coefficients = MatrixCoefficients.dense(a);
         }
         denseFactorizations = 0;
+        permuted = null;
+        wrapperReferenceLast = false;
         bVector = new double[matrixSize];
 
         // Allocate node potential vectors for multi-step integration methods
@@ -147,7 +151,7 @@ public class MatrixSolver {
      * Returns the system matrix. With the dense backend this is the live array: writes change the solver's matrix,
      * as before. With the sparse backend it is a new dense copy built on each call, so writes to it have no effect
      * and the call allocates an order-by-order array. Use {@link #addCoefficient} to change coefficients on either
-     * backend.
+     * backend. The matrix always keeps its original row order, even when an enabled dense solve factors a node-0-last copy.
      *
      * @return the live dense matrix, or a dense snapshot of the sparse coefficients
      */
@@ -183,7 +187,7 @@ public class MatrixSolver {
     }
 
     /** @return the sparse settings this solver was built with, or null for the dense default */
-    public SparseSolverSettings getSparseSettings() {
+    SparseSolverSettings getSparseSettings() {
         return sparseSettings;
     }
 
@@ -193,7 +197,7 @@ public class MatrixSolver {
     }
 
     /** @return the stored coefficients that are not zero */
-    public long getNonzeroCoefficientCount() {
+    long getNonzeroCoefficientCount() {
         if (sparse != null) return sparse.nonzeroCount();
         long nonzero = 0;
         for (double[] row : a) for (double value : row) if (value != 0) nonzero++;
@@ -201,13 +205,18 @@ public class MatrixSolver {
     }
 
     /** @return nonzeros in the sparse LU factors, the stored coefficients plus fill-in; 0 when dense */
-    public long getFactorNonzeroCount() {
+    long getFactorNonzeroCount() {
         return sparse == null ? 0 : sparse.factorNonzeros();
     }
 
-    /** @return bytes held by the coefficient storage and its cached solver data, excluding the vectors shared by both backends */
+    /**
+     * @return an estimate of the primitive-array bytes of the coefficient storage and its cached solver data, without the
+     *         vectors both backends share. It is neither retained capacity nor total heap. An enabled dense pinned solve
+     *         counts its node-0-last copy once allocated, so 16 n² bytes instead of 8 n².
+     */
     public long getCoefficientStorageBytes() {
-        return sparse == null ? 8L * matrixSize * matrixSize : sparse.storageBytes();
+        if (sparse != null) return sparse.storageBytes();
+        return (permuted == null ? 8L : 16L) * matrixSize * matrixSize;
     }
 
     /** @return how many times the LU was computed since {@link #initializeMatrices} */
@@ -800,6 +809,10 @@ public class MatrixSolver {
             }
         }
 
+        // Enabled dense solves of a pinned system factor the same equations with node 0 ordered last (ADR-0020).
+        // Null settings keep the legacy order, and every other branch below is unchanged.
+        boolean referenceLast = sparseSettings != null && !wireReference;
+
         // Step 1: Create or update Matrix wrapper for A (only if matrix changed)
         if (matrixSolverA == null) {
             // First time: create Matrix wrapper from a[][]
@@ -809,7 +822,14 @@ public class MatrixSolver {
             denseFactorizations++;
             // Matrix changed: reset cached LU decomposition and update wrapper
             if (wireReference) matrixSolverA = solveMatrix();
-            else matrixSolverA.resetLUDecomp();
+            else if (referenceLast) {
+                if (wrapperReferenceLast) {
+                    fillPermuted();
+                    matrixSolverA.resetLUDecomp();
+                } else {
+                    matrixSolverA = solveMatrix();
+                }
+            } else matrixSolverA.resetLUDecomp();
             // The underlying a[][] is already modified by buildMatrixA(),
             // so Matrix wrapper points to updated data
         }
@@ -818,8 +838,14 @@ public class MatrixSolver {
         int offset = wireReference ? 1 : 0;
         int size = matrixSize - offset;
         double[][] bArray = new double[size][1];
-        for (int i = 0; i < size; i++) {
-            bArray[i][0] = bVector[i + offset];
+        if (referenceLast) {
+            for (int i = 0; i < size; i++) {
+                bArray[referencePosition(i)][0] = bVector[i];
+            }
+        } else {
+            for (int i = 0; i < size; i++) {
+                bArray[i][0] = bVector[i + offset];
+            }
         }
         Matrix bMatrix = new Matrix(bArray);
 
@@ -836,8 +862,14 @@ public class MatrixSolver {
             }
         }
         if (wireReference) p[0] = 0;
-        for (int i = 0; i < size; i++) {
-            p[i + offset] = x[i][0];
+        if (referenceLast) {
+            for (int i = 0; i < size; i++) {
+                p[i] = x[referencePosition(i)][0];
+            }
+        } else {
+            for (int i = 0; i < size; i++) {
+                p[i + offset] = x[i][0];
+            }
         }
 
         // Mark that matrix is no longer changed (until next buildMatrixA or explicit flag)
@@ -847,7 +879,7 @@ public class MatrixSolver {
     /**
      * Sparse solve. The LU is kept until a stored coefficient differs from the factored one, so event trials,
      * diode and source-limit patches, and a new step width refactor, while an identical rebuild reuses the factors.
-     * A sparse failure is thrown; this path never falls back to the dense LU.
+     * A sparse failure is thrown, and this path never falls back to the dense LU.
      */
     private void solveSparse() {
         for (int row = 0; row < matrixSize; row++) {
@@ -874,7 +906,28 @@ public class MatrixSolver {
         matrixChanged = false;
     }
 
+    /** Position of an original index when node 0 is ordered last, the map SparseSystem uses for the complete matrix. */
+    private int referencePosition(int index) {
+        return index == 0 ? matrixSize - 1 : index - 1;
+    }
+
+    /** Copies a into the retained node-0-last buffer, which it allocates on first use. */
+    private void fillPermuted() {
+        if (permuted == null) permuted = new double[matrixSize][matrixSize];
+        for (int row = 0; row < matrixSize; row++) {
+            double[] source = a[row];
+            double[] target = permuted[referencePosition(row)];
+            for (int col = 0; col < matrixSize; col++) target[referencePosition(col)] = source[col];
+        }
+    }
+
     private Matrix solveMatrix() {
+        if (!wireReference && sparseSettings != null) {
+            fillPermuted();
+            wrapperReferenceLast = true;
+            return new Matrix(permuted, matrixSize, matrixSize);
+        }
+        wrapperReferenceLast = false;
         if (!wireReference) return new Matrix(a, matrixSize, matrixSize);
         // Desktop excludes its reference row and column from LU decomposition.
         double[][] reduced = new double[matrixSize - 1][matrixSize - 1];
