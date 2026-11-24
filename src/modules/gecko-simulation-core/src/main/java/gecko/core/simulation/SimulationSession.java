@@ -84,6 +84,8 @@ public final class SimulationSession implements AutoCloseable {
     private final boolean periodic;
     private final PeriodicStateMonitor monitor;
     private boolean searching;
+    /** Committed step count at which the main phase of a periodic search began. Zero when the search is off. */
+    private int loggingOrigin;
     private volatile SteadyStateReport steadyState;
 
     private SimulationSession(CircuitModel model, SolverSettingsCore settings, ExecutionOptions options,
@@ -244,7 +246,7 @@ public final class SimulationSession implements AutoCloseable {
                 float[] values = new float[signalNames.length];
                 if (control.hasScope()) values = control.sampleScope();
                 else if (electrical != null) electrical.copyNodeVoltagesTo(values);
-                if (!searching && options.loggingEnabled() && before.committedSteps() % options.loggingInterval() == 0) {
+                if (!searching && options.loggingEnabled() && (before.committedSteps() - loggingOrigin) % options.loggingInterval() == 0) {
                     recording.insertValuesAtEnd(values, time);
                     recordedSamples++;
                 }
@@ -260,6 +262,8 @@ public final class SimulationSession implements AutoCloseable {
                     if (outcome == PeriodicStateMonitor.Outcome.CONVERGED) {
                         // The main phase starts at the next grid step, with absolute time and all state kept.
                         searching = false;
+                        // The logging interval counts from the first main step, not from the unrecorded search.
+                        loggingOrigin = before.committedSteps() + 1;
                         endTime = time;
                         mainEndTime = time + mainDuration;
                     } else if (outcome == PeriodicStateMonitor.Outcome.EXHAUSTED) {

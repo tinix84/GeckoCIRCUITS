@@ -7,7 +7,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/** Shares scalar timing validation between preparation and persistent execution. */
+/**
+ * Shares timing validation between preparation and persistent execution. It covers scalar timing settings and the
+ * periodic steady-state settings, including the forcing check on an assembled circuit.
+ */
 public final class SimulationTiming {
     private static final double WHOLE_STEP = 1e-9;
     private static final int MAXIMUM_STEPS = Integer.MAX_VALUE - 2;

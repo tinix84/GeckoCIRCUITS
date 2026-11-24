@@ -96,7 +96,9 @@ class PeriodicSteadyStateIntegrationTest {
     void aNonPositivePeriodIsRejected() throws Exception {
         mvc.perform(post("/api/v1/simulations").contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(request(-1e-6, null, null))))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                // Bean validation keeps the existing contract: INVALID_REQUEST for every field except timeStep and simulationTime.
+                .andExpect(jsonPath("$.diagnostics[?(@.code=='INVALID_REQUEST' && @.parameterPath=='periodicSteadyState.period')]").isNotEmpty());
     }
 
     @Test

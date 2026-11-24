@@ -208,4 +208,24 @@ class PeriodicSteadyStateForcingTest {
         return PeriodicSteadyStateValidation.circuitIssues(period, null,
                 List.of(new SignalCalculatorSinus(0, 1, frequency, 0, 0, .5)));
     }
+
+    @Test
+    void everyAbsoluteTimeSineSourceFamilyIsChecked() {
+        for (var type : new gecko.core.circuit.circuitcomponents.CircuitTypCore[]{
+                gecko.core.circuit.circuitcomponents.CircuitTypCore.LK_U, gecko.core.circuit.circuitcomponents.CircuitTypCore.LK_I,
+                gecko.core.circuit.circuitcomponents.CircuitTypCore.TH_FLOW, gecko.core.circuit.circuitcomponents.CircuitTypCore.TH_TEMP,
+                gecko.core.circuit.circuitcomponents.CircuitTypCore.REL_MMF}) {
+            for (double[] frequency : new double[][]{{100e3, 0}, {130e3, 1}}) {
+                double[] sine = new double[21];
+                sine[0] = gecko.core.circuit.SourceType.QUELLE_SIN_NEW;
+                sine[1] = sine[20] = 1;
+                sine[2] = frequency[0];
+                var netlist = new gecko.core.circuit.netlist.CircuitNetlist();
+                netlist.initNetlist(new gecko.core.circuit.circuitcomponents.CircuitTypCore[]{type},
+                        new int[]{1}, new int[]{0}, new int[]{-1}, new double[][]{sine}, 1, 0, 1);
+                assertEquals((int) frequency[1], PeriodicSteadyStateValidation.circuitIssues(10e-6, netlist, List.of()).size(),
+                        type + " at " + frequency[0]);
+            }
+        }
+    }
 }

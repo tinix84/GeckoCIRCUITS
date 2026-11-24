@@ -36,7 +36,9 @@ final class PeriodicSteadyStateValidation {
         if (netlist != null) {
             for (int element = 0; element < netlist.getElementCount(); element++) {
                 CircuitTypCore type = netlist.getType(element);
-                if (type != CircuitTypCore.LK_U && type != CircuitTypCore.LK_I) continue;
+                // Every source family that MatrixSolver stamps with an absolute-time sine.
+                if (type != CircuitTypCore.LK_U && type != CircuitTypCore.LK_I && type != CircuitTypCore.TH_FLOW
+                        && type != CircuitTypCore.TH_TEMP && type != CircuitTypCore.REL_MMF) continue;
                 double[] parameters = netlist.getParameter(element);
                 int kind = (int) parameters[0];
                 if ((kind == SourceType.QUELLE_SIN || kind == SourceType.QUELLE_SIN_NEW) && !wholeCycles(period, parameters[2])) {
