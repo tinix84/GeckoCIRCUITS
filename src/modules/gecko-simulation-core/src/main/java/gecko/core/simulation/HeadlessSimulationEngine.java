@@ -298,6 +298,7 @@ public class HeadlessSimulationEngine {
                         .metadata("zeroCrossingRetained", report.retained())
                         .metadata("zeroCrossingDropped", report.dropped());
             }
+            if (settings.getAdaptiveStep() != null) success.metadata("adaptiveStep", session.adaptiveStepReport());
             return success.build();
         }
     }
