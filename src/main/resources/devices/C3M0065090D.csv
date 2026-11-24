@@ -1,0 +1,12 @@
+curve,tj_c,current_a,v_drop_v,blocking_v,e_on_j,e_off_j
+conduction,25,0,0,,,
+conduction,25,10,0.65,,,
+conduction,25,20,1.32,,,
+conduction,25,30,2.04,,,
+conduction,150,0,0,,,
+conduction,150,10,0.88,,,
+conduction,150,20,1.80,,,
+conduction,150,30,2.82,,,
+switching,25,10,,400,105e-6,15e-6
+switching,25,20,,400,245e-6,50e-6
+switching,25,30,,400,440e-6,125e-6

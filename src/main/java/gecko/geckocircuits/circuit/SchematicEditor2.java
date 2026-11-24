@@ -1272,6 +1272,15 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
         _visibleCircuitSheet.repaint();
     }
 
+    public gecko.geckocircuits.circuit.circuitcomponents.AbstractSwitch selectedPowerSwitch() {
+        if (_selectedComponents.size() == 1
+                && _selectedComponents.iterator().next() instanceof
+                    gecko.geckocircuits.circuit.circuitcomponents.AbstractSwitch powerSwitch) {
+            return powerSwitch;
+        }
+        return null;
+    }
+
     // rotiere LK-Element oder THERM-Element  -->
     public void maus_rotiereElement() {
         if (_selectedComponents.size() != 1) {

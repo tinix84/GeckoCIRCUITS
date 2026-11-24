@@ -45,7 +45,8 @@ public abstract class LossCurve {
         ascii.append("\n<" + getXMLTag() + ">");
         ascii.append("\ndata");
         SerializationUtils.appendAsString(ascii, data);
-        tj.writeXMLToFile(ascii);
+        ascii.append('\n').append(tj.getSaveIdentifier());
+        SerializationUtils.appendAsString(ascii, tj.getDoubleValue());
         exportIndividual(ascii);
         ascii.append("\n<\\" + getXMLTag() + ">");
     }
