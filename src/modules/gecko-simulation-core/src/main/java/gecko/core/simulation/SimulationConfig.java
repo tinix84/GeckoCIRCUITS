@@ -63,7 +63,9 @@ public final class SimulationConfig {
         return new SolverOverrides(solverTypeExplicit ? solverSettings.getSolverType() : null,
                 stepWidthExplicit ? solverSettings.getStepWidth() : null,
                 durationExplicit ? solverSettings.getSimulationDuration() : null,
-                new SolverFeatures(solverSettings.getControlSamplePeriod(), solverSettings.isZeroCrossing()));
+                new SolverFeatures(solverSettings.getControlSamplePeriod(), solverSettings.isZeroCrossing(),
+                        solverSettings.isDcOperatingPoint(), solverSettings.getPeriodicSteadyState(),
+                        solverSettings.getAdaptiveStep()));
     }
     /** Uses file defaults only for settings the caller did not supply. */
     SolverSettingsCore resolveSolverSettings(CircuitModel model) {
@@ -207,6 +209,44 @@ public final class SimulationConfig {
          */
         public Builder zeroCrossing(boolean enabled) {
             this.solverSettings.withZeroCrossing(enabled);
+            return this;
+        }
+
+        /**
+         * Starts the first electrical step from the circuit's DC operating point instead of the configured
+         * initial states. Off by default. The circuit must have a unique DC solution, or the run fails to start.
+         *
+         * @param enabled true to solve and seed the DC operating point
+         * @return this builder
+         */
+        public Builder dcOperatingPoint(boolean enabled) {
+            this.solverSettings.withDcOperatingPoint(enabled);
+            return this;
+        }
+
+        /**
+         * Searches for the periodic steady state before the main phase. Off (null) by default.
+         * The search runs period by period from the DC operating point and records nothing.
+         * The main phase then runs for the simulation duration from the converged state.
+         * The period must be a whole number of steps, so a carrier that clamps per step needs its simulated period.
+         *
+         * @param settings the period, tolerance and period limit, or null for off
+         * @return this builder
+         */
+        public Builder periodicSteadyState(gecko.core.allg.PeriodicSteadyStateSettings settings) {
+            this.solverSettings.withPeriodicSteadyState(settings);
+            return this;
+        }
+
+        /**
+         * Adapts the electrical sub-step between the fixed grid points. Off (null) by default.
+         * CONTROL, recordings and the grid stay unchanged, and location of diode switching turns on.
+         *
+         * @param settings the tolerance and step clamps, or null for off
+         * @return this builder
+         */
+        public Builder adaptiveStep(gecko.core.allg.AdaptiveStepSettings settings) {
+            this.solverSettings.withAdaptiveStep(settings);
             return this;
         }
 
