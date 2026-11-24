@@ -416,7 +416,7 @@ public final class ReglerOSZI extends RegelBlock
         }
 
         final TokenMap windowSettingsMap = tokenMap.getBlockTokenMap("<ScopeWindowSettings>");
-        if (settingsMap != null) {
+        if (windowSettingsMap != null) {
             _scopeFrame.importIndividualCONTROL(windowSettingsMap);
         }
 
@@ -424,6 +424,9 @@ public final class ReglerOSZI extends RegelBlock
 
         if (scopeMap != null) {
             importScopeSettings(scopeMap);
+        } else if (settingsMap == null) {
+            // A circuit import can supply scope terminals without saved diagrams.
+            createInitialDiagram();
         }
 
     }

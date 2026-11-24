@@ -121,6 +121,20 @@ public class CircuitFileParser {
         // Build token map for fast lookup
         String[] simulationLines = inspectSimulationStructure(maskOpaqueContent(lines), model);
         Map<String, Integer> tokenMap = buildTokenMap(simulationLines);
+        try {
+            if (tokenMap.containsKey(AcMetadataCodec.SETTINGS)) {
+                model.setAcSettings(AcMetadataCodec.decodeSettings(savedSettingValue(lines, tokenMap, AcMetadataCodec.SETTINGS)));
+            }
+            if (tokenMap.containsKey(HierarchyMetadataCodec.DOCUMENT)) {
+                model.setHierarchy(HierarchyMetadataCodec.decodeDocument(
+                        savedSettingValue(lines, tokenMap, HierarchyMetadataCodec.DOCUMENT)));
+            }
+            if (tokenMap.containsKey(AcMetadataCodec.PROVENANCE)) {
+                model.setAcProvenance(AcMetadataCodec.decodeProvenance(savedSettingValue(lines, tokenMap, AcMetadataCodec.PROVENANCE)));
+            }
+        } catch (IllegalArgumentException error) {
+            throw new CircuitParseException(filePath + ": " + error.getMessage(), error);
+        }
 
         // Parse simulation parameters
         parseSimulationParameters(model, lines, tokenMap);
@@ -147,8 +161,14 @@ public class CircuitFileParser {
         // Parse control components from special blocks
         parseControlComponents(simulationLines, model);
         parseThermalComponents(simulationLines, model);
-        inspectUnrecognizedSimulationBlocks(simulationLines, model);
         CircuitDescriptionReader.retain(model, lines, simulationLines);
+        HierarchyIndex hierarchy = null;
+        try {
+            hierarchy = new HierarchyIndex(model);
+        } catch (IllegalArgumentException error) {
+            throw new CircuitParseException(filePath + ": " + error.getMessage(), error);
+        }
+        inspectUnrecognizedSimulationBlocks(simulationLines, model, hierarchy);
         CircuitResourceReader.retain(model, lines, simulationLines, resourceAccess);
 
         // Validate pre-simulation time step
@@ -376,6 +396,10 @@ public class CircuitFileParser {
                 CircuitModel.ComponentData comp = new CircuitModel.ComponentData(type, name, x, y, orientation);
 
                 retainImportEvidence(comp, elementBlock, params, model);
+                if (elementBlock.containsToken(AcMetadataCodec.COMPONENT)) {
+                    comp.setAcComponent(AcMetadataCodec.decodeComponent(
+                            elementBlock.readDataLine(AcMetadataCodec.COMPONENT, "")));
+                }
 
                 // Store numeric parameters by index
                 for (int i = 0; i < params.length; i++) {
@@ -499,7 +523,7 @@ public class CircuitFileParser {
         model.getImportIssues().add(new ImportIssue("MALFORMED_SIMULATION_BLOCK", domain, "", message,
                 model.getFilePath() + ": line " + (line + 1) + " " + tag, false));
     }
-    private void inspectUnrecognizedSimulationBlocks(String[] lines, CircuitModel model) {
+    private void inspectUnrecognizedSimulationBlocks(String[] lines, CircuitModel model, HierarchyIndex hierarchy) {
         for (int start = 0; start < lines.length; start++) {
             String opening = lines[start].trim();
             if (!opening.startsWith("<Element") || !opening.endsWith(">")) {
@@ -516,7 +540,11 @@ public class CircuitFileParser {
             }
             TokenMap block = new TokenMap(Arrays.copyOfRange(lines, start + 1, end));
             String name = block.containsToken("idStringDialog") ? block.readDataLine("idStringDialog", "") : "";
-            var issue = SimulationBlockClassification.savedBlockIssue(tag, block.readDataLine("typ", -1), name,
+            int type = block.readDataLine("typ", -1);
+            if (hierarchy != null && tag.equals("ElementSPECIAL") && type == 27
+                    && block.containsToken(HierarchyMetadataCodec.OCCURRENCE)
+                    && hierarchy.sheet(block.readDataLine("uniqueObjectIdentifier", 0L)) != null) continue;
+            var issue = SimulationBlockClassification.savedBlockIssue(tag, type, name,
                     model.getFilePath() + ": line " + (start + 1) + " " + tag);
             if (issue != null) model.getImportIssues().add(issue);
         }
@@ -549,9 +577,6 @@ public class CircuitFileParser {
                             component.getImportTokens().get("uniqueObjectIdentifier")));
                 }
                 model.addThermalComponent(component);
-                model.getImportIssues().add(new ImportIssue("UNSUPPORTED_DOMAIN", "THERMAL", name,
-                        "Saved thermal elements cannot run in the headless engine.",
-                        component.getSourceLocation(), true));
             } catch (RuntimeException error) {
                 addComponentIssue(model, block, "THERMAL", "The component block is invalid: " + error.getMessage());
             }
@@ -750,7 +775,7 @@ public class CircuitFileParser {
             }
 
             String arrayPart = line.substring(arrayStart + 3).trim();
-            if (arrayPart.equals("null")) {
+            if (arrayPart.equals("null") || arrayPart.isEmpty()) {
                 return result;
             }
 
@@ -843,7 +868,7 @@ public class CircuitFileParser {
     }
 
     private void addInvalidSavedSetting(CircuitModel model, Map<String, Integer> tokenMap, String token, String path) {
-        model.getImportIssues().add(new ImportIssue("INVALID_SETTING", null, null,
+        model.addSavedTransientSettingIssue(new ImportIssue("INVALID_SETTING", null, null,
                 "The saved setting is invalid.", model.getFilePath() + ": line " + (tokenMap.get(token) + 1) + " " + token,
                 false, path));
     }

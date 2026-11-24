@@ -194,6 +194,8 @@ public final class VerlustBerechnungDetailed
         lossFile = null;
     }
 
+    @SuppressFBWarnings(value = "REC_CATCH_EXCEPTION",
+            justification = "Format fallback chain (gzip, deflate, plain text) must try the next format on any decoding failure")
     public boolean leseDetailVerlusteVonDatei(final GeckoFile newLossFile) {
         //------------------
         // Datei einlesen -->

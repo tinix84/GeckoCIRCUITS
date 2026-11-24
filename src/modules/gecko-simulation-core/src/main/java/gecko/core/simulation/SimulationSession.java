@@ -1,5 +1,6 @@
 package gecko.core.simulation;
 
+import gecko.core.allg.PeriodicSteadyStateSettings;
 import gecko.core.allg.SolverSettingsCore;
 import gecko.core.circuit.netlist.CircuitNetlist;
 import gecko.core.circuit.netlist.NetlistBuilder;
@@ -8,6 +9,7 @@ import gecko.core.datacontainer.DataContainerGlobal;
 import gecko.core.io.CircuitModel;
 import gecko.core.preparation.ExecutionOptions;
 import gecko.core.preparation.PreparedCircuit;
+import gecko.core.preparation.SolverFeatures;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -60,6 +62,8 @@ public final class SimulationSession implements AutoCloseable {
     private static final int MAX_OBSERVATION_SAMPLES = 10000;
     private final CircuitNetlist netlist;
     private final ElectricalTimeStep electrical;
+    private final ThermalNetwork thermal;
+    private final boolean zeroCrossing;
     private final ControlRuntime control;
     private final ExecutionOptions options;
     private final String[] signalNames;
@@ -78,6 +82,12 @@ public final class SimulationSession implements AutoCloseable {
     private final double mainStep;
     private final double mainDuration;
     private double mainEndTime;
+    private final boolean periodic;
+    private final PeriodicStateMonitor monitor;
+    private boolean searching;
+    /** Committed step count at which the main phase of a periodic search began. Zero when the search is off. */
+    private int loggingOrigin;
+    private volatile SteadyStateReport steadyState;
 
     private SimulationSession(CircuitModel model, SolverSettingsCore settings, ExecutionOptions options,
             ControlRuntime suppliedControl) {
@@ -86,6 +96,16 @@ public final class SimulationSession implements AutoCloseable {
         SimulationTiming.validateSettings(settings);
         double dt = settings.getStepWidth();
         double duration = settings.getSimulationDuration();
+        zeroCrossing = settings.isZeroCrossing() || settings.getAdaptiveStep() != null;
+        PeriodicSteadyStateSettings search = settings.getPeriodicSteadyState();
+        // The search seeds itself from the DC operating point. The caller's settings stay as given.
+        boolean dcStart = settings.isDcOperatingPoint() || search != null;
+        periodic = search != null;
+        searching = periodic;
+        monitor = periodic ? new PeriodicStateMonitor(search.tolerance(), search.maxPeriods(),
+                (int) Math.rint(search.period() / dt)) : null;
+        steadyState = periodic ? new SteadyStateReport(false, 0, Double.POSITIVE_INFINITY,
+                Double.POSITIVE_INFINITY, "", 0) : null;
         mainStep = dt;
         mainDuration = duration;
         double preTime = settings.getPreCalculationTime();
@@ -94,27 +114,52 @@ public final class SimulationSession implements AutoCloseable {
             phase = Phase.WARMUP;
             dt = settings.getPreCalculationStepWidth();
             duration = preTime;
+        } else if (periodic) {
+            // The search runs as a warmup with the main step. Its end only bounds progress until it converges.
+            phase = Phase.WARMUP;
+            duration = search.maxPeriods() * search.period();
         }
         ControlRuntime constructedControl = suppliedControl;
         try {
             CircuitNetlist constructedNetlist = NetlistBuilder.buildFromCircuitModel(model);
+            ThermalNetwork constructedThermal = ThermalNetwork.build(model, constructedNetlist, settings.getSolverType());
             if (constructedControl == null) {
-                constructedControl = ControlRuntime.fromDeferred(model, dt, constructedNetlist);
+                constructedControl = ControlRuntime.fromDeferred(model, dt, constructedNetlist,
+                        settings.getControlSamplePeriod(), constructedThermal == null ? null : constructedThermal.netlist());
+            }
+            if (periodic) {
+                var issues = PeriodicSteadyStateValidation.circuitIssues(search.period(), constructedNetlist,
+                        constructedControl.calculators(), constructedThermal != null);
+                if (!issues.isEmpty()) {
+                    throw new IllegalArgumentException(issues.stream()
+                            .map(issue -> issue.parameterPath() + ": " + issue.message())
+                            .collect(java.util.stream.Collectors.joining(" ")));
+                }
             }
             // Validate the main grid now. Stage its live histories again after warmup.
             if (phase == Phase.WARMUP && mainStep != dt) constructedControl.prepareTimeStepChange(mainStep);
             String[] constructedSignalNames = constructedControl.hasScope()
                     ? constructedControl.getSignalNames() : fallbackSignalNames(model);
             DataContainerGlobal constructedRecording = new DataContainerGlobal();
-            constructedRecording.init(constructedSignalNames.length, recordingCapacity(dt, duration),
+            constructedRecording.init(constructedSignalNames.length, recordingCapacity(dt, periodic ? mainDuration : duration),
                     constructedSignalNames, "time [s]");
             constructedRecording.setContainerStatus(ContainerStatus.PAUSED);
             Status constructedStatus = statusFor(State.READY, 0, 0, 0, duration, dt);
             boolean hasElectrical = constructedNetlist != null && constructedNetlist.getElementCount() > 0;
             if (hasElectrical) constructedControl.seedSources(constructedNetlist);
+            if (constructedThermal != null) constructedControl.seedThermalSources(constructedThermal);
+            if (hasElectrical && dcStart) {
+                // The DC solve needs the gates the first step will use. Initializing CONTROL here is the same
+                // call the first step makes, so the default order is unchanged when the feature is off.
+                constructedControl.initializeAtSimulationStart();
+                constructedControl.applyPendingGates(constructedNetlist);
+            }
             ElectricalTimeStep constructedElectrical = hasElectrical
-                    ? new ElectricalTimeStep(constructedNetlist, settings.getSolverType()) : null;
+                    ? new ElectricalTimeStep(constructedNetlist, settings.getSolverType(),
+                            new SolverFeatures(0, settings.isZeroCrossing(), dcStart, null,
+                                    settings.getAdaptiveStep(), settings.getSparseSolver())) : null;
             netlist = constructedNetlist;
+            thermal = constructedThermal;
             control = constructedControl;
             signalNames = constructedSignalNames;
             recording = constructedRecording;
@@ -166,6 +211,9 @@ public final class SimulationSession implements AutoCloseable {
 
     Sample step(HeadlessSimulationEngine.StepTraceListener listener) { return step(listener, false); }
 
+    /** @return the number of thermal solves so far, which is one per committed grid step, or 0 without a thermal network */
+    int thermalSolves() { return thermal == null ? 0 : thermal.committedSteps(); }
+
     private Sample step(HeadlessSimulationEngine.StepTraceListener listener, boolean pauseAfterStep) {
         Trace[] trace = new Trace[1];
         Sample sample;
@@ -196,22 +244,44 @@ public final class SimulationSession implements AutoCloseable {
                 if (netlist != null) netlist.setSimulationTime(time);
                 if (electrical != null) {
                     control.applyPendingGates(netlist);
-                    electrical.advance(before.stepWidth(), time, listener == null ? null :
+                    HeadlessSimulationEngine.StepTraceListener capture = listener == null ? null :
                             (t, volts, currents, circuit) -> trace[0] = new Trace(t, volts.clone(), currents.clone(),
-                                    circuit.detachedSnapshot()));
+                                    circuit.detachedSnapshot());
+                    if (zeroCrossing) electrical.advanceInterval(before.stepWidth(), time, capture);
+                    else electrical.advance(before.stepWidth(), time, capture);
                 }
-                control.advanceAfterElectricalStep(netlist, time);
+                if (thermal != null) thermal.advance(before.stepWidth(), time, netlist);
+                control.advanceAfterElectricalStep(netlist, thermal, time);
                 float[] values = new float[signalNames.length];
                 if (control.hasScope()) values = control.sampleScope();
                 else if (electrical != null) electrical.copyNodeVoltagesTo(values);
-                if (options.loggingEnabled() && before.committedSteps() % options.loggingInterval() == 0) {
+                if (!searching && options.loggingEnabled() && (before.committedSteps() - loggingOrigin) % options.loggingInterval() == 0) {
                     recording.insertValuesAtEnd(values, time);
                     recordedSamples++;
                 }
                 State nextState = nextTime > before.endTime() && phase == Phase.MAIN ? State.COMPLETED
                         : pauseAfterStep ? State.PAUSED : State.RUNNING;
+                double endTime = before.endTime();
+                if (searching) {
+                    monitor.begin();
+                    if (electrical != null) electrical.exportPeriodicState(monitor.sink());
+                    control.exportPeriodicState(netlist, time, monitor.sink());
+                    var outcome = monitor.commit(before.committedSteps() + 1, time);
+                    steadyState = monitor.report();
+                    if (outcome == PeriodicStateMonitor.Outcome.CONVERGED) {
+                        // The main phase starts at the next grid step, with absolute time and all state kept.
+                        searching = false;
+                        // The logging interval counts from the first main step, not from the unrecorded search.
+                        loggingOrigin = before.committedSteps() + 1;
+                        endTime = time;
+                        mainEndTime = time + mainDuration;
+                    } else if (outcome == PeriodicStateMonitor.Outcome.EXHAUSTED) {
+                        searching = false;
+                        nextState = State.COMPLETED;
+                    }
+                }
                 status = statusFor(nextState, before.committedSteps() + 1, time, nextTime,
-                        before.endTime(), before.stepWidth());
+                        endTime, before.stepWidth());
                 recording.setContainerStatus(nextState == State.COMPLETED ? ContainerStatus.FINISHED
                         : nextState == State.RUNNING ? ContainerStatus.RUNNING : ContainerStatus.PAUSED);
                 if (pauseAfterStep || nextState == State.COMPLETED) control.tearDownOnPause();
@@ -377,8 +447,12 @@ public final class SimulationSession implements AutoCloseable {
 
     private void extend(double endTime, double requestedStep, boolean changeStep) {
         enterOperation();
-        try { extendAtBoundary(endTime, changeStep ? requestedStep : status.stepWidth(), phase, false); }
-        finally { leaveOperation(); }
+        try {
+            if (periodic && phase == Phase.WARMUP) {
+                throw new IllegalStateException("The periodic steady-state search owns the end time until the main phase starts.");
+            }
+            extendAtBoundary(endTime, changeStep ? requestedStep : status.stepWidth(), phase, false);
+        } finally { leaveOperation(); }
     }
 
     private void extendAtBoundary(double endTime, double step, Phase nextPhase, boolean automaticPhase) {
@@ -416,6 +490,14 @@ public final class SimulationSession implements AutoCloseable {
         segmentFirstRecorded = recordedSamples;
         status = continued;
     }
+
+    /**
+     * Reports the periodic steady-state search. While the search runs, the report shows the last compared period
+     * with converged false. After the search it is final.
+     *
+     * @return the report, or null when the search is off
+     */
+    public SteadyStateReport steadyStateReport() { return steadyState; }
 
     /**
      * Reads status without waiting for an active step or callback.
@@ -466,11 +548,76 @@ public final class SimulationSession implements AutoCloseable {
     }
 
     /**
+     * Returns at most 10000 located switching events, oldest first. The log is empty when zero-crossing
+     * location is off. Its signal index is the circuit element index.
+     *
+     * @param firstIndex the nonnegative index of the first event
+     * @param count the number of events, from zero through 10000
+     * @return a detached window, empty when the first index exceeds the log
+     * @throws IllegalArgumentException if an index or count is invalid
+     * @throws IllegalStateException if an operation is active or the call is reentrant
+     */
+    public List<ZeroCrossingEvent> zeroCrossingEvents(int firstIndex, int count) {
+        if (firstIndex < 0 || count < 0 || count > MAX_OBSERVATION_SAMPLES) {
+            throw new IllegalArgumentException("Event indices must be non-negative. Count must not exceed 10000.");
+        }
+        enterOperation(true);
+        try { return electrical == null ? List.of() : electrical.events(firstIndex, count); }
+        finally { leaveOperation(); }
+    }
+
+    /**
+     * Reports located, unlocated and dropped switching events. A nonzero unlocated or dropped count means
+     * the event log is incomplete.
+     *
+     * @return the counts, all zero when location is off
+     * @throws IllegalStateException if an operation is active or the call is reentrant
+     */
+    public EventLocationReport eventLocationReport() {
+        enterOperation(true);
+        try { return electrical == null ? EventLocationReport.empty() : electrical.eventReport(); }
+        finally { leaveOperation(); }
+    }
+
+    /** @return true when events are located, whether requested directly or implied by the adaptive step */
+    boolean locatesEvents() { return zeroCrossing; }
+
+    /**
+     * Reports the adaptive electrical step: committed, rejected and forced sub-steps, the shortest and longest
+     * sub-step, and the located and unlocated diode events.
+     *
+     * @return the statistics, all zero when the adaptive step is off
+     * @throws IllegalStateException if an operation is active or the call is reentrant
+     */
+    public AdaptiveStepReport adaptiveStepReport() {
+        enterOperation(true);
+        try { return electrical == null ? AdaptiveStepReport.empty() : electrical.adaptiveReport(); }
+        finally { leaveOperation(); }
+    }
+
+    /**
+     * Reports which linear solver the electrical network runs on, read from the live solvers.
+     *
+     * @return the solver report, or null when the circuit has no electrical network
+     * @throws IllegalStateException if an operation is active or the call is reentrant
+     */
+    public LinearSolverReport linearSolverReport() {
+        enterOperation(true);
+        try { return electrical == null ? null : electrical.linearSolverReport(); }
+        finally { leaveOperation(); }
+    }
+
+    /**
      * Returns signal names in recording row order.
      *
      * @return a detached array whose changes cannot affect the session
      */
     public String[] signalNames() { return signalNames.clone(); }
+
+    /** Streams every accepted electrical sub-step to a test. It does nothing without an electrical circuit. */
+    void setSubStepListenerForTest(ElectricalTimeStep.SubStepListener listener) {
+        if (electrical != null) electrical.setSubStepListenerForTest(listener);
+    }
 
     List<ScopeDataExtractor.ScopeChannel> scopeChannels() { return control.getScopeChannels(); }
     DataContainerGlobal recording() { return recording; }

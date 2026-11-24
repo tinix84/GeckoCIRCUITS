@@ -13,6 +13,12 @@
  */
 package gecko.geckocircuits.circuit;
 
+import gecko.core.ac.AcComponent;
+import gecko.core.ac.AcDocumentSettings;
+import gecko.core.io.AcMetadataCodec;
+import gecko.core.io.SpicePorts;
+import gecko.core.io.importer.SpiceValue;
+import gecko.geckocircuits.allg.TechFormat;
 import gecko.core.circuit.ComponentIdentifiable;
 import gecko.core.circuit.TokenMap;
 import gecko.geckocircuits.control.ControlTypeInfo;
@@ -66,6 +72,8 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
     private Point _sheetPosition = new Point(0, 0);
     protected String[] parameterString = new String[]{"", "", "0"};
     public final double[] parameter = new double[40];
+    private final ModelMVC<Optional<AcComponent>> acComponent = new ModelMVC<>(Optional.empty(), "AC component law");
+    private static final TechFormat AC_VALUE_FORMAT = new TechFormat();
     public final Stack<AbstractTerminal> XIN = new Stack<AbstractTerminal>();
     public final Stack<AbstractTerminal> YOUT = new Stack<AbstractTerminal>();
     private AffineTransform _origTransform;
@@ -267,6 +275,10 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
 
     @Override
     public void importASCII(final TokenMap tokenMap) {
+        if (getSimulationDomain() == ConnectorType.LK && tokenMap.containsToken(AcMetadataCodec.COMPONENT)) {
+            acComponent.setValueWithoutUndo(Optional.of(
+                    AcMetadataCodec.decodeComponent(tokenMap.readDataLine(AcMetadataCodec.COMPONENT, ""))));
+        }
         if (this instanceof SemiconductorLossCalculatable) {
             TokenMap subBlock = tokenMap.getBlockTokenMap("<Verluste>");
             if (subBlock != null) {
@@ -424,6 +436,77 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
 
     @Override
     public final void exportASCII(final StringBuffer ascii) {
+        writeASCII(ascii, getAcComponent(), parameter);
+    }
+
+    /** Exports current law and compatibility fields with the owning document parameters. */
+    public final void exportASCII(StringBuffer ascii, AcDocumentSettings settings) {
+        AcComponent owned = settings == null ? getAcComponent() : getAcComponentOrLiteral();
+        double[] values = owned == null ? parameter : AcMetadataCodec.compatibilityValues(owned, getParameter(), settings);
+        writeASCII(ascii, owned, values);
+    }
+
+    public final void exportScopedAcASCII(StringBuffer ascii, Map<String, String> scope) {
+        AcComponent owned = getAcComponentOrLiteral();
+        double[] values = owned == null ? parameter : AcMetadataCodec.compatibilityValues(owned, getParameter(), scope);
+        writeASCII(ascii, owned, values);
+    }
+
+    final void exportForCapture(StringBuffer ascii, AcDocumentSettings settings) {
+        if (settings == null) {
+            exportASCII(ascii);
+        } else {
+            writeASCII(ascii, getAcComponentOrLiteral(), getParameter());
+        }
+    }
+
+    public final AcComponent getAcComponent() { return acComponent.getValue().orElse(null); }
+
+    final void setAcComponentWithoutUndo(AcComponent owned) { acComponent.setValueWithoutUndo(Optional.of(owned)); }
+
+    public final AcComponent getAcComponentOrLiteral() {
+        var owned = getAcComponent();
+        if (owned != null) {
+            return owned;
+        }
+        if (getSimulationDomain() != ConnectorType.LK) {
+            return null;
+        }
+        var descriptor = SpicePorts.find("LK", getTypeEnum().getTypeNumber());
+        if (descriptor == null) {
+            return null;
+        }
+        double[] values = getParameter();
+        AcComponent.Law law = switch (descriptor) {
+            case RES, CAP -> new AcComponent.Passive(Double.toString(values[0]));
+            case VOLTAGE -> new AcComponent.Voltage(Double.toString(values[1]), "", "0", "0");
+            case E -> new AcComponent.Controlled(Double.toString(values[0]), false);
+            default -> null;
+        };
+        return law == null ? null : new AcComponent(getStringID(), List.of(), false, law);
+    }
+
+    public final void setAcLaw(AcComponent.Law law) {
+        var editor = SchematicEditor2.Singleton;
+        if (editor != null && editor.getHierarchy() != null && getHierarchyMember() != null) {
+            editor.hierarchyEdits.setSharedLaw(this, law);
+            return;
+        }
+        setAcLawLocal(law);
+    }
+
+    final void setAcLawLocal(AcComponent.Law law) {
+        var current = Objects.requireNonNull(getAcComponentOrLiteral(), "The component has no AC law.");
+        if (current.law().getClass() != law.getClass()) {
+            throw new IllegalArgumentException("Invalid AC component law.");
+        }
+        acComponent.setValueWithoutUndo(Optional.of(current));
+        acComponent.setValue(Optional.of(new AcComponent(current.instance(), current.spiceOrders(), current.aliases(),
+                current.mirrored(), law)));
+        SchematicEditor2.Singleton.setDirtyFlag();
+    }
+
+    private void writeASCII(StringBuffer ascii, AcComponent owned, double[] values) {
         final String saveIdentifierStartString = "<" + getTypeInfo().getSaveIdentifier() + ">";
         ascii.append(saveIdentifierStartString);
 
@@ -446,7 +529,10 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
 
         ProjectData.appendAsString(ascii.append("\nx"), getSheetPosition().x);
         ProjectData.appendAsString(ascii.append("\ny"), getSheetPosition().y);
-        ProjectData.appendAsString(ascii.append("\nparameter"), parameter);
+        ProjectData.appendAsString(ascii.append("\nparameter"), values);
+        if (owned != null) {
+            ascii.append('\n').append(AcMetadataCodec.COMPONENT).append(' ').append(AcMetadataCodec.encode(owned));
+        }
 
         ProjectData.appendAsString(ascii.append("\nparameterString"), parameterString);
         updateNameOptArray();
@@ -460,6 +546,11 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
         }
 
         for (UserParameter par : getRegisteredParameters()) {
+            if (owned != null && ((owned.law() instanceof AcComponent.Passive || owned.law() instanceof AcComponent.Inductance)
+                    && par.getParameterIndex() == 0 || (owned.law() instanceof AcComponent.Voltage
+                    || owned.law() instanceof AcComponent.Current) && par.getParameterIndex() == 1)) {
+                continue;
+            }
             par.writeXMLToFile(ascii);
         }
 
@@ -691,6 +782,8 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
     }
 
     public void copyLKBlockPars(final AbstractBlockInterface copy) {
+        acComponent.getValue().ifPresent(current -> copy.acComponent.setValueWithoutUndo(Optional.of(
+                new AcComponent(copy.getStringID(), current.spiceOrders(), List.of(), current.mirrored(), current.law()))));
         copy.setSheetPositionWithoutUndo(getSheetPosition());
         copy.setPositionVorVerschieben(getSheetPosition());
         System.arraycopy(parameter, 0, copy.parameter, 0, parameter.length);
@@ -779,8 +872,17 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
             _textInfo.addParameter(getStringID());
         }
 
-        this.addTextInfoParameters();
-        _textInfo.addParameters(getRegisteredParameters(), getDisplayProperties());
+        var editor = SchematicEditor2.Singleton;
+        var settings = editor == null ? null : editor.getAcSettings();
+        var owned = getAcComponent();
+        if (settings != null && owned != null) {
+            if (getDisplayProperties().showParameter) {
+                addAcDisplayParameters(owned, settings);
+            }
+        } else {
+            this.addTextInfoParameters();
+            _textInfo.addParameters(getRegisteredParameters(), getDisplayProperties());
+        }
 
         _textInfo.zeichneLinie(graphics, getDisplayProperties().showTextLine);
 
@@ -791,6 +893,50 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
         }
 
         paintIndividualComponent(graphics);
+    }
+
+    private void addAcDisplayParameters(AcComponent owned, AcDocumentSettings settings) {
+        try {
+            var editor = SchematicEditor2.Singleton;
+            var parameters = editor.getHierarchy() == null ? settings.parameterMap() : editor.hierarchyEdits.scope(this);
+            switch (owned.law()) {
+                case AcComponent.Passive law -> {
+                    boolean resistance = getTypeEnum().getTypeNumber() == SpicePorts.RES.type();
+                    double value = SpiceValue.evaluate(law.expression(), parameters);
+                    _textInfo.addParameter((resistance ? "R = " : "C = ") + AC_VALUE_FORMAT.formatENG(value, 4)
+                            + (resistance ? " Ω" : " F"));
+                }
+                case AcComponent.Voltage law -> {
+                    double magnitude = SpiceValue.evaluate(law.magnitude(), parameters);
+                    if (magnitude != 0) {
+                        double phase = SpiceValue.evaluate(law.phaseDegrees(), parameters);
+                        _textInfo.addParameter("AC " + AC_VALUE_FORMAT.formatENG(magnitude, 4) + " V ∠ "
+                                + AC_VALUE_FORMAT.formatENG(phase, 4) + "°");
+                    } else {
+                        double dc = SpiceValue.evaluate(law.dc(), parameters);
+                        _textInfo.addParameter("DC " + AC_VALUE_FORMAT.formatENG(dc, 4) + " V");
+                    }
+                }
+                case AcComponent.Inductance law -> {
+                    _textInfo.addParameter("L = " + AC_VALUE_FORMAT.formatENG(SpiceValue.evaluate(law.expression(), parameters), 4)
+                            + " H");
+                    _textInfo.addParameter("Rser = " + AC_VALUE_FORMAT.formatENG(
+                            SpiceValue.evaluate(law.seriesResistance(), parameters), 4) + " Ω");
+                }
+                case AcComponent.Current law -> {
+                    _textInfo.addParameter("AC " + AC_VALUE_FORMAT.formatENG(SpiceValue.evaluate(law.magnitude(), parameters), 4)
+                            + " A ∠ " + AC_VALUE_FORMAT.formatENG(SpiceValue.evaluate(law.phaseDegrees(), parameters), 4) + "°");
+                }
+                case AcComponent.Controlled law -> {
+                    if (!law.laplace()) {
+                        double gain = SpiceValue.evaluate(law.expression(), parameters);
+                        _textInfo.addParameter("Gain = " + AC_VALUE_FORMAT.formatENG(gain, 4));
+                    }
+                }
+            }
+        } catch (IllegalArgumentException error) {
+            _textInfo.addErrorValue("Invalid AC value");
+        }
     }
 
     /**
@@ -989,7 +1135,8 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
             labelDialog.setVisible(true);
             return;
         }
-        final Window dialog = openDialogWindow();
+        final Window dialog = (getAcComponent() != null || SchematicEditor2.Singleton.getAcSettings() != null)
+                && getAcComponentOrLiteral() != null ? AcEditorDialogs.componentDialog(this) : openDialogWindow();
         dialog.setVisible(true);
         if (dialog instanceof Frame) {
             Frame frame = (Frame) dialog;

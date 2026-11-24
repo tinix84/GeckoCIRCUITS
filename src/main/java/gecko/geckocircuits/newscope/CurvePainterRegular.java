@@ -26,7 +26,7 @@ import java.util.Stack;
  * @author andy
  */
 class CurvePainterRegular extends AbstractCurvePainter {
-  private final Stack<AbstractCurvePixelPainter> _allPainters = new Stack<AbstractCurvePixelPainter>();
+  private final List<AbstractCurvePixelPainter> _allPainters = new Stack<AbstractCurvePixelPainter>();
   private static final float ZERO_TRANS_REPLACE = 0.15f;
   private static final int MAX_PIXEL_DRAW = 1000000;
 
