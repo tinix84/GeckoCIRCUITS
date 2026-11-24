@@ -109,7 +109,7 @@ xvfb-run -a mvn -f pom-reactor.xml test -pl . -am -Pregression
 `ReleaseTraceApplicationTest` runs all ten circuits and rejects a 5% in-memory reference mutation.
 It also rejects command/state flips and shifted or missing steps during matching simulations.
 `PhysicalTraceComparisonTest` checks binary flips, timestamp shifts, missing values, nonfinite values, and unit-specific floors.
-`ReleaseTraceFixtureValidationTest` rejects malformed schemas, missing signals, truncated rows, duplicate times, and empty traces.
+`ReleaseTraceFixtureValidationTest` rejects malformed CSV headers, missing signals, truncated rows, duplicate times, and empty traces.
 Accepted files remain unchanged during these controls.
 
 The Core mapping resolves saved component identifiers and terminal connectivity before reading numerical values.

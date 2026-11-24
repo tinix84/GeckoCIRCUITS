@@ -152,7 +152,9 @@ final class ReleaseTraceFixture {
         int[] step = {0};
         engine.setStepTraceListener((time, p, currents, netlist) -> {
             int index = step[0]++;
-            assertTrue(index < fixture.rows().size(), fixture.id() + " extra committed step at " + time);
+            assertTrue(index < fixture.rows().size(), () -> fixture.id() + " first divergence: divergentStep=" + index
+                    + ", nativeTime=" + time + " s, committed step count [steps] limit=0, expected="
+                    + fixture.rows().size() + ", actual=" + (index + 1));
             if (mapping[0] == null) mapping[0] = new Mapping(fixture.columns(), model, netlist);
             double[] actual = mapping[0].values(p, currents, netlist);
             Row expected = fixture.rows().get(index);
@@ -175,10 +177,12 @@ final class ReleaseTraceFixture {
         });
         var outcome = engine.runSimulation(SimulationConfig.builder().circuitFile(file.toString()).build());
         assertTrue(outcome.isSuccess(), fixture.id() + " execution failed: " + outcome.getErrorMessage());
-        assertEquals(fixture.rows().size(), step[0], fixture.id() + " committed step count");
+        assertEquals(fixture.rows().size(), step[0], () -> fixture.id() + " first divergence: divergentStep=" + step[0]
+                + ", nativeTime=" + fixture.rows().get(step[0]).time() + " s, committed step count [steps] limit=0, expected="
+                + fixture.rows().size() + ", actual=" + step[0]);
     }
 
-    private static final class Mapping {
+    static final class Mapping {
         private final List<Column> columns;
         private final int[] index;
         private final int[] reference;
@@ -201,6 +205,7 @@ final class ReleaseTraceFixture {
             Set<Integer> auxiliary = new HashSet<>();
             Set<Integer> commands = new HashSet<>();
             Set<Integer> states = new HashSet<>();
+            Set<Integer> resistances = new HashSet<>();
             for (int columnIndex = 0; columnIndex < columns.size(); columnIndex++) {
                 Column column = columns.get(columnIndex);
                 if (column.kind().equals("node_voltage")) {
@@ -219,6 +224,7 @@ final class ReleaseTraceFixture {
                         }
                         case "gate_command" -> assertTrue(commands.add(component));
                         case "conduction_state" -> assertTrue(states.add(component));
+                        case "device_resistance" -> assertTrue(resistances.add(component), "Duplicate resistance binding");
                         default -> { }
                     }
                 }
@@ -238,6 +244,7 @@ final class ReleaseTraceFixture {
                         || type == CircuitTypCore.LK_THYR || type == CircuitTypCore.LK_IGBT;
                 assertEquals(controlled, commands.contains(component), "Incomplete command mapping");
                 assertEquals(controlled || type == CircuitTypCore.LK_D, states.contains(component), "Incomplete conduction mapping");
+                assertEquals(controlled || type == CircuitTypCore.LK_D, resistances.contains(component), "Incomplete resistance mapping");
             }
         }
 
@@ -270,7 +277,7 @@ final class ReleaseTraceFixture {
                     case "component_current" -> currents[component];
                     case "auxiliary_current" -> p[netlist.getNodeMax() + netlist.getVoltageSourceNumber(component)];
                     case "device_resistance" -> netlist.getParameter(component)[0];
-                    case "gate_command" -> netlist.getParameter(component)[8] > .5 ? 1 : 0;
+                    case "gate_command" -> netlist.getConsumedGateCommand(component);
                     case "conduction_state" -> conduction(netlist, component);
                     default -> throw new IllegalArgumentException("Unknown physical signal kind: " + column.kind());
                 };

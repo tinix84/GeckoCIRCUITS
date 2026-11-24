@@ -43,7 +43,7 @@ class PhysicalTraceComparisonTest {
                 List.of(new TraceComparisonHelper.PhysicalSignal("V:node", "V", false)),
                 new double[]{48}, new double[]{48}, .01, FLOORS, 1e-12);
         assertFalse(result.match());
-        assertEquals("time [s]", result.divergentVariable());
+        assertEquals("time [s] limit=1.0E-12", result.divergentVariable());
     }
 
     @Test void aMissingSignalCannotPass() {

@@ -1,5 +1,6 @@
 package gecko.core.io;
 
+import gecko.core.simulation.ControlBlockDescriptor;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -511,23 +512,28 @@ public final class CircuitTopology {
             Map<CircuitModel.ComponentData, ComponentIdentity> identities, List<Port> ports) {
         var candidates = new LinkedHashMap<TerminalIdentity, CircuitModel.TerminalData>();
         var anonymousPositions = new HashSet<Position>();
+        Set<TerminalIdentity> admitted = ports.stream().map(Port::id).collect(Collectors.toSet());
+        for (Port port : ports) {
+            var geometry = port.geometry();
+            if (port.domain().equals("CONTROL") && port.label().isEmpty() && geometry != null && geometry.geometric()) {
+                anonymousPositions.add(new Position(port.domain(), port.sheet(), geometry.x(), geometry.y()));
+            }
+        }
         for (var component : model.getControlComponents()) {
             var saved = component.getSavedBlock();
             if (saved == null || !component.getTerminalData().isEmpty()) continue;
             int type = component.getType();
             // RegelBlock and AbstractReglerVariableInputs use these standard terminal layouts.
             if (!Set.of(1, 2, 3, 4, 5, 6, 7, 11, 12, 13, 14, 18, 19, 21, 25, 64).contains(type)) continue;
+            var descriptor = ControlBlockDescriptor.find(type);
             for (Side side : Side.values()) {
-                if (side == Side.INPUT && type <= 3 || side == Side.OUTPUT && (type == 5 || type == 6)) continue;
                 String[] labels = portLabels(component, side);
-                int count = side == Side.OUTPUT ? 1 : switch (type) {
-                    case 4 -> component.getNumericParameters().length > 6 && component.getNumericParameters()[6] != 0 ? 5 : 0;
-                    case 6, 7, 18, 25 -> 1;
-                    case 11 -> component.getNumericParameters().length > 1 && component.getNumericParameters()[1] != 0 ? 2 : 1;
-                    case 64 -> 2;
-                    default -> labels.length;
-                };
+                int count;
+                try { count = side == Side.INPUT ? descriptor.inputs(component) : descriptor.outputs(component); }
+                catch (IllegalArgumentException invalidMode) { continue; } // Readiness reports invalid saved modes separately.
                 for (int port = 0; port < Math.min(labels.length, count); port++) {
+                    var terminal = new TerminalIdentity(identities.get(component), side, port);
+                    if (!admitted.contains(terminal)) continue;
                     int dx = side == Side.INPUT ? -2 : type <= 4 ? 2 : 1;
                     int dy = -port;
                     // Expanded SIGNAL inputs are below the source, as in ReglerSignalSource.setExpanded().
@@ -543,7 +549,7 @@ public final class CircuitTopology {
                         default -> { x += dx; y -= dy; }
                     }
                     var geometry = new CircuitModel.TerminalData("CONTROL", saved.parentSheetIdentifier(), side, port, x, y, true);
-                    candidates.put(new TerminalIdentity(identities.get(component), side, port), geometry);
+                    candidates.put(terminal, geometry);
                     if (normalizeLabel(labels[port]).isEmpty()) {
                         anonymousPositions.add(new Position("CONTROL", geometry.sheetIdentifier(), x, y));
                     }

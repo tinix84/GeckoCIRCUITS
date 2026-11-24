@@ -6,6 +6,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import java.util.ArrayList;
+import gecko.core.circuit.netlist.NetlistBuilder;
+import gecko.core.io.CircuitFileParser;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -69,6 +71,40 @@ class ReleaseTraceApplicationTest {
                 () -> ReleaseTraceFixture.compare(withRows(circuit, rows), -1, -1));
         assertTrue(failure.getMessage().contains("time [s]"), failure::getMessage);
         assertTrue(failure.getMessage().contains("divergentStep=5"), failure::getMessage);
+        assertTrue(failure.getMessage().contains("limit=1.0E-12"), failure::getMessage);
+        assertTrue(failure.getMessage().contains("expectedValue="), failure::getMessage);
+        assertTrue(failure.getMessage().contains("actualValue="), failure::getMessage);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void missingOrExtraEndpointReportsCountsAndNativeTime(boolean extraReference) throws Exception {
+        var circuit = buck();
+        var rows = new ArrayList<>(circuit.rows());
+        if (extraReference) rows.add(new ReleaseTraceFixture.Row(rows.getLast().time() + 1e-6, rows.getLast().values()));
+        else rows.removeLast();
+        AssertionError failure = assertThrows(AssertionError.class,
+                () -> ReleaseTraceFixture.compare(withRows(circuit, rows), -1, -1));
+        for (String required : List.of("divergentStep=", "nativeTime=", "[steps] limit=0", "expected=", "actual=")) {
+            assertTrue(failure.getMessage().contains(required), failure::getMessage);
+        }
+    }
+
+    @Test
+    void missingAndDuplicateResistanceBindingsFailTheCoreMapping() throws Exception {
+        var circuit = buck();
+        var input = ReleaseTraceApplicationTest.class.getResource(circuit.input());
+        var model = new CircuitFileParser().parse(java.nio.file.Path.of(input.toURI()).toString());
+        var netlist = NetlistBuilder.buildFromCircuitModel(model);
+        var columns = new ArrayList<>(circuit.columns());
+        var resistance = columns.stream().filter(column -> column.kind().equals("device_resistance")).findFirst().orElseThrow();
+        columns.remove(resistance);
+        AssertionError missing = assertThrows(AssertionError.class, () -> new ReleaseTraceFixture.Mapping(columns, model, netlist));
+        assertTrue(missing.getMessage().contains("resistance"), missing::getMessage);
+        columns.add(resistance);
+        columns.add(resistance);
+        AssertionError duplicate = assertThrows(AssertionError.class, () -> new ReleaseTraceFixture.Mapping(columns, model, netlist));
+        assertTrue(duplicate.getMessage().contains("resistance"), duplicate::getMessage);
     }
 
     private static ReleaseTraceFixture.Case buck() throws Exception {

@@ -50,7 +50,7 @@ public final class TraceComparisonHelper {
         }
         if (!Double.isFinite(expectedTime) || !Double.isFinite(actualTime)
                 || Math.abs(expectedTime - actualTime) > timestampTolerance) {
-            return ComparisonResult.mismatch(step, "time [s]", expectedTime, actualTime);
+            return ComparisonResult.mismatch(step, "time [s] limit=" + timestampTolerance, expectedTime, actualTime);
         }
         if (expected.length != signals.size() || actual.length != signals.size()) {
             return ComparisonResult.mismatch(step, "physical signal count", expected.length, actual.length);

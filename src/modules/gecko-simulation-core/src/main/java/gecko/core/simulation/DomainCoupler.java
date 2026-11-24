@@ -220,8 +220,9 @@ public class DomainCoupler {
                     params[PARAM_GATE] = (gateValue > 0.5) ? 1.0 : 0.0;
                     break;
                 default:
-                    break;
+                    continue;
             }
+            circuitNetlist.recordConsumedGateCommand(switchIndex, gateValue > 0.5);
 
             if (params[0] != oldR) {
                 anyChanged = true;
