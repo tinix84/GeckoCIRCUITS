@@ -160,7 +160,15 @@ class ThermalReadinessTest {
 
     @Test
     void aThermalBlockWithAHierarchyMemberKeyFailsToParse() throws Exception {
-        String saved = new String(new CircuitFileWriter().write(nativeHierarchy()), StandardCharsets.UTF_8);
+        byte[] compressed = new CircuitFileWriter().write(nativeHierarchy());
+        String saved;
+        try (var gzip = new java.util.zip.GZIPInputStream(new ByteArrayInputStream(compressed))) {
+            saved = new String(gzip.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        // Positive control: the base document parses to a hierarchy with its occurrences.
+        var base = new CircuitFileParser().parse(new ByteArrayInputStream(saved.getBytes(StandardCharsets.UTF_8)), "base.ipes");
+        assertNotNull(base.getHierarchy());
+        assertFalse(base.getHierarchy().definitions().isEmpty());
         String member = gecko.core.io.HierarchyMetadataCodec.MEMBER + " "
                 + gecko.core.io.HierarchyMetadataCodec.encode(new gecko.core.io.CircuitHierarchy.Member("k"));
         String block = ThermalFixture.thermal(46, "Rth.m", 7001, "a", "0", "1.0", member + "\n");
