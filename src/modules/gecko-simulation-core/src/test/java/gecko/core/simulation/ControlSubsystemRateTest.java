@@ -381,4 +381,46 @@ class ControlSubsystemRateTest {
         assertEquals(4, exportedValues(Map.of("fast", 10e-6, "slow", 100e-6), 0));
         assertEquals(6, exportedValues(Map.of("fast", 10e-6, "slow", 100e-6), 50e-6), "the global group too");
     }
+
+    private static CircuitModel buckWithTwoClocks() throws Exception {
+        var path = java.nio.file.Path.of(java.util.Objects.requireNonNull(
+                ControlSubsystemRateTest.class.getResource("/ipes/buck_simple.ipes")).toURI()).toString();
+        var buck = new CircuitFileParser().parse(path);
+        var extra = parse(sheet(9101, 0, "fast") + sheet(9202, 0, "slow")
+                + block(58, "fastTime", 9001, 9101, "", "", "/fastclock")
+                + block(5, "fastScope", 9002, 9101, "", "/fastclock", "")
+                + block(58, "slowTime", 9003, 9202, "", "", "/slowclock")
+                + block(5, "slowScope", 9004, 9202, "", "/slowclock", ""));
+        buck.getSpecialComponents().addAll(extra.getSpecialComponents());
+        buck.getControlComponents().addAll(extra.getControlComponents());
+        return buck;
+    }
+
+    @Test
+    void adaptiveStepsAndEventLocationLeaveEveryGroupOnTheGridClock() throws Exception {
+        var periods = Map.of("fast", 5e-6, "slow", 20e-6);
+        float[][] rows = new float[2][];
+        float[][] slows = new float[2][];
+        for (int run = 0; run < 2; run++) {
+            var adaptive = run == 1 ? new gecko.core.allg.AdaptiveStepSettings(1e-3, 1e-9, Double.NaN) : null;
+            var features = new gecko.core.preparation.SolverFeatures(0, false, false, null, adaptive, null, periods);
+            var preparation = new gecko.core.preparation.CircuitPreparation();
+            var result = preparation.prepare(preparation.capture(buckWithTwoClocks()),
+                    new gecko.core.preparation.PreparationRequest(new gecko.core.preparation.SolverOverrides(null, null, 1e-4,
+                            features), Map.of()));
+            var ready = assertInstanceOf(gecko.core.preparation.PreparationResult.Ready.class, result, result.report().toString());
+            try (var session = SimulationSession.open(ready.execution(), ExecutionOptions.defaults())) {
+                session.run();
+                rows[run] = row(session, "fastclock");
+                slows[run] = row(session, "slowclock");
+                if (run == 1) assertTrue(session.adaptiveStepReport().located() > 0, session.adaptiveStepReport().toString());
+            }
+        }
+        assertArrayEquals(rows[0], rows[1]);
+        assertArrayEquals(slows[0], slows[1]);
+        for (int step = 0; step < rows[1].length; step++) {
+            assertEquals(5e-6 * (step / 5), rows[1][step], 1e-9, "fast " + step);
+            assertEquals(20e-6 * (step / 20), slows[1][step], 1e-9, "slow " + step);
+        }
+    }
 }
