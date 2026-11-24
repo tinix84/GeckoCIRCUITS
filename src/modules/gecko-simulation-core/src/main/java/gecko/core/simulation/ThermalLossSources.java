@@ -53,7 +53,7 @@ public final class ThermalLossSources {
     public static Resolution resolve(CircuitModel model, CircuitModel.ComponentData lossSource) {
         CircuitModel.ComponentData coupled = coupledComponent(model, lossSource);
         if (coupled == null) {
-            return Resolution.unsupported("UNSUPPORTED_LOSS_COMPONENT", "The loss source has no resolvable coupled component.");
+            return Resolution.unsupported("UNSUPPORTED_LOSS_COMPONENT", "The loss source reference does not match exactly one electrical component.");
         }
         int type = coupled.getType();
         if (type == CircuitTypCore.LK_R.getTypeNumber()) {
@@ -94,25 +94,22 @@ public final class ThermalLossSources {
         return new Resolution(new Spec(coupled, () -> SemiconductorLossModel.simple(uf, rOn, kOn, kOff, blocking)), null, null);
     }
 
+    /** The one component whose saved identifier equals the saved reference, or null. Names repeat across sheet copies. */
     private static CircuitModel.ComponentData coupledComponent(CircuitModel model, CircuitModel.ComponentData lossSource) {
         String reference = lossSource.getImportTokens().get("coupledReferenceID[]");
-        if (reference != null && !reference.isBlank()) {
-            try {
-                long identifier = Long.parseLong(reference.trim().split("\\s+")[0]);
-                for (var component : model.getCircuitComponents()) {
-                    if (component.getParameters().get("uniqueObjectIdentifier") instanceof Number number
-                            && number.longValue() == identifier) return component;
-                }
-            } catch (NumberFormatException ignored) {
-                // Fall back to the saved coupled name.
+        if (reference == null || reference.isBlank()) return null;
+        long identifier;
+        try { identifier = Long.parseLong(reference.trim().split("\\s+")[0]); }
+        catch (NumberFormatException error) { return null; }
+        CircuitModel.ComponentData match = null;
+        for (var component : model.getCircuitComponents()) {
+            if (component.getParameters().get("uniqueObjectIdentifier") instanceof Number number
+                    && number.longValue() == identifier) {
+                if (match != null) return null;
+                match = component;
             }
-            return null;
         }
-        String[] names = lossSource.getParameterStrings();
-        if (names.length > 0) {
-            for (var component : model.getCircuitComponents()) if (names[0].equals(component.getName())) return component;
-        }
-        return null;
+        return match;
     }
 
     private static double parameter(CircuitModel.ComponentData component, int index) {
@@ -120,8 +117,18 @@ public final class ThermalLossSources {
         return index < values.length ? values[index] : 0;
     }
 
+    /** A saved {@code <Verluste>} value, which overrides the parameter array like the legacy import. */
     private static double token(CircuitModel.ComponentData component, String name, double fallback) {
-        String text = component.getImportTokens().get(name);
+        String text = null;
+        var saved = component.getSavedBlock();
+        String section = saved == null ? null : saved.sections().get("Verluste");
+        if (section != null) {
+            for (String line : section.split("\\R")) {
+                String[] pair = line.trim().split("\\s+", 2);
+                if (pair[0].equals(name) && pair.length == 2) text = pair[1];
+            }
+        }
+        if (text == null) text = component.getImportTokens().get(name);
         if (text == null || text.isBlank()) return fallback;
         try { return Double.parseDouble(text.trim()); }
         catch (NumberFormatException error) { return Double.NaN; }

@@ -48,6 +48,13 @@ public final class CircuitPreparation {
     public PreparationResult prepare(CircuitSnapshot base, PreparationRequest request) {
         var model = base.toModel();
         if (model.getAcSettings() != null) return prepareAc(base, model, request);
+        if (model.getHierarchy() != null || model.getCircuitComponents().stream().anyMatch(component ->
+                component.getAcComponent() != null && component.getAcComponent().law() instanceof gecko.core.ac.AcComponent.Inductance)) {
+            return new PreparationResult.Rejected(new ReadinessReport(ReadinessReport.Outcome.UNSUPPORTED,
+                    List.of(new Diagnostic("UNSUPPORTED_TRANSIENT_LAW", Diagnostic.Category.CAPABILITY, Diagnostic.Severity.ERROR,
+                            "Select AC analysis for the imported hierarchy or series resistance law.",
+                            "LK", null, "analysis", model.getFilePath()))));
+        }
         for (var finding : CircuitConfiguration.normalize(model)) {
             var issue = new ImportIssue(finding.code(), finding.domain(), finding.component(), finding.message(),
                     finding.sourceLocation(), false, finding.parameterPath());
@@ -129,8 +136,14 @@ public final class CircuitPreparation {
         }
         var diagnostics = new ArrayList<Diagnostic>();
         AcExecutionPlan plan = null;
+        // Before the plan: a hierarchy document reaches the same rejection.
+        for (var component : model.getThermalComponents()) {
+            diagnostics.add(new Diagnostic("UNSUPPORTED_DOMAIN", Diagnostic.Category.CAPABILITY, Diagnostic.Severity.ERROR,
+                    "AC analysis does not support THERMAL elements.", "THERMAL", component.getName(), null,
+                    component.getSourceLocation()));
+        }
         try {
-            model = snapshot.executionModel();
+            if (model.getHierarchy() == null) model = snapshot.executionModel();
             plan = new AcExecutionPlan(model);
         } catch (IllegalArgumentException error) {
             diagnostics.add(new Diagnostic("INVALID_AC", Diagnostic.Category.CONFIGURATION, Diagnostic.Severity.ERROR,
@@ -140,11 +153,6 @@ public final class CircuitPreparation {
         var conversionIssues = model.getConversionIssues();
         model.getImportIssues().removeIf(issue -> parserTimingIssues.contains(issue) && !conversionIssues.contains(issue));
         CircuitReadiness.appendImportDiagnostics(model, diagnostics);
-        for (var component : model.getThermalComponents()) {
-            diagnostics.add(new Diagnostic("UNSUPPORTED_DOMAIN", Diagnostic.Category.CAPABILITY, Diagnostic.Severity.ERROR,
-                    "AC analysis does not support THERMAL elements.", "THERMAL", component.getName(), null,
-                    component.getSourceLocation()));
-        }
         if (diagnostics.stream().anyMatch(diagnostic -> diagnostic.severity() == Diagnostic.Severity.ERROR)) {
             return new PreparationResult.Inspectable(snapshot, new ReadinessReport(ReadinessReport.Outcome.INVALID, diagnostics));
         }

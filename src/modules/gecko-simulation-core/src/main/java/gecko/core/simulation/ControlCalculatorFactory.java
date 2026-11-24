@@ -477,25 +477,22 @@ public class ControlCalculatorFactory {
         }
     }
 
+    /** The one thermal component whose saved identifier equals the saved reference, or null. Names repeat across copies. */
     private static CircuitModel.ComponentData coupledThermal(CircuitModel model, CircuitModel.ComponentData control) {
         String reference = control.getImportTokens().get("coupledReferenceID[]");
-        if (reference != null && !reference.isBlank()) {
-            try {
-                long identifier = Long.parseLong(reference.trim().split("\\s+")[0]);
-                for (var thermal : model.getThermalComponents()) {
-                    if (thermal.getParameters().get("uniqueObjectIdentifier") instanceof Number number
-                            && number.longValue() == identifier) return thermal;
-                }
-            } catch (NumberFormatException ignored) {
-                return null;
+        if (reference == null || reference.isBlank()) return null;
+        long identifier;
+        try { identifier = Long.parseLong(reference.trim().split("\\s+")[0]); }
+        catch (NumberFormatException error) { return null; }
+        CircuitModel.ComponentData match = null;
+        for (var thermal : model.getThermalComponents()) {
+            if (thermal.getParameters().get("uniqueObjectIdentifier") instanceof Number number
+                    && number.longValue() == identifier) {
+                if (match != null) return null;
+                match = thermal;
             }
-            return null;
         }
-        String[] names = control.getParameterStrings();
-        if (names.length > 0) {
-            for (var thermal : model.getThermalComponents()) if (names[0].equals(thermal.getName())) return thermal;
-        }
-        return null;
+        return match;
     }
 
     /** The thermal netlist node of a label on the probe's sheet, like the legacy findIndexFromLabelInSheet. */
