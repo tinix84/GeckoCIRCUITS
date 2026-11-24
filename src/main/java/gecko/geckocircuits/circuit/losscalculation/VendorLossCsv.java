@@ -9,6 +9,7 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.SortedMap;
 import java.util.TreeMap;
 
 /**
@@ -29,7 +30,7 @@ public final class VendorLossCsv {
     /** Reads CSV samples and returns the existing detailed loss format in UTF-8. */
     public static byte[] toDetailedLossFile(Reader input) throws IOException {
         var reader = new BufferedReader(input);
-        var conduction = new TreeMap<Double, TreeMap<Double, Double>>();
+        var conduction = new TreeMap<Double, SortedMap<Double, Double>>();
         var switching = new TreeMap<Double, SwitchingSamples>();
         String line;
         int lineNumber = 0;
@@ -37,7 +38,9 @@ public final class VendorLossCsv {
         while ((line = reader.readLine()) != null) {
             lineNumber++;
             line = line.strip();
-            if (line.isEmpty() || line.startsWith("#")) continue;
+            if (line.isEmpty() || line.startsWith("#")) {
+                continue;
+            }
             if (!headerRead) {
                 if (!line.replace("\uFEFF", "").equals(HEADER)) {
                     throw invalid(lineNumber, "Use the documented loss CSV header.");
@@ -46,25 +49,35 @@ public final class VendorLossCsv {
                 continue;
             }
             String[] columns = line.split(",", -1);
-            if (columns.length != 7) throw invalid(lineNumber, "Enter seven columns.");
-            for (int index = 0; index < columns.length; index++) columns[index] = columns[index].strip();
+            if (columns.length != 7) {
+                throw invalid(lineNumber, "Enter seven columns.");
+            }
+            for (int index = 0; index < columns.length; index++) {
+                columns[index] = columns[index].strip();
+            }
             double temperature = number(columns[1], lineNumber, "junction temperature");
             double current = number(columns[2], lineNumber, "current");
-            if (temperature < -273.15) throw invalid(lineNumber, "Enter a temperature above absolute zero.");
+            if (temperature < -273.15) {
+                throw invalid(lineNumber, "Enter a temperature above absolute zero.");
+            }
             switch (columns[0]) {
                 case "conduction" -> {
                     if (!columns[4].isEmpty() || !columns[5].isEmpty() || !columns[6].isEmpty()) {
                         throw invalid(lineNumber, "Leave the switching columns empty for conduction.");
                     }
                     double voltage = number(columns[3], lineNumber, "voltage drop");
-                    if (current * voltage < 0) throw invalid(lineNumber, "Use matching current and voltage signs.");
+                    if (current * voltage < 0) {
+                        throw invalid(lineNumber, "Use matching current and voltage signs.");
+                    }
                     var points = conduction.computeIfAbsent(temperature, key -> new TreeMap<>());
                     if (points.putIfAbsent(current, voltage) != null) {
                         throw invalid(lineNumber, "Enter one conduction sample per current and temperature.");
                     }
                 }
                 case "switching" -> {
-                    if (!columns[3].isEmpty()) throw invalid(lineNumber, "Leave the voltage drop empty for switching.");
+                    if (!columns[3].isEmpty()) {
+                        throw invalid(lineNumber, "Leave the voltage drop empty for switching.");
+                    }
                     double blocking = number(columns[4], lineNumber, "blocking voltage");
                     double turnOn = number(columns[5], lineNumber, "turn-on energy");
                     double turnOff = number(columns[6], lineNumber, "turn-off energy");
@@ -128,7 +141,9 @@ public final class VendorLossCsv {
     private static double number(String raw, int line, String column) {
         try {
             double value = Double.parseDouble(raw);
-            if (Double.isFinite(value)) return value == 0 ? 0 : value;
+            if (Double.isFinite(value)) {
+                return value == 0 ? 0 : value;
+            }
         } catch (NumberFormatException ignored) {
             // Use the same diagnostic for an invalid number and a non-finite number.
         }
@@ -147,7 +162,7 @@ public final class VendorLossCsv {
 
     private record Energy(double turnOn, double turnOff) {}
 
-    private record SwitchingSamples(double voltage, TreeMap<Double, Energy> points) {
+    private record SwitchingSamples(double voltage, SortedMap<Double, Energy> points) {
         SwitchingSamples(double voltage) {
             this(voltage, new TreeMap<>());
         }
