@@ -76,7 +76,7 @@ The importer reports unsupported symbol attributes such as `ModelFile`. Review d
 
 Use one `.ac dec` sweep in a `.cir` netlist or an `.asc` schematic. The sweep specifies points per decade, start frequency, and stop frequency.
 
-Use resistors, capacitors, inductors, independent voltage and current sources, and voltage-controlled voltage sources. The controlled source accepts scalar gain or a Laplace expression. Specify an explicit `Rser` for each AC inductor, including zero for an ideal inductor. An inductor with this AC law is restricted to AC execution.
+Use resistors, capacitors, inductors, independent voltage and current sources, and voltage-controlled voltage sources. The controlled source accepts scalar gain or a Laplace expression. Specify an explicit positive `Rser` for each AC inductor. An inductor with this AC law is restricted to AC execution.
 
 Run the saved analysis to write the frequencies and complex results as JSON.
 
