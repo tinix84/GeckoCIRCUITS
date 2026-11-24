@@ -1962,7 +1962,7 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
 
         ProjectData daten = null;
         String[] lines = getLinesArrayFromIpesFile(dateiName);
-        daten = new ProjectData(lines, isAutoBackupFile, optimizer);
+        daten = new ProjectData(lines, isAutoBackupFile, optimizer, dateiName);
         return daten;
 
     }
