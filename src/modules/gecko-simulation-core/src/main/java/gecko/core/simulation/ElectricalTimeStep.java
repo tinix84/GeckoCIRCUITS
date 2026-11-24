@@ -72,7 +72,8 @@ final class ElectricalTimeStep {
     private double firstUnlocatedTime = Double.NaN;
     private boolean committedOnce;
 
-    // Adaptive sub-step state. Everything here changes only at a committed sub-step, except the retry step.
+    // Adaptive sub-step state. Histories, restart state and margins change only at a committed sub-step.
+    // The retry step and the rejected counter also change while a trial is retried.
     private static final double VOLT_FLOOR = 1e-6;
     private static final double AMPERE_FLOOR = 1e-9;
     private static final int MAX_RETRIES = 30;
@@ -95,6 +96,8 @@ final class ElectricalTimeStep {
     private double shortestSubStep = Double.NaN;
     private double longestSubStep = Double.NaN;
     private SubStepListener subStepListener;
+    /** The last grid time that the adaptive step published. NaN before the first one. */
+    private double publishedGridTime = Double.NaN;
 
     /** Receives each accepted sub-step in order. Tests use it to stream, so production code stores nothing. */
     interface SubStepListener {
@@ -538,11 +541,18 @@ final class ElectricalTimeStep {
     /**
      * Advances one grid step with error-controlled sub-steps that land exactly on the grid time.
      * A trial changes only the diode-family parameter 0, the source-limit parameter 14 and solver scratch.
-     * Both are restored on a rejection. Histories, restart state and statistics change only at a commit.
+     * Both are restored on a rejection. Histories, restart state and the accepted, forced and width statistics
+     * change only at a commit. The rejected counter and the retry step change on each LTE rejection.
      * CONTROL, results and the trace see only the grid step.
+     *
+     * <p>The interval spans from the last published grid time to {@code time}. After a step change that gap
+     * differs from {@code dt}, which stays the nominal step for the width clamps.
      */
     private void advanceAdaptive(double dt, double time, HeadlessSimulationEngine.StepTraceListener traceListener) {
-        double start = time - dt;
+        if (!Double.isNaN(publishedGridTime) && !(time > publishedGridTime)) {
+            throw new IllegalArgumentException("The adaptive grid time must advance past " + publishedGridTime + ".");
+        }
+        double start = Double.isNaN(publishedGridTime) ? time - dt : publishedGridTime;
         double stepMax = Math.min(adaptive.resolvedMaxStep(dt), dt);
         double stepMin = Math.min(adaptive.resolvedMinStep(dt), stepMax);
         if (Double.isNaN(controllerStep)) controllerStep = stepMin;
@@ -569,6 +579,7 @@ final class ElectricalTimeStep {
         }
         for (int slot = 0; slot < diodeElements.length; slot++) gatePrevious[slot] = gateOn(slot);
         rememberDiscontinuityInputs();
+        publishedGridTime = time;
         publishGrid(time, traceListener);
     }
 
