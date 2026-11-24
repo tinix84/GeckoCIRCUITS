@@ -3,6 +3,10 @@
 import numpy as np
 
 
+FEATURES = ("Vin", "L", "C", "fsw", "D", "Rload")
+OUTPUTS = ("vout", "ripple", "conduction_loss", "switching_loss")
+
+
 def design_terms(inputs, grid_step):
     vin, inductance, capacitance, frequency, duty, load = np.asarray(inputs, dtype=float).T
     if not np.all(np.isfinite(inputs)) or np.any(np.asarray(inputs) <= 0) or np.any(duty >= 1):

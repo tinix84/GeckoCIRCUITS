@@ -37,8 +37,7 @@ conda run -n ntbees2 python -m tools.surrogate.predict surrogate-output/buck_sur
 Set `GECKO_API_BASE_URL`, `GECKO_API_KEY`, or `GECKO_ACCESS_TOKEN` as applicable.
 The sweep uses [buck_sweep.yaml](buck_sweep.yaml) for the bounds, sample seed, and measurement window.
 The Parquet file stores the six inputs and four outputs, with the seed, simulation grid step, and sweep duration in its metadata.
-The example sweep file is 184,848 bytes.
-The training command prints the generated model size and the error and speed measurements for the fixed 20 % holdout.
+The training command prints the data set and model sizes and the error and speed measurements for the fixed 20 % holdout.
 
 Use `python -m tools.surrogate.sweep` and `python -m tools.surrogate.train` to run the steps independently.
 Load only a trusted local Joblib file.

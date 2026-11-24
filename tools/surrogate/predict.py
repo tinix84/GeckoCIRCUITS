@@ -7,8 +7,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 
-from .model import predict
-from .sweep import FEATURES
+from .model import FEATURES, predict
 
 
 def main():

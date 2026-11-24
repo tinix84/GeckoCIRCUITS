@@ -14,8 +14,7 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from .model import design_terms, predict
-from .sweep import FEATURES, OUTPUTS
+from .model import FEATURES, OUTPUTS, design_terms, predict
 
 
 def train(dataset, output):

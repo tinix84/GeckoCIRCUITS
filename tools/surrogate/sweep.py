@@ -12,8 +12,8 @@ from tools.optimize.batch import BatchEvaluator, SimulationFailed, connect
 from tools.optimize.problem import load_problem
 
 
-FEATURES = ("Vin", "L", "C", "fsw", "D", "Rload")
-OUTPUTS = ("vout", "ripple", "conduction_loss", "switching_loss")
+from .model import FEATURES, OUTPUTS
+
 DEFAULT_PROBLEM = Path(__file__).with_name("buck_sweep.yaml")
 SAMPLE_COUNT = 2000
 
