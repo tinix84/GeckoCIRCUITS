@@ -7,10 +7,10 @@ Audience: maintainers who implement or review solver features in `gecko-simulati
 
 ## Context
 
-Issue [#58](https://github.com/tinix84/GeckoCIRCUITS/issues/58) asks to locate switching events inside a step. The feature must be off by default and bit-identical when off.
-A session step applies held gates, then solves and commits the electrical step, then runs CONTROL and records one row.
-The diode iteration selects the end-of-step state, so the model knows a transition time only to one step.
-The core has no CONTROL state snapshot. `SignalCalculatorRandom` uses the global `Math.random()` stream, and the caller supplies external inputs.
+Issue [#58](https://github.com/tinix84/GeckoCIRCUITS/issues/58) asks to locate switching events inside a step, with the feature off by default and bit-identical when off.
+A session step applies held gates, solves and commits the electrical step, then runs CONTROL and records one row.
+The diode iteration selects the end-of-step state, so a transition time is known only to one step.
+The core has no CONTROL state snapshot, `SignalCalculatorRandom` uses the global `Math.random()` stream, and the caller supplies external inputs.
 Gear-Shichman (GS) stamps read two history points and assume a uniform step.
 
 ## Options
@@ -25,18 +25,25 @@ Gear-Shichman (GS) stamps read two history points and assume a uniform step.
 ## Decision and rationale
 
 Only `LK_D`, `LK_THYR` and `LK_IGBT` conduction changes emit events. A sign change of `g = vX - vY - Uf` detects them. The diode iteration compares the same quantity [C, High].
-CONTROL blocks, `LK_S`, `LK_MOSFET`, IGBT gate removal and source-limit changes emit no events. CONTROL is discrete-time and holds its outputs, so a gate edge has no time inside a step [C, High].
+
+CONTROL blocks, `LK_S`, `LK_MOSFET`, source-limit changes and gate edges emit no events. A gate edge is a rising gate of a thyristor or IGBT, or a removed IGBT gate. CONTROL is discrete-time and holds its outputs, so a gate edge has no time inside a step [C, High].
+A thyristor or IGBT with a gate that stays high switches by voltage, so the solver locates it.
+
 The split happens before the electrical commit and before CONTROL runs. A rollback therefore restores only trial scratch: diode-family parameter 0, `LK_U` parameter 14, and a forced matrix rebuild [C, High, from the step order in the code].
 Each sub-step commit owns the solver histories. Only the grid commit publishes results, step traces and probe values.
-Recordings keep one row per grid step. Located events go to a bounded log of `ZeroCrossingEvent` records. The result reports any events that were not located and any log overflow.
+
+Every diode-family state change that a committed sub-step holds is either a located event or an unlocated count. A gate edge is in neither group.
+A located event that the next sub-step reverses leaves the log and counts as unlocated. Devices that cross together, such as two series devices of a bridge, switch at the same sub-step.
+
+Recordings keep one row per grid step. Located events go to a bounded log of `ZeroCrossingEvent` records. The result reports the located count, the unlocated count, and any log overflow.
 The opt-in setting is `zeroCrossing` in `SolverFeatures`. The setting validation rejects GS. When the setting is off, the existing step runs unchanged.
 
 ## Consequences
 
-- Diode turn-on and turn-off times resolve inside the step.
-- Gate-driven edges keep the resolution of the grid. The LLC waveform goal of the original request is not claimed. A CONTROL state snapshot contract is a follow-up.
-- A split step rebuilds the matrix at each sub-step. The cost grows with the number of events.
-- Trapezoidal ringing after an event does not change.
+- Diode turn-on and turn-off times resolve inside the step [C, High].
+- Gate-driven edges keep the resolution of the grid. The goal of the original request to match the waveforms of an LLC (inductor-inductor-capacitor) resonant converter is not claimed. A CONTROL state snapshot contract would be a design constraint for locating CONTROL crossings [C, High].
+- A split step rebuilds the matrix at each sub-step. The cost grows with the number of events [C, Medium].
+- Trapezoidal ringing after an event does not change. The ringing switches a device back and forth, and the solver reports those changes as unlocated [C, Medium].
 
 ## Status
 

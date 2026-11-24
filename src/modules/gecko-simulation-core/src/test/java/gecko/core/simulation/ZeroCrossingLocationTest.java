@@ -467,4 +467,95 @@ class ZeroCrossingLocationTest {
         assertThrows(IllegalArgumentException.class, () -> step.advanceInterval(1e-3, Double.POSITIVE_INFINITY, null));
         assertEquals(EventLocationReport.empty(), step.eventReport());
     }
+
+    /** Four diodes and a load across a sine source: D1 and D4 conduct together, then D2 and D3. */
+    static CircuitNetlist bridge(double phaseDegrees) {
+        double[][] parameters = {sine(phaseDegrees), diode(UF), diode(UF), diode(UF), diode(UF), value(LOAD)};
+        CircuitNetlist netlist = new CircuitNetlist();
+        netlist.initNetlist(new CircuitTypCore[]{CircuitTypCore.LK_U, CircuitTypCore.LK_D, CircuitTypCore.LK_D,
+                CircuitTypCore.LK_D, CircuitTypCore.LK_D, CircuitTypCore.LK_R},
+                new int[]{1, 1, 0, 3, 3, 2}, new int[]{0, 2, 2, 1, 0, 3}, new int[]{1, -1, -1, -1, -1, -1},
+                parameters, 3, 1, 6);
+        return netlist;
+    }
+
+    /** Result of comparing every committed diode transition with the reported events. */
+    record Accounting(int transitions, int explained, long located, long unlocated) { }
+
+    /**
+     * Steps a netlist and checks each grid step. A device whose committed state changed must have a located
+     * event or a larger unlocated count. A device with an event must have changed state. Returns totals.
+     */
+    static Accounting audit(CircuitNetlist netlist, SolverType method, double dt, int steps) {
+        ElectricalTimeStep step = new ElectricalTimeStep(netlist, method, true);
+        int transitions = 0;
+        int explained = 0;
+        for (int index = 0; index < steps; index++) {
+            boolean[] before = new boolean[netlist.getElementCount()];
+            for (int element = 0; element < before.length; element++) before[element] = netlist.getParameter(element)[0] < 10000;
+            EventLocationReport old = step.eventReport();
+            step.advanceInterval(dt, index * dt, null);
+            EventLocationReport now = step.eventReport();
+            var fresh = step.events(old.retained(), now.retained() - old.retained());
+            java.util.Set<Integer> logged = new java.util.HashSet<>();
+            for (var event : fresh) assertTrue(logged.add(event.getSignalIndex()), "one event per device and step");
+            if (index == 0) continue;
+            long newUnlocated = now.unlocated() - old.unlocated();
+            int changedUnexplained = 0;
+            for (int element = 0; element < before.length; element++) {
+                if (netlist.getType(element) != CircuitTypCore.LK_D) continue;
+                boolean changed = before[element] != (netlist.getParameter(element)[0] < 10000);
+                if (changed) transitions++;
+                if (changed && logged.contains(element)) explained++;
+                else if (changed) changedUnexplained++;
+                if (!changed) assertFalse(logged.contains(element), "a logged event needs a committed change: step " + index + " device " + element);
+            }
+            assertTrue(changedUnexplained <= newUnlocated, "step " + index + ": " + changedUnexplained
+                    + " silent transitions, unlocated rose by " + newUnlocated);
+            explained += changedUnexplained;
+        }
+        return new Accounting(transitions, explained, step.eventReport().located(), step.eventReport().unlocated());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = SolverType.class, names = {"SOLVER_BE", "SOLVER_TRZ"})
+    void fullBridgePairsAreAllLocatedIncludingPairsNearTheGridPoint(SolverType method) {
+        double dt = PERIOD / 50;
+        // The second phase puts the paired turn-on of D1 and D4 just before a grid point.
+        double nearGridPoint = Math.toDegrees(Math.asin(2 * UF / VPK) - OMEGA * (5 * dt - 1e-7));
+        for (double phase : new double[]{0, nearGridPoint, -27.95035375268849, 10, 45, -60, 90, 133.3}) {
+            Accounting accounting = audit(bridge(phase), method, dt, 150);
+            assertEquals(24, accounting.transitions(), "phase " + phase);
+            assertEquals(accounting.transitions(), accounting.located() + accounting.unlocated(), "phase " + phase);
+            assertEquals(0, accounting.unlocated(), "every crossing of this bridge has a known time: phase " + phase);
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = SolverType.class, names = {"SOLVER_BE", "SOLVER_TRZ"})
+    void ringingThatSwitchesADeviceBackAndForthNeverLeavesAFalseEventOrASilentChange(SolverType method) {
+        // The trapezoidal inductor rings after the diode opens and switches it on and off again. Each audit
+        // step rejects a logged event without a committed change, and a committed change without an event
+        // or an unlocated count.
+        double dt = PERIOD / 50;
+        for (double forward : new double[]{0, UF}) {
+            Accounting accounting = audit(rectifier(forward, 20e-3), method, dt, 150);
+            assertTrue(accounting.located() >= 5, "the regular turn-on and turn-off events stay located: " + accounting);
+            if (method == SolverType.SOLVER_TRZ) {
+                assertTrue(accounting.unlocated() > 0, "ringing transitions are reported, not hidden: " + accounting);
+            }
+        }
+    }
+
+    @Test
+    void devicesThatChangeDuringAPinnedSubStepAreCountedNotDropped() {
+        // Both diodes of the ladder cross inside one step. The first one pins, the second changes in the same sub-step
+        // when the two thresholds differ by less than the boundary tolerance, so it is located together or counted.
+        double dt = PERIOD / 4;
+        CircuitNetlist netlist = ladder(3);
+        netlist.getParameter(3)[1] = netlist.getParameter(1)[1] * (1 + 1e-9);
+        Accounting accounting = audit(netlist, SolverType.SOLVER_BE, dt, 2);
+        assertEquals(3, accounting.transitions());
+        assertEquals(accounting.transitions(), accounting.located() + accounting.unlocated());
+    }
 }

@@ -24,7 +24,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/** Owns one converged electrical step and commits its histories exactly once. */
+/**
+ * Owns the converged electrical solution and its solver histories.
+ * {@link #advance} commits one grid step as a single history update. With zero-crossing location on,
+ * {@link #advanceInterval} commits one history update per sub-step instead. In both cases the grid step
+ * publishes its results, probe values and trace once, at the grid time.
+ */
 final class ElectricalTimeStep {
 
     private final CircuitNetlist netlist;
@@ -48,6 +53,13 @@ final class ElectricalTimeStep {
     private final double[] savedDiodeStates;
     private final double[] savedSourceStates;
     private final boolean[] locatedInStep;
+    private final boolean[] accountedOn;
+    private final boolean[] justToggled;
+    private final boolean[] gatePrevious;
+    private final int[] stagedBySlot;
+    private final List<StagedEvent> staged = new ArrayList<>();
+    private final double[] startMargin;
+    private final double[] trialMargin;
     private final ZeroCrossingDetector detector = new ZeroCrossingDetector();
     private final List<ZeroCrossingEvent> events = new ArrayList<>();
     private int eventRetention = MAX_RETAINED_EVENTS;
@@ -87,7 +99,17 @@ final class ElectricalTimeStep {
         savedDiodeStates = new double[diodeCount];
         savedSourceStates = new double[sourceCount];
         locatedInStep = new boolean[diodeCount];
+        accountedOn = new boolean[diodeCount];
+        justToggled = new boolean[diodeCount];
+        gatePrevious = new boolean[diodeCount];
+        stagedBySlot = new int[diodeCount];
+        startMargin = new double[diodeCount];
+        trialMargin = new double[diodeCount];
+        for (int slot = 0; slot < diodeCount; slot++) gatePrevious[slot] = gateOn(slot);
     }
+
+    /** A located event that enters the log only when its grid step ends and still holds. */
+    private record StagedEvent(int slot, double time, boolean turnOn, double before, double after) { }
 
     private static boolean isDiodeFamily(CircuitTypCore type) {
         return type == CircuitTypCore.LK_D || type == CircuitTypCore.LK_THYR || type == CircuitTypCore.LK_IGBT;
@@ -129,6 +151,9 @@ final class ElectricalTimeStep {
      * Each sub-step commits its solver histories once. Results and the trace publish once, at the grid time.
      * A trial may change only diode-family parameter 0, source-limit parameter 14 and matrix scratch,
      * and all three are restored before the split sub-step runs.
+     *
+     * <p>Every diode-family state change that a committed sub-step holds is either a located event or
+     * counted as unlocated. Gate-driven edges stay on the grid and are in neither group.
      */
     void advanceInterval(double dt, double time, HeadlessSimulationEngine.StepTraceListener traceListener) {
         if (!zeroCrossing) {
@@ -136,90 +161,160 @@ final class ElectricalTimeStep {
             return;
         }
         if (!Double.isFinite(dt) || dt <= 0 || !Double.isFinite(time) || time < 0) {
-            throw new IllegalArgumentException("Time step must be finite and positive; time must be finite and non-negative");
+            throw new IllegalArgumentException("Time step must be finite and positive. Time must be finite and non-negative.");
         }
         double start = time - dt;
-        boolean locate = committedOnce && start >= 0 && start < time;
+        if (committedOnce && start >= 0 && start < time) {
+            locateWithin(start, dt, time);
+            flushStaged();
+        } else {
+            solveFree(dt, time);
+            commitSubStep(dt, time);
+        }
+        for (int slot = 0; slot < diodeElements.length; slot++) gatePrevious[slot] = gateOn(slot);
+        publishGrid(time, traceListener);
+    }
+
+    private void locateWithin(double start, double dt, double time) {
         double current = start;
         double epsilon = BOUNDARY_FRACTION * dt;
         int locatedThisStep = 0;
         boolean wholeStep = true;
         Arrays.fill(locatedInStep, false);
-        double[] g0 = new double[diodeElements.length];
-        double[] gFirst = new double[diodeElements.length];
+        Arrays.fill(justToggled, false);
+        Arrays.fill(stagedBySlot, -1);
+        staged.clear();
+        for (int slot = 0; slot < diodeElements.length; slot++) accountedOn[slot] = isOn(slot);
         while (true) {
             double width = wholeStep ? dt : time - current;
-            if (!locate) {
-                solveFree(width, time);
-                commitSubStep(width, time);
-                break;
-            }
             saveTrialState();
-            computeG(matrixSolver.getPALT(), g0);
+            computeThresholdMargin(matrixSolver.getPALT(), startMargin);
             solveStartTopology(width, time);
-            computeG(matrixSolver.getP(), gFirst);
-            runIteration(width, time, null);
+            computeThresholdMargin(matrixSolver.getP(), trialMargin);
+            doDiodeIteration(numericalNetlist, width, time, null);
             boolean[] candidate = new boolean[diodeElements.length];
-            int blocked = 0;
             boolean any = false;
             boolean capReached = locatedThisStep >= MAX_LOCATED_PER_STEP;
             for (int slot = 0; slot < diodeElements.length; slot++) {
-                if (!toggled(slot) || !(g0[slot] * gFirst[slot] < 0) || gateRemoved(slot)) continue;
-                if (locatedInStep[slot] || capReached) blocked++;
-                else { candidate[slot] = true; any = true; }
+                if (capReached || locatedInStep[slot] || !toggled(slot) || !(startMargin[slot] * trialMargin[slot] < 0)
+                        || gateDriven(slot, isOff(savedDiodeStates[slot]))) continue;
+                candidate[slot] = true;
+                any = true;
             }
             if (!any) {
                 commitSubStep(width, time);
-                countUnlocated(blocked, time);
-                break;
+                reconcile(time);
+                return;
             }
+            double[] crossing = new double[diodeElements.length];
             int best = -1;
-            double bestTime = Double.NaN;
             for (int slot = 0; slot < candidate.length; slot++) {
                 if (!candidate[slot]) continue;
-                double crossing = refine(slot, g0[slot], gFirst[slot], current, time, epsilon);
-                if (best < 0 || crossing < bestTime) { best = slot; bestTime = crossing; }
+                crossing[slot] = refine(slot, startMargin[slot], trialMargin[slot], current, time, epsilon);
+                if (best < 0 || crossing[slot] < crossing[best]) best = slot;
             }
-            boolean turnOn = savedDiodeStates[best] > 10000;
-            locatedInStep[best] = true;
-            locatedThisStep++;
-            recordEvent(best, bestTime, turnOn, g0[best], gFirst[best]);
-            if (bestTime >= time - epsilon) {
-                // The event is on the grid point, so the free trial is the committed step.
-                restoreTrialState();
-                solveStartTopology(width, time);
-                runIteration(width, time, null);
-                commitSubStep(width, time);
-                countUnlocated(blocked, time);
-                break;
+            double eventTime = crossing[best];
+            // Candidates that cross together, such as two series devices of a bridge, switch together.
+            boolean[] together = new boolean[diodeElements.length];
+            int count = 0;
+            for (int slot = 0; slot < candidate.length && locatedThisStep + count < MAX_LOCATED_PER_STEP; slot++) {
+                if (candidate[slot] && crossing[slot] - eventTime <= epsilon) { together[slot] = true; count++; }
             }
             restoreTrialState();
-            if (bestTime > current + epsilon) {
-                subStep(bestTime - current, bestTime, diodeElements[best]);
-                current = bestTime;
+            if (eventTime >= time - epsilon) {
+                // Every candidate crosses at the grid point, so the free trial is the committed step.
+                for (int slot = 0; slot < candidate.length; slot++) if (together[slot]) accept(slot, eventTime);
+                solveFree(width, time);
+                commitSubStep(width, time);
+                reconcile(time);
+                return;
+            }
+            if (eventTime > current + epsilon) {
+                boolean[] pinned = new boolean[netlist.getElementCount()];
+                for (int slot = 0; slot < together.length; slot++) if (together[slot]) pinned[diodeElements[slot]] = true;
+                subStep(eventTime - current, eventTime, pinned);
+                reconcile(eventTime);
+                current = eventTime;
                 wholeStep = false;
             }
-            toggleDiode(best);
+            for (int slot = 0; slot < together.length; slot++) {
+                if (!together[slot]) continue;
+                accept(slot, eventTime);
+                toggleDiode(slot);
+            }
+            locatedThisStep += count;
         }
-        publishGrid(time, traceListener);
     }
 
-    /** Solves, iterates with {@code pinnedElement} held (or -1 for none), and commits histories once. */
-    private void subStep(double width, double time, int pinnedElement) {
-        boolean[] pinned = null;
-        if (pinnedElement >= 0) {
-            pinned = new boolean[netlist.getElementCount()];
-            pinned[pinnedElement] = true;
+    /** Accepts a located event: the slot's expected state flips, and the log takes it when the step ends. */
+    private void accept(int slot, double eventTime) {
+        locatedInStep[slot] = true;
+        stagedBySlot[slot] = staged.size();
+        staged.add(new StagedEvent(slot, eventTime, isOff(savedDiodeStates[slot]), startMargin[slot], trialMargin[slot]));
+        accountedOn[slot] = !accountedOn[slot];
+        justToggled[slot] = true;
+    }
+
+    /**
+     * Compares each committed state with the state the located events expect. A device that returned to
+     * its old state loses its event and counts as unlocated. Any other unexpected change counts as
+     * unlocated unless a gate edge explains it.
+     */
+    private void reconcile(double time) {
+        int unexplained = 0;
+        for (int slot = 0; slot < diodeElements.length; slot++) {
+            boolean on = isOn(slot);
+            if (on != accountedOn[slot]) {
+                if (justToggled[slot] && stagedBySlot[slot] >= 0) {
+                    int index = stagedBySlot[slot];
+                    staged.remove(index);
+                    stagedBySlot[slot] = -1;
+                    for (int other = 0; other < stagedBySlot.length; other++) if (stagedBySlot[other] > index) stagedBySlot[other]--;
+                    unexplained++;
+                } else if (!gateDriven(slot, on)) {
+                    unexplained++;
+                }
+                accountedOn[slot] = on;
+            }
+            justToggled[slot] = false;
         }
+        countUnlocated(unexplained, time);
+    }
+
+    private void flushStaged() {
+        for (StagedEvent event : staged) recordEvent(event);
+        staged.clear();
+    }
+
+    private boolean isOn(int slot) { return !isOff(netlist.getParameter(diodeElements[slot])[0]); }
+
+    private static boolean isOff(double resistance) { return resistance > 10000; }
+
+    private boolean gateOn(int slot) { return netlist.getParameter(diodeElements[slot])[8] >= 0.5; }
+
+    /**
+     * A gate edge switches a device on the grid point. It is a grid event, not a missed crossing:
+     * a gate that rises turns a thyristor or IGBT on, and a removed IGBT gate turns it off.
+     * A device with a gate that stays high is not gate-driven, so its crossing must be located.
+     */
+    private boolean gateDriven(int slot, boolean turnsOn) {
+        CircuitTypCore type = netlist.getType(diodeElements[slot]);
+        if (type == CircuitTypCore.LK_D) return false;
+        if (turnsOn) return gateOn(slot) && !gatePrevious[slot];
+        return type == CircuitTypCore.LK_IGBT && !gateOn(slot);
+    }
+
+    /** Solves, iterates with the pinned elements held (null for none), and commits histories once. */
+    private void subStep(double width, double time, boolean[] pinned) {
         solveStartTopology(width, time);
-        runIteration(width, time, pinned);
+        doDiodeIteration(numericalNetlist, width, time, pinned);
         commitSubStep(width, time);
     }
 
     /** Solves and iterates like the committed step does, without recording anything. */
     private void solveFree(double width, double time) {
         solveStartTopology(width, time);
-        runIteration(width, time, null);
+        doDiodeIteration(numericalNetlist, width, time, null);
     }
 
     private void solveStartTopology(double width, double time) {
@@ -228,10 +323,6 @@ final class ElectricalTimeStep {
         }
         matrixSolver.buildVectorB(numericalNetlist, width, time, false);
         matrixSolver.solve();
-    }
-
-    private void runIteration(double width, double time, boolean[] pinned) {
-        doDiodeIteration(numericalNetlist, width, time, pinned);
     }
 
     /** Commits histories for one sub-step. Public values stay unchanged until {@link #publishGrid}. */
@@ -272,20 +363,15 @@ final class ElectricalTimeStep {
         return netlist.getParameter(diodeElements[slot])[0] != savedDiodeStates[slot];
     }
 
-    private boolean gateRemoved(int slot) {
-        int element = diodeElements[slot];
-        return netlist.getType(element) == CircuitTypCore.LK_IGBT && netlist.getParameter(element)[8] < 0.5;
-    }
-
     private void toggleDiode(int slot) {
         double[] parameters = netlist.getParameter(diodeElements[slot]);
         // An element that was off turns on at the event, and the reverse.
-        parameters[0] = savedDiodeStates[slot] > 10000 ? parameters[2] : parameters[3];
+        parameters[0] = isOff(savedDiodeStates[slot]) ? parameters[2] : parameters[3];
         matrixDt = Double.NaN;
     }
 
     /** Fills the threshold quantity {@code vX - vY - Uf} that the diode iteration compares. */
-    private void computeG(double[] potentials, double[] target) {
+    private void computeThresholdMargin(double[] potentials, double[] target) {
         for (int slot = 0; slot < diodeElements.length; slot++) {
             int element = diodeElements[slot];
             target[slot] = potentials[numericalNetlist.getNodeX(element)] - potentials[numericalNetlist.getNodeY(element)]
@@ -304,7 +390,7 @@ final class ElectricalTimeStep {
             if (!(crossing > start + epsilon && crossing < end - epsilon)) break;
             restoreTrialState();
             solveStartTopology(crossing - start, crossing);
-            computeG(matrixSolver.getP(), probe);
+            computeThresholdMargin(matrixSolver.getP(), probe);
             double value = probe[slot];
             if (value == 0) break;
             if (value * gLow > 0) { low = crossing; gLow = value; } else { high = crossing; gHigh = value; }
@@ -315,11 +401,12 @@ final class ElectricalTimeStep {
         return Math.max(start, Math.min(end, crossing));
     }
 
-    private void recordEvent(int slot, double crossing, boolean turnOn, double before, double after) {
+    private void recordEvent(StagedEvent event) {
         locatedCount++;
         if (events.size() >= eventRetention) { droppedCount++; return; }
-        events.add(new ZeroCrossingEvent(diodeElements[slot], crossing,
-                turnOn ? ZeroCrossingEvent.Direction.RISING : ZeroCrossingEvent.Direction.FALLING, before, after));
+        events.add(new ZeroCrossingEvent(diodeElements[event.slot()], event.time(),
+                event.turnOn() ? ZeroCrossingEvent.Direction.RISING : ZeroCrossingEvent.Direction.FALLING,
+                event.before(), event.after()));
     }
 
     private void countUnlocated(int transitions, double time) {
@@ -344,7 +431,14 @@ final class ElectricalTimeStep {
     void invalidateMatrixForTest() { matrixDt = Double.NaN; }
 
     /** Commits one sub-step directly, with {@code pinnedElement} held or -1 for none. */
-    void subStepForTest(double width, double time, int pinnedElement) { subStep(width, time, pinnedElement); }
+    void subStepForTest(double width, double time, int pinnedElement) {
+        boolean[] pinned = null;
+        if (pinnedElement >= 0) {
+            pinned = new boolean[netlist.getElementCount()];
+            pinned[pinnedElement] = true;
+        }
+        subStep(width, time, pinned);
+    }
 
     /** Flips one diode-family element and forces a matrix rebuild, as a located event does. */
     void toggleForTest(int element) {
