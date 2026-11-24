@@ -321,22 +321,35 @@ public final class VerlustBerechnungDetailed
         }
     }
 
+    static String lossFileContents(List<SwitchingLossCurve> switching, List<LeitverlusteMesskurve> conduction) {
+        StringBuffer ascii = new StringBuffer();
+        ProjectData.appendAsString(ascii.append("\nanzMesskurvenPvSWITCH"), switching.size());
+        switching.forEach(curve -> curve.exportASCII(ascii));
+        ProjectData.appendAsString(ascii.append("\nanzMesskurvenPvCOND"), conduction.size());
+        conduction.forEach(curve -> curve.exportASCII(ascii));
+        return ascii.toString();
+    }
+
+    /** Imports the CSV as an embedded loss file for this component. */
+    public void importVendorLosses(java.nio.file.Path csv) throws java.io.IOException {
+        byte[] contents;
+        try (var reader = java.nio.file.Files.newBufferedReader(csv)) {
+            contents = VendorLossCsv.toDetailedLossFile(reader);
+        }
+        String name = csv.getFileName().toString().replaceFirst("(?i)\\.csv$", "");
+        GeckoFile imported = new GeckoFile(new File(name + ".scl"), _fileAccessor.getOpenFileName(), contents);
+        if (!leseDetailVerlusteVonDatei(imported)) {
+            throw new java.io.IOException("Cannot read the converted detailed loss file.");
+        }
+        _lossParent.setLossType(LossCalculationDetail.DETAILED);
+    }
+
     public boolean schreibeDetailVerlusteAufDatei(final String fkaku, final List<SwitchingLossCurve> messkurvePvSWITCH,
             final List<LeitverlusteMesskurve> messkurvePvCOND, final GeckoFile.StorageType storageType) {
         //added boolean flag "external" - true if losses always looked up from external file,
         // false if loss file is to be saved with .ipes file
 
-        StringBuffer ascii = new StringBuffer();
-        ProjectData.appendAsString(ascii.append("\nanzMesskurvenPvSWITCH"), messkurvePvSWITCH.size());
-
-        for (SwitchingLossCurve curve : messkurvePvSWITCH) {
-            curve.exportASCII(ascii);
-        }
-
-        ProjectData.appendAsString(ascii.append("\nanzMesskurvenPvCOND"), messkurvePvCOND.size());
-        for (LeitverlusteMesskurve curve : messkurvePvCOND) {
-            curve.exportASCII(ascii);
-        }
+        String contents = lossFileContents(messkurvePvSWITCH, messkurvePvCOND);
         GeckoFile newLossFile = null;
 
         //
@@ -356,7 +369,7 @@ public final class VerlustBerechnungDetailed
                  OutputStreamWriter streamWriter = new OutputStreamWriter(fileOut, StandardCharsets.UTF_8);
                  BufferedWriter out = new BufferedWriter(streamWriter)) {
                 //
-                out.write(ascii.toString());
+                out.write(contents);
                 out.flush();
             }
             //blocks using this loss file can also see the changes

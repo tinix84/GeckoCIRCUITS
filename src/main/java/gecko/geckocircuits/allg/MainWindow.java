@@ -138,6 +138,24 @@ public final class MainWindow extends JFrame
     private static final String spTitleX = "  -  ";
     public static boolean IS_BRANDED = false;
     private SuggestionField _searchTestField;
+
+    private void importSelectedSwitchLosses() {
+        var powerSwitch = _se.selectedPowerSwitch();
+        String title = "Import Semiconductor Loss CSV";
+        if (powerSwitch == null) {
+            JOptionPane.showMessageDialog(this, "Select one power switch first.", title, JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        var chooser = GeckoFileChooser.createSimpleOpenFileChooser(".csv", this);
+        if (chooser.getUserResult() != GeckoFileChooser.FileChooserResult.OK) return;
+        try {
+            powerSwitch.getVerlustBerechnung().getDetailedLosses()
+                    .importVendorLosses(chooser.getFileWithCheckedEnding().toPath());
+            _se.registerChangeWithNetlistUpdate();
+        } catch (java.io.IOException | IllegalArgumentException e) {
+            JOptionPane.showMessageDialog(this, e.getMessage(), title, JOptionPane.ERROR_MESSAGE);
+        }
+    }
     public LastComponentButton _lastComponentButton;
     public static final JPanel _northPanel = new JPanel();
 
@@ -650,6 +668,9 @@ public final class MainWindow extends JFrame
         mItemCheckModel.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, KeyEvent.CTRL_DOWN_MASK));
         toolsMenu.addSeparator();
         toolsMenu.add(mItemSetPar);
+        JMenuItem importVendorLosses = new JMenuItem("Import Semiconductor Loss CSV...");
+        importVendorLosses.addActionListener(event -> importSelectedSwitchLosses());
+        toolsMenu.add(importVendorLosses);
         toolsMenu.addSeparator();
         toolsMenu.add(mItemMemorySettings);
         toolsMenu.add(mItemUpdateSettings);
