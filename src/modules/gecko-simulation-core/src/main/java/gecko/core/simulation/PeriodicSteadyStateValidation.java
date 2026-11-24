@@ -6,7 +6,11 @@ import gecko.core.circuit.netlist.CircuitNetlist;
 import gecko.core.control.PeriodicStateSource;
 import gecko.core.control.StatelessCalculation;
 import gecko.core.control.calculators.AbstractControlCalculatable;
+import gecko.core.control.calculators.NothingToDoCalculator;
 import gecko.core.control.calculators.SignalCalculatorExternalWrapper;
+import gecko.core.control.calculators.SignalCalculatorImport;
+import gecko.core.control.calculators.SparseMatrixCalculator;
+import gecko.core.control.calculators.TimeCalculator;
 import gecko.core.control.calculators.SignalCalculatorRandom;
 import gecko.core.control.calculators.SignalCalculatorSinus;
 import java.util.ArrayList;
@@ -45,14 +49,29 @@ final class PeriodicSteadyStateValidation {
             var calculator = calculators.get(index);
             String name = calculator.getClass().getSimpleName() + "#" + index;
             if (calculator instanceof SignalCalculatorRandom) {
-                issues.add(new SimulationTiming.SettingIssue("periodicSteadyState",
-                        "CONTROL block " + name + " draws from a hidden random generator, so its state cannot repeat."));
+                issues.add(unsupported(name, "draws from a hidden random generator, so its state cannot repeat"));
                 continue;
             }
-            var periodic = calculator instanceof SignalCalculatorExternalWrapper wrapper ? wrapper.wrapped() : calculator;
-            if (periodic instanceof SignalCalculatorSinus sine && !wholeCycles(period, sine.frequency())) {
+            if (calculator instanceof SparseMatrixCalculator) {
+                issues.add(unsupported(name, "computes its phase from absolute time and an input frequency, which is not supported"));
+                continue;
+            }
+            if (calculator instanceof SignalCalculatorExternalWrapper wrapper
+                    && wrapper.wrapped() instanceof SignalCalculatorSinus) {
+                issues.add(unsupported(name, "is a sine with an input frequency, so its absolute-time phase is not proven periodic"));
+                continue;
+            }
+            if (calculator instanceof SignalCalculatorSinus sine && !wholeCycles(period, sine.frequency())) {
                 issues.add(new SimulationTiming.SettingIssue("periodicSteadyState.period",
                         "CONTROL sine source " + name + " does not complete whole cycles in the period."));
+            }
+            if (calculator instanceof SignalCalculatorImport table && !table.repeatsEvery(period)) {
+                issues.add(new SimulationTiming.SettingIssue("periodicSteadyState.period",
+                        "CONTROL import " + name + " does not repeat in the period. It must start at time zero, and the period"
+                                + " must be a whole multiple of its duration unless the table is constant."));
+            }
+            if (calculator instanceof TimeCalculator && consumedByLogic(calculators, calculator)) {
+                issues.add(unsupported(name, "feeds another CONTROL block, so absolute time would act as a hidden state"));
             }
             if (!(calculator instanceof PeriodicStateSource) && !(calculator instanceof StatelessCalculation)) {
                 issues.add(new SimulationTiming.SettingIssue("periodicSteadyState",
@@ -62,8 +81,23 @@ final class PeriodicSteadyStateValidation {
         return issues;
     }
 
+    private static SimulationTiming.SettingIssue unsupported(String name, String why) {
+        return new SimulationTiming.SettingIssue("periodicSteadyState", "CONTROL block " + name + " " + why + ".");
+    }
+
+    /** A display sink reads the time output without acting on it. Every other reader is control logic. */
+    private static boolean consumedByLogic(List<AbstractControlCalculatable> calculators, AbstractControlCalculatable time) {
+        for (var other : calculators) {
+            if (other == time || other instanceof NothingToDoCalculator) continue;
+            for (double[] input : other._inputSignal) if (input == time._outputSignal[0]) return true;
+        }
+        return false;
+    }
+
+    /** A fixed frequency of exactly zero is constant. Any other must complete a whole, nonzero number of cycles. */
     private static boolean wholeCycles(double period, double frequency) {
+        if (frequency == 0) return true;
         double cycles = period * frequency;
-        return Double.isFinite(cycles) && Math.abs(cycles - Math.rint(cycles)) <= WHOLE;
+        return Double.isFinite(cycles) && Math.abs(Math.rint(cycles)) >= 1 && Math.abs(cycles - Math.rint(cycles)) <= WHOLE;
     }
 }

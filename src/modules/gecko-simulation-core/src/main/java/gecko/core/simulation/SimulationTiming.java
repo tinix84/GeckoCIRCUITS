@@ -68,6 +68,34 @@ public final class SimulationTiming {
     }
 
     /**
+     * Checks the circuit parts of the periodic steady-state settings on an execution model, before any session exists.
+     * It assembles the CONTROL chain only to inspect it and closes it again. A model that cannot be assembled has
+     * no issues here, because preparation reports its own findings.
+     *
+     * @param model the execution model
+     * @param step the main electrical step in seconds
+     * @param samplePeriod the CONTROL sample period, zero for every step
+     * @param pss the settings, or null
+     * @return one issue per violation, each with its parameter path
+     */
+    public static List<SettingIssue> periodicSteadyStateCircuitIssues(gecko.core.io.CircuitModel model, double step,
+            double samplePeriod, PeriodicSteadyStateSettings pss) {
+        if (pss == null || !positive(pss.period()) || !positive(step) || !Double.isFinite(samplePeriod) || samplePeriod < 0) {
+            return List.of();
+        }
+        ControlRuntime runtime = null;
+        try {
+            var netlist = gecko.core.circuit.netlist.NetlistBuilder.buildFromCircuitModel(model);
+            runtime = ControlRuntime.fromDeferred(model, step, netlist, samplePeriod);
+            return PeriodicSteadyStateValidation.circuitIssues(pss.period(), netlist, runtime.calculators());
+        } catch (RuntimeException unassembled) {
+            return List.of();
+        } finally {
+            if (runtime != null) runtime.close();
+        }
+    }
+
+    /**
      * Checks the scalar periodic steady-state settings against the resolved step, duration and sample period.
      * A null setting is off and has no issues.
      *

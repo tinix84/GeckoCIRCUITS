@@ -108,6 +108,26 @@ class PeriodicSteadyStateIntegrationTest {
     }
 
     @Test
+    void aSineThatDoesNotCompleteWholeCyclesIsRejectedBeforeAnyJobIsAccepted(@org.junit.jupiter.api.io.TempDir Path directory) throws Exception {
+        String circuit = ExistingSimulationFixtures.ac(directory);
+        int before = simulations.getAllSimulations().size();
+        var bad = new SimulationRequest(circuit, 0.02, 1e-4);
+        var search = new SimulationRequest.PeriodicSteadyState();
+        search.setPeriod(0.0125);
+        bad.setPeriodicSteadyState(search);
+        mvc.perform(post("/api/v1/simulations").contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(bad)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.diagnostics[?(@.code=='INVALID_SETTING' && @.parameterPath=='periodicSteadyState.period')]").isNotEmpty());
+        assertEquals(before, simulations.getAllSimulations().size(), "no job is accepted");
+        var good = new SimulationRequest(circuit, 0.02, 1e-4);
+        search.setPeriod(0.02);
+        good.setPeriodicSteadyState(search);
+        var response = finished(submit(good));
+        assertEquals(SimulationResponse.SimulationStatus.COMPLETED, response.getStatus(), response.getErrorMessage());
+        assertTrue(response.getSteadyState().converged());
+    }
+
+    @Test
     void theOpenApiSnapshotDocumentsTheRequestAndResponseFields() throws Exception {
         var live = mapper.readTree(mvc.perform(get("/api-docs")).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString()).path("components").path("schemas");

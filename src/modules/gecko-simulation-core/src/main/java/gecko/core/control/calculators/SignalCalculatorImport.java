@@ -49,6 +49,30 @@ public final class SignalCalculatorImport extends AbstractSignalCalculator imple
         }
     }
 
+    /**
+     * Tells whether the output depends on absolute time only through a pattern that repeats every {@code period}.
+     * A table with one constant value repeats in any positive period. Any other table must start at time zero or
+     * earlier, so that no flat hold prefix exists, and the period must be a whole multiple of the table duration.
+     *
+     * @param period the period in seconds
+     * @return true when the output at time t and at t plus the period is the same for every t of a run
+     */
+    public boolean repeatsEvery(final double period) {
+        if (!Double.isFinite(period) || period <= 0) {
+            return false;
+        }
+        boolean constant = true;
+        for (double value : _xy[1]) {
+            constant &= value == _xy[1][0];
+        }
+        if (constant) {
+            return true;
+        }
+        double cycles = period / _signalDuration;
+        double whole = Math.rint(cycles);
+        return _xy[0][0] <= 0 && whole >= 1 && Math.abs(cycles - whole) <= 1e-9;
+    }
+
     @Override
     public void initializeAtSimulationStart(final double deltaT) {
         // The immutable table is validated at construction. Lookup has no cached repeat offset.

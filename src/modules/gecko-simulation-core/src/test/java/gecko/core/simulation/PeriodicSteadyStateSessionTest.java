@@ -453,11 +453,10 @@ class PeriodicSteadyStateSessionTest {
     }
 
     @Test
-    void theTimeCalculatorIsNotStateSoAClockDoesNotPreventConvergence() {
+    void theTimeCalculatorIsNotStateSoADisplayedClockDoesNotPreventConvergence() {
         var model = new CircuitModel();
         model.addControlComponent(component(58, "clock", new double[0], new String[0], "t"));
-        model.addControlComponent(component(7, "mute", new double[]{0}, new String[]{"t"}, "flat"));
-        model.addControlComponent(component(5, "scope", new double[0], new String[]{"flat"}));
+        model.addControlComponent(component(5, "scope", new double[0], new String[]{"t"}));
         try (var session = SimulationSession.fromModel(model,
                 settings(1e-4, new PeriodicSteadyStateSettings(10e-6)), ExecutionOptions.defaults())) {
             session.run();

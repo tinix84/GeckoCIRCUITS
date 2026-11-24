@@ -383,7 +383,9 @@ Add `periodicSteadyState` to the request to skip the startup transient:
 
 The search runs period by period from the DC operating point and records nothing. The job then records `simulationTime` seconds from the converged state.
 A CONTROL carrier that clamps per step has a simulated period of a whole number of steps. A 35 kHz carrier at a 1 µs step has a period of 30 µs, not 28.57 µs.
-A pre-calculation time cannot combine with the search. Circuits with random sources are rejected. Batch requests do not accept the field.
+A pre-calculation time cannot combine with the search. Batch requests do not accept the field.
+Absolute-time forcing must repeat in the period. A sine source needs a whole number of cycles, an imported table needs a whole multiple of its duration, and a constant forcing repeats in any period.
+The search rejects random sources, sine sources with an input frequency, the matrix converter block, and a time block that feeds control logic. The request fails with HTTP 400 and `INVALID_SETTING` before the job exists.
 
 The response has a `steadyState` object with `converged`, `periods`, `residual` and `startTime`. `residual` is null when it is not finite.
 When the search reaches `maxPeriods`, the job has status `FAILED`, `steadyState.converged` is `false` and the job has no results.
