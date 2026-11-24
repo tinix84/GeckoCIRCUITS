@@ -10,7 +10,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * The legacy-order sparse LU must return entries exactly equal, under {@code ==} so a signed zero is ignored, to those
- * of {@link gecko.core.math.LUDecomposition} through {@link Matrix#solve}. The dense arrays below are the reference only; the kernel under test reads sparse columns.
+ * of {@link gecko.core.math.LUDecomposition} through {@link Matrix#solve}. The dense arrays below are the reference
+ * only, and the kernel under test reads sparse columns.
  */
 class LegacyOrderSparseLuTest {
     private static final double[] PALETTE = {1e-7, 1e-7, 1e-7, 100, 100, 1.0, 0.5, 2.2e-2, 1e-3, 1e3};

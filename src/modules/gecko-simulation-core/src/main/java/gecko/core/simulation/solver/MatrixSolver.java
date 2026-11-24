@@ -858,7 +858,9 @@ public class MatrixSolver {
         double[][] x = xMatrix.getArray();
         for (int i = 0; i < size; i++) {
             if (!Double.isFinite(x[i][0])) {
-                throw new IllegalStateException("Nonfinite solution at row " + i);
+                // An enabled dense pinned solve holds node 0 last, so report the original row. Nothing is published yet.
+                int row = referenceLast ? (i == size - 1 ? 0 : i + 1) : i;
+                throw new IllegalStateException("Nonfinite solution at row " + row);
             }
         }
         if (wireReference) p[0] = 0;

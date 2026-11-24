@@ -12,7 +12,7 @@ Issue [#60](https://github.com/tinix84/GeckoCIRCUITS/issues/60) requires dense a
 With the EJML LU, 4 of 21 wired circuits missed that bound on node potentials, by 5.8e-9 to 2.6e-6, while switch states and time grids agreed exactly [M, High].
 Both wired LUs drop row and column 0 ([ADR-0011](0011-numerical-reference-compatibility.md)), but EJML cannot repeat the Crout summation or the pivot ties [C from bytecode, High].
 The pinned 300-node DC-seeded ladder missed the bound by 32 % on component currents at its first sub-step [M, High].
-A sparse LU in that order fills fully, with 1.0e6 factor nonzeros against 7002 for EJML at 1000 nodes [M, High].
+A sparse LU that eliminates node 0 first fills fully, with 1.0e6 factor nonzeros against 7002 for EJML at 1000 nodes [M, High].
 
 ## Options
 
@@ -32,7 +32,7 @@ A prototype solved 3000 seeded wire-reference MNA matrices of order 3 to 66. All
 The kernel runs only where the threshold exceeds the node count. Larger wired and pinned sparse systems keep EJML with node 0 last, and pinned ladders agree to 6.7e-14 or better [M, Medium].
 
 Pinned dense systems: the legacy LU eliminates the 1e15-pinned node 0 first, so 299 equal ground products round in one direction (mechanism: E). With explicit settings the dense LU factors the same complete system with row and column 0 moved last. The mapping covers potentials and voltage-source branch currents, and `LUDecomposition`, the 1e15 pin and the equations do not change [C, High].
-A prototype `MatrixSolver` gave 0.0 A and 8.5e-43 relative on the 300-node ladder for both integration methods, and the null path kept its 28 trace fingerprints [M, High]. Node 0 last is closer to the exact double solution, 1.17e-14 A against 1.31e-12 A of error at 300 nodes [M, High].
+A prototype `MatrixSolver` gave 0.0 A and 8.5e-43 relative on the 300-node ladder for both integration methods [M, High]. The null path kept its 28 trace fingerprints [M, High]. Node 0 last is closer to the exact double solution, 1.17e-14 A against 1.31e-12 A of error at 300 nodes [M, High].
 Wire-reference ladders and source-limit patches matched the null path and EJML [M, High]. The legacy order stays the compatibility reference, and an MMC arm with ground degree 2 agrees in both orders [M, High].
 This evidence comes from prototypes, so the implementation tests decide the final result.
 

@@ -53,7 +53,7 @@ final class LegacyOrderSparseLu {
         if (column == null) column = new double[n];
         double[] x = column;
         for (int j = 0; j < n; j++) {
-            // ponytail: this scan makes factoring O(n^2 + n * nnz(L)); it only runs below thresholdNodes (default 100).
+            // ponytail: this scan makes factoring O(n^2 + n * nnz(L)), and it only runs below thresholdNodes (default 100).
             Arrays.fill(x, 0.0);
             for (int e = a.col_idx[j]; e < a.col_idx[j + 1]; e++) x[posOf[a.nz_rows[e]]] = a.nz_values[e];
             for (int i = 0; i < n; i++) {

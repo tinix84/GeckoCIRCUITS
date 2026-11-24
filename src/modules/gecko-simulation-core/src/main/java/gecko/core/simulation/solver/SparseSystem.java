@@ -184,7 +184,7 @@ final class SparseSystem implements MatrixCoefficients {
      *
      * @param b the full-length right-hand side
      * @param x the full-length result
-     * @param recheck true to compare the coefficients with the factored values; false trusts the factors when present
+     * @param recheck true to compare the coefficients with the factored values; or false to trust the factors when present
      * @param dropReference 1 to exclude row and column 0, else 0
      * @throws RuntimeException when the matrix is singular
      */

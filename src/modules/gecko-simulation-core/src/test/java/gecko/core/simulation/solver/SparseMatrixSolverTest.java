@@ -685,4 +685,25 @@ class SparseMatrixSolverTest {
         step(sparse, netlist, 0);
         assertTrue(sparse.getCoefficientStorageBytes() < 8L * square * 2);
     }
+
+    @Test
+    void anOverflowingFiniteSystemReportsOriginalRowsOnEveryDenseOrder() {
+        // Finite inputs: row 1 overflows to infinity, and the back substitution then makes row 0 NaN (infinity times 0).
+        // The legacy order scans ascending rows, so it reports row 0 as before. The enabled order scans node 0 last,
+        // finds the infinite entry first and must report its original row 1, not its permuted position 0.
+        String[] expected = {"Nonfinite solution at row 0", "Nonfinite solution at row 1"};
+        SparseSolverSettings[] settings = {null, new SparseSolverSettings(Mode.DENSE)};
+        for (int variant = 0; variant < settings.length; variant++) {
+            MatrixSolver solver = new MatrixSolver(SolverType.SOLVER_BE, settings[variant]);
+            solver.initializeMatrices(1, 0, 0);
+            solver.addCoefficient(0, 0, 1.0);
+            solver.addCoefficient(1, 1, Double.MIN_NORMAL);
+            solver.getb()[1] = Double.MAX_VALUE;
+            solver.setMatrixChanged();
+            double[] before = solver.getP().clone();
+            IllegalStateException failure = assertThrows(IllegalStateException.class, solver::solve);
+            assertEquals(expected[variant], failure.getMessage(), "variant " + variant);
+            assertSameBits(before, solver.getP(), "a failed solve publishes nothing");
+        }
+    }
 }
