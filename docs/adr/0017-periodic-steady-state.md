@@ -1,6 +1,6 @@
 # Find periodic steady state by brute-force period iteration
 
-ADR-0017 · Claude Opus 5.5 for tinix84 · 2026-11-24 · Status: Accepted · Version 1.0
+ADR-0017 · Claude Opus 5.5 for tinix84 · 2026-11-24 · Status: Accepted · Version 1.1
 Audience: maintainers who implement or review solver features in `gecko-simulation-core` and the REST API.
 
 **Decision:** We find the periodic steady state (PSS) with a brute-force period search before the main phase, seeded from the DC operating point. The convergence test uses the full periodic state.
@@ -40,7 +40,15 @@ A circuit with a stateful calculator that has no export is rejected. A partial c
 Each state is normalized inside its own unit class (volt, ampere, CONTROL), with a relative scale and an absolute floor. Volts and amperes are never compared.
 The contraction-corrected estimate `D r / (1 - r)` rejects drift that a plain change test accepts [C, High]. Two consecutive periods must pass.
 
-T must be a whole number of steps and of the #61 sample periods. Sine sources that use absolute time, in the electrical and CONTROL domains, must complete whole cycles in T. A setting issue reports each violation.
+T must be a whole number of steps and of the #61 sample periods. Each absolute-time forcing must repeat in T. A setting issue reports each violation [C, High].
+- A sine source with a fixed nonzero frequency must complete one or more whole cycles in T. A fixed frequency of exactly zero is constant, so it repeats in any T.
+- An imported table must start at time zero or earlier, and T must be a whole multiple of its duration. A constant table repeats in any T.
+- PSS rejects a sine source whose frequency comes from an input, and the matrix converter block. Both compute their phase from absolute time.
+- PSS rejects a time block whose output goes to another CONTROL block. A time block that goes only to a scope is valid.
+
+The residual does not contain absolute time. A flat forcing can look periodic for many periods, so these rules apply before the run [C, High].
+These setting issues are reported by preparation, so REST rejects the request before it accepts a job [C, High].
+
 If `maxPeriods` completes without convergence, the session ends with `converged = false` and no main phase. The engine maps this to a failed result. A cancellation stops at the next step.
 
 ## Consequences
@@ -48,6 +56,7 @@ If `maxPeriods` completes without convergence, the session ends with `converged 
 - Users give the simulated period, not a nominal frequency. `buck_simple` needs T = 30 µs at 1 µs [C, High].
 - Circuits with counters or incremental carriers that do not repeat in T fail with a residual report [C, Medium].
 - Circuits with random sources are rejected before the run [C, High].
+- v1 rejects circuits that use time in control logic, sine sources with external modulation, and matrix converter blocks. The setting issue names the block [C, High].
 - Main-phase timestamps start after the search. Progress uses `maxPeriods` as its upper bound [C, High].
 - REST gets a `periodicSteadyState` request field and a `steadyState` response field. The OpenAPI snapshot is regenerated. Batch requests are a follow-up [C, High].
 - Period boundaries stay on the grid, so [ADR-0016](0016-zero-crossing-event-location.md) event location stays compatible [C, Medium].
@@ -55,6 +64,7 @@ If `maxPeriods` completes without convergence, the session ends with `converged 
 ## Status
 
 Proposed by Claude Opus 5.5 (design pass for tinix84) on 2026-11-24. Accepted by root review on 2026-11-24 under tinix84 task authorization, with the Opus attribution retained. No human approval is claimed.
+Amended to Version 1.1 by Claude Opus 5.5 on 2026-11-24 after the root audit found a false convergence with an imported table. Root accepted the amendment on 2026-11-24, with the clarification that a fixed zero-frequency sine is constant.
 Depends on [#57](https://github.com/tinix84/GeckoCIRCUITS/issues/57).
 
 Links: [SimulationSession](../../src/modules/gecko-simulation-core/src/main/java/gecko/core/simulation/SimulationSession.java) · [SolverFeatures](../../src/modules/gecko-simulation-core/src/main/java/gecko/core/preparation/SolverFeatures.java) · [SignalCalculatorRectangle](../../src/modules/gecko-simulation-core/src/main/java/gecko/core/control/calculators/SignalCalculatorRectangle.java) · [ADR-0007](0007-local-simulation-session.md)
