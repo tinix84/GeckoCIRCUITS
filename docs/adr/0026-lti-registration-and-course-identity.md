@@ -1,7 +1,8 @@
 
 # Use registered LTI platforms and course-scoped identities
 
-ADR-0025 · Codex for tinix84 · 2026-11-25 · Version 1.0  
+ADR-0026 · Codex for tinix84 · 2026-11-25 · Version 1.0
+
 Audience: GeckoCIRCUITS REST API maintainers.
 
 **Decision**  

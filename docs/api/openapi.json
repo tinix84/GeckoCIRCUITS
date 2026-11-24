@@ -1325,6 +1325,24 @@
             "type": "array"
           }
         }
+      },
+      "Verification": {
+        "properties": {
+          "maxRelativeDeviation": {
+            "additionalProperties": {
+              "format": "double",
+              "type": "number"
+            },
+            "type": "object"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "tolerance": {
+            "format": "double",
+            "type": "number"
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -1678,6 +1696,38 @@
         "summary": "Issue an access token and refresh token for an API key",
         "tags": [
           "auth-controller"
+        ]
+      }
+    },
+    "/api/v1/bundles/verify": {
+      "post": {
+        "operationId": "verifyResearchBundle",
+        "requestBody": {
+          "content": {
+            "application/zip": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Verification"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Replay a research bundle and compare signals",
+        "tags": [
+          "Research Bundles"
         ]
       }
     },
@@ -2550,6 +2600,38 @@
         "summary": "Get simulation",
         "tags": [
           "Simulations"
+        ]
+      }
+    },
+    "/api/v1/simulations/{simulationId}/bundle": {
+      "get": {
+        "operationId": "exportResearchBundle",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "simulationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Export a completed simulation as a research bundle",
+        "tags": [
+          "Research Bundles"
         ]
       }
     },

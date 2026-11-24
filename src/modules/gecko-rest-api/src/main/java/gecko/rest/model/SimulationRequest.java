@@ -85,6 +85,20 @@ public class SimulationRequest {
         this.timeStep = timeStep;
     }
 
+    /** Copies the submitted settings before the caller can change them. */
+    public SimulationRequest(SimulationRequest source) {
+        this(source.circuitFile, source.simulationTime, source.timeStep);
+        circuitId = source.circuitId;
+        solverType = source.solverType;
+        parameters = source.parameters == null ? null : new java.util.LinkedHashMap<>(source.parameters);
+        if (source.periodicSteadyState != null) {
+            periodicSteadyState = new PeriodicSteadyState();
+            periodicSteadyState.period = source.periodicSteadyState.period;
+            periodicSteadyState.tolerance = source.periodicSteadyState.tolerance;
+            periodicSteadyState.maxPeriods = source.periodicSteadyState.maxPeriods;
+        }
+    }
+
     // Getters and setters
     /**
      * Returns the explicit registry source selection.
