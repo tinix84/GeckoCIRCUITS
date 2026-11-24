@@ -1,6 +1,6 @@
 # Keep editable ASC occurrences on native sheets
 
-ADR-0021 · Codex · 2026-11-24 · Version 1.0
+ADR-0022 · Codex · 2026-11-24 · Version 1.0
 
 Audience — Core and desktop maintainers
 

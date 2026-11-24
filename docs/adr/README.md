@@ -20,4 +20,5 @@
 | 2026-11-24 | [ADR-0018: Adapt the electrical step between fixed CONTROL grid points](0018-adaptive-electrical-step.md) |
 | 2026-11-24 | [ADR-0019: Headless circuit import writer](0019-headless-circuit-import-writer.md) |
 | 2026-11-24 | [ADR-0020: Native linear AC analysis](0020-native-linear-ac-analysis.md) |
-| 2026-11-24 | [ADR-0021: Native ASC hierarchy](0021-native-asc-hierarchy.md) |
+| 2026-11-24 | [ADR-0021: Order the enabled LU like the dense reference or like EJML](0021-sparse-numerical-compatibility.md) |
+| 2026-11-24 | [ADR-0022: Native ASC hierarchy](0022-native-asc-hierarchy.md) |
