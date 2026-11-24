@@ -86,7 +86,7 @@ public class LabAssignmentService {
     public Submission submit(CourseUser student, UUID assignmentId, byte[] circuit) throws IOException {
         LabAssignment assignment = get(student.tenant(), assignmentId);
         List<CheckResult> results = evaluate(assignment.definition(), circuit);
-        double score = (double) results.stream().filter(CheckResult::passed).count() / results.size();
+        double score = (double) results.stream().mapToInt(CheckResult::score).sum() / results.size();
         var submission = new Submission(UUID.randomUUID(), assignmentId, student.subject(), clock.instant(), score, results);
         writeNew(directory(student.tenant(), assignmentId).resolve("submissions").resolve(submission.id() + ".json"),
                 submission);

@@ -64,7 +64,8 @@ class LabAssignmentIntegrationTest {
         mvc.perform(multipart(endpoint).file(circuit(reference)).header("X-API-Key", "learner"))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.score").value(1.0))
                 .andExpect(jsonPath("$.checks[0].passed").value(true))
-                .andExpect(jsonPath("$.checks[1].passed").value(true));
+                .andExpect(jsonPath("$.checks[1].passed").value(true))
+                .andExpect(jsonPath("$.checks[1].score").value(1));
 
         byte[] changed;
         try (var gzip = new GZIPInputStream(new ByteArrayInputStream(reference))) {
@@ -74,7 +75,8 @@ class LabAssignmentIntegrationTest {
             changed = variant.getBytes(StandardCharsets.UTF_8);
         }
         mvc.perform(multipart(endpoint).file(circuit(changed)).header("X-API-Key", "learner"))
-                .andExpect(status().isCreated()).andExpect(jsonPath("$.checks[1].passed").value(false));
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.checks[1].passed").value(false))
+                .andExpect(jsonPath("$.checks[1].score").value(0));
 
         mvc.perform(get(endpoint).header("X-API-Key", "instructor"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(2))
