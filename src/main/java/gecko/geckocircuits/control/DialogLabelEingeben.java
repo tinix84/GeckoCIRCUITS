@@ -121,8 +121,8 @@ public final class DialogLabelEingeben extends JDialog {
                             return;
                         }
                     } catch (IllegalArgumentException error) {
-                        javax.swing.JOptionPane.showMessageDialog(DialogLabelEingeben.this, error.getMessage(),
-                                "ASC edit", javax.swing.JOptionPane.ERROR_MESSAGE);
+                        JOptionPane.showMessageDialog(DialogLabelEingeben.this, error.getMessage(),
+                                "ASC edit", JOptionPane.ERROR_MESSAGE);
                         return;
                     }
                     if (jCheckBoxEnabled.isSelected()) {

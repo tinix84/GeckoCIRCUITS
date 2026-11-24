@@ -103,7 +103,9 @@ public final class SubcircuitBlock extends AbstractSpecialBlock {
             @Override
             public void actionPerformed(final ActionEvent event) {
                 for (SubCircuitTerminable terminal : _myTerminals) {
-                    if (terminal instanceof AbstractCircuitTerminal imported && imported.importedBlockOffset() != null) continue;
+                    if (terminal instanceof AbstractCircuitTerminal imported && imported.importedBlockOffset() != null) {
+                        continue;
+                    }
                     if (terminal.getTerminalLocation() == EnumTerminalLocation.RIGHT) {
                         final TerminalSubCircuitBlock term = terminal.getBlockTerminal();
                         term.setRelativePosition(_blockSizeX.getValue(), term.getRelativeY());
@@ -116,7 +118,9 @@ public final class SubcircuitBlock extends AbstractSpecialBlock {
             @Override
             public void actionPerformed(final ActionEvent event) {
                 for (SubCircuitTerminable terminal : _myTerminals) {
-                    if (terminal instanceof AbstractCircuitTerminal imported && imported.importedBlockOffset() != null) continue;
+                    if (terminal instanceof AbstractCircuitTerminal imported && imported.importedBlockOffset() != null) {
+                        continue;
+                    }
                     if (terminal.getTerminalLocation() == EnumTerminalLocation.BOTTOM) {
                         final TerminalSubCircuitBlock term = terminal.getBlockTerminal();
                         term.setRelativePosition(term.getRelativeX(), _blockSizeY.getValue());
@@ -452,7 +456,9 @@ public final class SubcircuitBlock extends AbstractSpecialBlock {
     protected void exportAsciiIndividual(StringBuffer ascii) {
         super.exportAsciiIndividual(ascii);
         var call = getHierarchyCall();
-        if (call != null) ascii.append('\n').append(HierarchyMetadataCodec.OCCURRENCE).append(' ')
-                .append(HierarchyMetadataCodec.encode(call));
+        if (call != null) {
+            ascii.append('\n').append(HierarchyMetadataCodec.OCCURRENCE).append(' ')
+                    .append(HierarchyMetadataCodec.encode(call));
+        }
     }
 }

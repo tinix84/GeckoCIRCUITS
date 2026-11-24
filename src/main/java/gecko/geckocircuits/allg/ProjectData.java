@@ -53,7 +53,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 public final class ProjectData implements Serializable {
     private transient AcDocumentSettings acSettings;
     private transient gecko.core.io.CircuitHierarchy hierarchy;
-    private transient java.util.Map<Long, java.util.Map<String, String>> hierarchyScopes = java.util.Map.of();
+    private transient Map<Long, Map<String, String>> hierarchyScopes = Map.of();
 
     public gecko.core.io.CircuitHierarchy getHierarchy() { return hierarchy; }
     private transient AcProvenance acProvenance;
@@ -116,8 +116,10 @@ public final class ProjectData implements Serializable {
         this._allSheetComponents.addAll(se._circuitSheet.getAllElements());
         this.acSettings = se.getAcSettings();
         this.hierarchy = se.getHierarchy();
-        if (hierarchy != null) this.hierarchyScopes = se.inspectHierarchy().parameterScopes(
-                acSettings == null ? java.util.Map.of() : acSettings.parameterMap());
+        if (hierarchy != null) {
+            this.hierarchyScopes = se.inspectHierarchy().parameterScopes(
+                    acSettings == null ? Map.of() : acSettings.parameterMap());
+        }
         this.acProvenance = se.getAcProvenance();
         this.conversionIssues = se.getConversionIssues();
         this._dt = solverSettings.dt.getValue();
@@ -189,10 +191,14 @@ public final class ProjectData implements Serializable {
             if (elem instanceof AbstractBlockInterface block) {
                 long sheet = block.getParentCircuitSheet() instanceof gecko.geckocircuits.control.SubCircuitSheet child
                         ? child._subBlock.getUniqueObjectIdentifier() : 0;
-                if (hierarchy == null) block.exportASCII(asc, acSettings);
-                else block.exportScopedAcASCII(asc, hierarchyScopes.get(sheet));
+                if (hierarchy == null) {
+                    block.exportASCII(asc, acSettings);
+                } else {
+                    block.exportScopedAcASCII(asc, hierarchyScopes.get(sheet));
+                }
+            } else {
+                elem.exportASCII(asc);
             }
-            else elem.exportASCII(asc);
             elementCounter++;
         }
 
@@ -219,12 +225,18 @@ public final class ProjectData implements Serializable {
         asc.append("\nT_pre ").append(_T_pre);
         asc.append("\ndt_pre ").append(_dt_pre);
         asc.append("\nsolverType ").append(solverType);
-        if (acSettings != null) asc.append('\n').append(AcMetadataCodec.SETTINGS).append(' ')
-                .append(AcMetadataCodec.encode(acSettings));
-        if (hierarchy != null) asc.append('\n').append(gecko.core.io.HierarchyMetadataCodec.DOCUMENT).append(' ')
-                .append(gecko.core.io.HierarchyMetadataCodec.encode(hierarchy));
-        if (acProvenance != null) asc.append('\n').append(AcMetadataCodec.PROVENANCE).append(' ')
-                .append(AcMetadataCodec.encode(acProvenance));
+        if (acSettings != null) {
+            asc.append('\n').append(AcMetadataCodec.SETTINGS).append(' ')
+                    .append(AcMetadataCodec.encode(acSettings));
+        }
+        if (hierarchy != null) {
+            asc.append('\n').append(gecko.core.io.HierarchyMetadataCodec.DOCUMENT).append(' ')
+                    .append(gecko.core.io.HierarchyMetadataCodec.encode(hierarchy));
+        }
+        if (acProvenance != null) {
+            asc.append('\n').append(AcMetadataCodec.PROVENANCE).append(' ')
+                    .append(AcMetadataCodec.encode(acProvenance));
+        }
         asc.append("\npath ").append(modelPath);
         //
         asc.append("\n\ndpix ").append(dpix);

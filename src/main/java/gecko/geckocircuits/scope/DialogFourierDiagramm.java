@@ -232,7 +232,7 @@ public class DialogFourierDiagramm extends JDialog implements ComponentListener 
             mouseButtons[i1] = new JButton();
             mouseButtons[i1].setIcon(iconOFF[i1]);
             mouseButtons[i1].setActionCommand("mouseMode " + i1);
-            mouseButtons[i1].addActionListener((final ActionEvent actionEvent) -> updateMouseMode(actionEvent));
+            mouseButtons[i1].addActionListener(this::updateMouseMode);
 
             //--------------------
             switch (i1) {

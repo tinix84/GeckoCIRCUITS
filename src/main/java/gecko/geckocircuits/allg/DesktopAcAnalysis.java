@@ -54,7 +54,9 @@ final class DesktopAcAnalysis {
     }
 
     void start(SchematicEditor2 editor, SolverSettings settings, boolean async) throws Exception {
-        if (!async) throw new IllegalArgumentException("Use the AC result interface for this circuit.");
+        if (!async) {
+            throw new IllegalArgumentException("Use the AC result interface for this circuit.");
+        }
         onEdt(() -> {
             begin(editor, settings);
             return null;
@@ -75,7 +77,9 @@ final class DesktopAcAnalysis {
 
             @Override
             protected void done() {
-                if (active != this) return;
+                if (active != this) {
+                    return;
+                }
                 active = null;
                 window.setAcAnalysisRunning(false);
                 try {
@@ -98,7 +102,9 @@ final class DesktopAcAnalysis {
     boolean stop() { return active != null && syncOnEdt(this::stopRun); }
 
     void invalidate() {
-        if (active == null && resultWindow == null && SwingUtilities.isEventDispatchThread()) return;
+        if (active == null && resultWindow == null && SwingUtilities.isEventDispatchThread()) {
+            return;
+        }
         syncOnEdt(() -> {
             invalidateRun();
             return null;
@@ -114,7 +120,9 @@ final class DesktopAcAnalysis {
     }
 
     private boolean stopRun() {
-        if (active == null) return false;
+        if (active == null) {
+            return false;
+        }
         var oldRun = active;
         active = null;
         oldRun.cancel(true);
@@ -132,7 +140,9 @@ final class DesktopAcAnalysis {
     }
 
     private static <T> T onEdt(Callable<T> operation) throws Exception {
-        if (SwingUtilities.isEventDispatchThread()) return operation.call();
+        if (SwingUtilities.isEventDispatchThread()) {
+            return operation.call();
+        }
         var task = new FutureTask<>(operation);
         try {
             SwingUtilities.invokeAndWait(task);
@@ -142,7 +152,9 @@ final class DesktopAcAnalysis {
             Thread.currentThread().interrupt();
             throw error;
         } catch (ExecutionException error) {
-            if (error.getCause() instanceof Exception cause) throw cause;
+            if (error.getCause() instanceof Exception cause) {
+                throw cause;
+            }
             throw error;
         }
     }
@@ -152,13 +164,17 @@ final class DesktopAcAnalysis {
         dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
         var traces = new ArrayList<Trace>();
         for (var group : result.groups()) {
-            if (group.ground()) continue;
+            if (group.ground()) {
+                continue;
+            }
             String name = group.aliases().isEmpty() ? group.id() : String.join(", ", group.aliases());
             var terminal = group.members().getFirst();
             traces.add(new Trace("V(" + name + ") [" + terminal.instance() + ":" + terminal.spiceOrder() + "]",
                     "V", group.voltageV()));
         }
-        for (var current : result.currents()) traces.add(new Trace("I(" + current.instance() + ")", "A", current.currentA()));
+        for (var current : result.currents()) {
+            traces.add(new Trace("I(" + current.instance() + ")", "A", current.currentA()));
+        }
         if (result.hierarchy() != null) {
             for (var port : result.hierarchy().ports()) {
                 var formal = port.internal();
@@ -216,7 +232,9 @@ final class DesktopAcAnalysis {
             int left = 82, right = getWidth() - 30, top = 28, bottom = getHeight() - 46;
             double low = phase ? -180 : 0;
             double high = phase ? 180 : trace.values.stream().mapToDouble(this::value).max().orElse(1);
-            if (high == 0) high = 1;
+            if (high == 0) {
+                high = 1;
+            }
             g.setColor(Color.DARK_GRAY);
             g.drawString(phase ? "Phase (degrees)" : "Magnitude (" + trace.units + ")", left, 17);
             for (int j = 0; j <= 4; j++) {
@@ -248,8 +266,11 @@ final class DesktopAcAnalysis {
                 double sample = value(trace.values.get(i));
                 int x = left + (int) Math.round((right - left) * (Math.log10(frequencies.get(i)) - first) / width);
                 int y = bottom - (int) Math.round((bottom - top) * (sample - low) / (high - low));
-                if (i > 0 && (!phase || Math.abs(sample - previousValue) <= 180)) g.drawLine(previousX, previousY, x, y);
-                else g.fillOval(x - 2, y - 2, 4, 4);
+                if (i > 0 && (!phase || Math.abs(sample - previousValue) <= 180)) {
+                    g.drawLine(previousX, previousY, x, y);
+                } else {
+                    g.fillOval(x - 2, y - 2, 4, 4);
+                }
                 previousX = x;
                 previousY = y;
                 previousValue = sample;

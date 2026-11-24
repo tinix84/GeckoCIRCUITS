@@ -77,7 +77,9 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
     public gecko.core.io.CircuitHierarchy getHierarchy() { return hierarchy.getValue().orElse(null); }
 
     static void requireEditThread() {
-        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Edit the hierarchy on the editor thread.");
+        if (!SwingUtilities.isEventDispatchThread()) {
+            throw new IllegalStateException("Edit the hierarchy on the editor thread.");
+        }
     }
 
     void retainFailedHierarchyEdit() {
@@ -104,7 +106,9 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
     /** Stops a simulation start when the import findings show that conversion is incomplete. */
     public void requireCompleteConversion() {
         var issues = conversionIssues;
-        if (issues.isEmpty()) return;
+        if (issues.isEmpty()) {
+            return;
+        }
         String details = issues.stream().map(issue -> issue.code() + " " + issue.message()
                 + (issue.sourceLocation() == null ? "" : " (" + issue.sourceLocation() + ")"))
                 .collect(java.util.stream.Collectors.joining("\n"));
@@ -953,7 +957,9 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
 
     private void attachProject(ProjectData daten, String insertIntoSubCircuitName, List<ImportIssue> findings,
             boolean replaceAcMetadata) {
-        if (!replaceAcMetadata) requireComponentMergeSupported(daten);
+        if (!replaceAcMetadata) {
+            requireComponentMergeSupported(daten);
+        }
         var pending = new LinkedHashSet<>(findings);
         pending.add(INCOMPLETE_ATTACHMENT);
         conversionIssues = List.copyOf(pending);
@@ -1063,7 +1069,7 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
             return;
         }
 
-        if ((me.getModifiersEx() != MouseEvent.BUTTON3_DOWN_MASK)) {
+        if (me.getModifiersEx() != MouseEvent.BUTTON3_DOWN_MASK) {
             _lastMouseClickTime = System.currentTimeMillis();
         }
 
