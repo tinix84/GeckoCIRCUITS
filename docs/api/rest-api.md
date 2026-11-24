@@ -389,7 +389,7 @@ The search rejects random sources, sine sources with an input frequency, the mat
 
 The response has a `steadyState` object with `converged`, `periods`, `residual` and `startTime`. `residual` is null when it is not finite.
 When the search reaches `maxPeriods`, the job has status `FAILED`, `steadyState.converged` is `false` and the job has no results.
-A missing or out-of-range field returns HTTP 400 with `INVALID_REQUEST`, like other request fields. A period or forcing that the circuit cannot satisfy returns HTTP 400 with an `INVALID_SETTING` diagnostic and its parameter path.
+An invalid `periodicSteadyState` setting returns HTTP 400. Each entry in `diagnostics[]` has `code` `INVALID_SETTING` and the parameter path, such as `periodicSteadyState.period`. This covers a missing or out-of-range field, a period that the step grid or the circuit forcing cannot satisfy, and unsupported forcing.
 
 **Get Simulation Status and Results**
 

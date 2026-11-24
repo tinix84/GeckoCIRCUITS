@@ -93,12 +93,22 @@ class PeriodicSteadyStateIntegrationTest {
     }
 
     @Test
-    void aNonPositivePeriodIsRejected() throws Exception {
-        mvc.perform(post("/api/v1/simulations").contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(request(-1e-6, null, null))))
-                .andExpect(status().isBadRequest())
-                // Bean validation keeps the existing contract: INVALID_REQUEST for every field except timeStep and simulationTime.
-                .andExpect(jsonPath("$.diagnostics[?(@.code=='INVALID_REQUEST' && @.parameterPath=='periodicSteadyState.period')]").isNotEmpty());
+    void invalidPeriodicSettingsAreRejectedAsInvalidSettingWithTheirPathsAndNoJob() throws Exception {
+        int before = simulations.getAllSimulations().size();
+        Object[][] cases = {
+                {request(-1e-6, null, null), "periodicSteadyState.period"},
+                {request(null, null, null), "periodicSteadyState.period"},
+                {request(30e-6, 0.5, null), "periodicSteadyState.tolerance"},
+                {request(30e-6, -1e-4, null), "periodicSteadyState.tolerance"},
+                {request(30e-6, null, 2), "periodicSteadyState.maxPeriods"},
+                {request(30e-6, null, 1_000_001), "periodicSteadyState.maxPeriods"}};
+        for (Object[] item : cases) {
+            mvc.perform(post("/api/v1/simulations").contentType(MediaType.APPLICATION_JSON)
+                            .content(mapper.writeValueAsString(item[0])))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.diagnostics[?(@.code=='INVALID_SETTING' && @.parameterPath=='" + item[1] + "')]").isNotEmpty());
+        }
+        assertEquals(before, simulations.getAllSimulations().size(), "no job is accepted");
     }
 
     @Test
