@@ -46,12 +46,15 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 public final class ProjectData implements Serializable {
     private transient AcDocumentSettings acSettings;
     private transient AcProvenance acProvenance;
-    private transient List<ImportIssue> conversionIssues = List.of();
 
     public AcDocumentSettings getAcSettings() { return acSettings; }
     public AcProvenance getAcProvenance() { return acProvenance; }
-    public List<ImportIssue> getConversionIssues() { return List.copyOf(conversionIssues); }
     private static final long serialVersionUID = 1L;
+    private transient List<ImportIssue> conversionIssues = List.of();
+
+    public List<ImportIssue> getConversionIssues() {
+        return List.copyOf(conversionIssues);
+    }
 
     private static final Random RANDOM = new Random();
 

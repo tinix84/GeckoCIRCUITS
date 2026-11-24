@@ -407,6 +407,11 @@ public final class GeckoFile {
         _usageList.add(uniqueObjectIdentifier);
     }
 
+    /** Returns the saved identifiers of the components that use this file. */
+    public List<Long> getOwnerIds() {
+        return List.copyOf(_usageList);
+    }
+
     /**
      * function which removes a particular model block from the user list of
      * this file CAREFUL - probably should be called along with removeUser when

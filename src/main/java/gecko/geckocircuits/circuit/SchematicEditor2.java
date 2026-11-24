@@ -15,10 +15,10 @@ package gecko.geckocircuits.circuit;
 
 import gecko.core.ac.AcDocumentSettings;
 import gecko.core.io.AcProvenance;
-import gecko.core.io.ImportIssue;
 import gecko.modelviewcontrol.ModelMVC;
 import java.util.Optional;
 import gecko.GeckoSim;
+import gecko.core.io.ImportIssue;
 import gecko.geckocircuits.allg.AbstractComponentTyp;
 import gecko.geckocircuits.allg.ProjectData;
 import gecko.geckocircuits.allg.MainWindow;
@@ -58,16 +58,22 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 public final class SchematicEditor2 implements MouseListener, MouseMotionListener {
     private final ModelMVC<Optional<AcDocumentSettings>> acSettings = new ModelMVC<>(Optional.empty(), "AC analysis");
     private AcProvenance acProvenance;
-    private List<ImportIssue> conversionIssues = List.of();
+    private static final ImportIssue INCOMPLETE_ATTACHMENT = new ImportIssue(
+            "PROJECT_ATTACHMENT_INCOMPLETE", null, null, "Project component attachment is incomplete.", null, true);
+    private volatile List<ImportIssue> conversionIssues = List.of();
 
     public AcDocumentSettings getAcSettings() { return acSettings.getValue().orElse(null); }
     public AcProvenance getAcProvenance() { return acProvenance; }
-    public List<ImportIssue> getConversionIssues() { return List.copyOf(conversionIssues); }
 
-    /** Blocks simulation when an import dropped or approximated behavior. */
+    public List<ImportIssue> getConversionIssues() {
+        return List.copyOf(conversionIssues);
+    }
+
+    /** Stops a simulation start when the import findings show that conversion is incomplete. */
     public void requireCompleteConversion() {
-        if (conversionIssues.isEmpty()) return;
-        String details = conversionIssues.stream().map(issue -> issue.code() + " " + issue.message()
+        var issues = conversionIssues;
+        if (issues.isEmpty()) return;
+        String details = issues.stream().map(issue -> issue.code() + " " + issue.message()
                 + (issue.sourceLocation() == null ? "" : " (" + issue.sourceLocation() + ")"))
                 .collect(java.util.stream.Collectors.joining("\n"));
         throw new IllegalArgumentException("The source conversion is incomplete.\n" + details);
@@ -756,9 +762,6 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
     }
 
     public void resetCircuitSheetsForNewFile() {
-        acSettings.setValueWithoutUndo(Optional.empty());
-        acProvenance = null;
-        conversionIssues = List.of();
         for (AbstractCircuitSheetComponent comp : _circuitSheet.getAllElements().toArray(new AbstractCircuitSheetComponent[0])) {
             comp.deleteComponent();
         }
@@ -776,6 +779,9 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
         AbstractUndoGenericModel.undoManager.discardAllEdits();
         CircuitSheet.clearFindNodes();
         CircuitSheet.clearShowNodes();
+        acSettings.setValueWithoutUndo(Optional.empty());
+        acProvenance = null;
+        conversionIssues = List.of();
     }
 
     public NetListLK getNetzliste(final ConnectorType connectorType) {
@@ -886,28 +892,31 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
 
     public void ladeGespeicherteNetzlisteVonProjectData(final ProjectData daten,
             final String insertIntoSubCircuitName) {
-        attachProjectComponents(daten, insertIntoSubCircuitName);
-        conversionIssues = daten.getConversionIssues();
-        if (insertIntoSubCircuitName == null) {
-            acSettings.setValueWithoutUndo(Optional.ofNullable(daten.getAcSettings()));
-            acProvenance = daten.getAcProvenance();
-        }
+        attachProject(daten, insertIntoSubCircuitName, daten.getConversionIssues(), insertIntoSubCircuitName == null);
     }
 
     public void importProjectComponents(ProjectData project, String parent) {
-        attachProjectComponents(project, parent);
         var combined = new LinkedHashSet<>(conversionIssues);
         combined.addAll(project.getConversionIssues());
-        conversionIssues = List.copyOf(combined);
+        attachProject(project, parent, List.copyOf(combined), false);
     }
 
-    private void attachProjectComponents(ProjectData daten, String insertIntoSubCircuitName) {
+    private void attachProject(ProjectData daten, String insertIntoSubCircuitName, List<ImportIssue> findings,
+            boolean replaceAcMetadata) {
+        var pending = new LinkedHashSet<>(findings);
+        pending.add(INCOMPLETE_ATTACHMENT);
+        conversionIssues = List.copyOf(pending);
+        if (replaceAcMetadata) {
+            acProvenance = daten.getAcProvenance();
+            acSettings.setValueWithoutUndo(Optional.ofNullable(daten.getAcSettings()));
+        }
         for (AbstractCircuitSheetComponent elem : daten._allSheetComponents) {
             elem.findAndSetReferenceToParentSheet(daten.allSubCircuitBlocks, insertIntoSubCircuitName);
         }
 
         //initAdditionalFiles(daten._allSheetComponents);
         _visibleCircuitSheet.repaint();
+        conversionIssues = findings;
     }
 
     public void toggleEnable(final boolean shortDisableCommand) {
