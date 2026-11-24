@@ -147,12 +147,14 @@ public final class MainWindow extends JFrame
             return;
         }
         var chooser = GeckoFileChooser.createSimpleOpenFileChooser(".csv", this);
-        if (chooser.getUserResult() != GeckoFileChooser.FileChooserResult.OK) return;
+        if (chooser.getUserResult() != GeckoFileChooser.FileChooserResult.OK) {
+            return;
+        }
         try {
             powerSwitch.getVerlustBerechnung().getDetailedLosses()
                     .importVendorLosses(chooser.getFileWithCheckedEnding().toPath());
             _se.registerChangeWithNetlistUpdate();
-        } catch (java.io.IOException | IllegalArgumentException e) {
+        } catch (IOException | IllegalArgumentException e) {
             JOptionPane.showMessageDialog(this, e.getMessage(), title, JOptionPane.ERROR_MESSAGE);
         }
     }
