@@ -45,7 +45,7 @@ public final class ProjectData implements Serializable {
     private transient List<ImportIssue> conversionIssues = List.of();
 
     public List<ImportIssue> getConversionIssues() {
-        return conversionIssues;
+        return List.copyOf(conversionIssues);
     }
 
     private static final Random RANDOM = new Random();

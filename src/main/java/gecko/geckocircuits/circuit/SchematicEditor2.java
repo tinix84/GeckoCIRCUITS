@@ -55,7 +55,7 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
     private volatile List<ImportIssue> conversionIssues = List.of();
 
     public List<ImportIssue> getConversionIssues() {
-        return conversionIssues;
+        return List.copyOf(conversionIssues);
     }
 
     /** Stops a simulation start when the import findings show that conversion is incomplete. */
