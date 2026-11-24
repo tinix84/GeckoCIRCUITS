@@ -33,7 +33,7 @@ Each CONTROL subsystem keeps the #61 clock arithmetic, including its summed grid
 At a grid step the runtime runs the due blocks in the global dependency order, with the ADR-0003 publication and capture phases. Delays and dependency planning use the step of their own subsystem.
 A block output changes only when its subsystem runs, so faster consumers read a held value.
 A gate publishes at a sample of its own subsystem. A signal-controlled source, electrical or thermal ([ADR-0023](0023-core-thermal-network.md)), publishes after a sample of its producer's subsystem. Probes stay live.
-A gate of a configured subsystem applies its published value to the switch, not its live input. A gate outside every configured subsystem keeps the #61 behaviour.
+A gate applies its published value to the switch, not its live input, in two cases. The gate belongs to a configured subsystem. Or subsystems are configured and the default group has a positive period. Without configured subsystems, a gate keeps the #61 behaviour. A default group with period zero reads its live input.
 A step change restages only subsystems whose controller step changes. Adaptive and event sub-steps never run CONTROL ([ADR-0018](0018-adaptive-electrical-step.md)).
 The periodic steady-state search needs a period that is a whole multiple of every positive period. It also compares each subsystem's sample phase, flag and held gate values.
 Preparation rejects these cases at `controlSubsystemPeriods.<path>`:

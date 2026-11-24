@@ -20,7 +20,6 @@ import gecko.core.control.calculators.PT2Calculator;
 import gecko.core.control.calculators.InitializableAtSimulationStart;
 import gecko.core.control.IsDtChangeSensitive;
 
-import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.function.BiFunction;

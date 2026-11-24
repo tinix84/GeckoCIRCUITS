@@ -273,12 +273,15 @@ final class ControlRuntime implements AutoCloseable {
     }
 
     /**
-     * A gate of a configured subsystem applies the value it published at its own sample. A gate of the default group
-     * reads its live input, as with a single global period.
+     * A gate applies the value it published at its own sample, not its live input, in two cases. The gate belongs to
+     * a configured subsystem. Or subsystems are configured and the default group has a positive period, so a faster
+     * producer cannot reach the switch between two samples of the default group. Otherwise the gate reads its live
+     * input: without configured subsystems as with a single global period, and in a default group with period zero.
      */
     void applyPendingGates(CircuitNetlist circuitNetlist) {
         requireOpen();
-        domainCoupler.applyGateSignals(circuitNetlist, calculator -> groupOf(calculator) != 0);
+        boolean defaultGroupSampled = periods.length > 1 && periods[0] > 0;
+        domainCoupler.applyGateSignals(circuitNetlist, calculator -> groupOf(calculator) != 0 || defaultGroupSampled);
     }
 
     void advanceAfterElectricalStep(CircuitNetlist circuitNetlist, double time) {
