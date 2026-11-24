@@ -567,7 +567,8 @@ class NativeAcDesktopTest {
         } else {
             GeckoSim._win.openFile(file.toString());
         }
-        assertEquals(file.toString(), MainWindow.getOpenFileName());
+        assertEquals(file.toAbsolutePath().normalize(),
+                Path.of(MainWindow.getOpenFileName()).toAbsolutePath().normalize());
         return GeckoSim._win;
     }
 
