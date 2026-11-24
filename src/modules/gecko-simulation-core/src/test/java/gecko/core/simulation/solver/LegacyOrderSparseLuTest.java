@@ -9,8 +9,8 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * The legacy-order sparse LU must return exactly the entries of {@link gecko.core.math.LUDecomposition} through
- * {@link Matrix#solve}. The dense arrays below are the reference only; the kernel under test reads sparse columns.
+ * The legacy-order sparse LU must return entries exactly equal, under {@code ==} so a signed zero is ignored, to those
+ * of {@link gecko.core.math.LUDecomposition} through {@link Matrix#solve}. The dense arrays below are the reference only; the kernel under test reads sparse columns.
  */
 class LegacyOrderSparseLuTest {
     private static final double[] PALETTE = {1e-7, 1e-7, 1e-7, 100, 100, 1.0, 0.5, 2.2e-2, 1e-3, 1e3};
@@ -86,7 +86,7 @@ class LegacyOrderSparseLuTest {
         }
     }
 
-    /** @return 1 for a nonsingular system that matched bit for bit, 0 for a singular verdict both agreed on */
+    /** @return 1 for a nonsingular system whose entries are equal under {@code ==} (signed zero ignored), 0 for a shared singular verdict */
     private static int check(double[][] a, double[] b, String label) {
         double[] expected = dense(a, b);
         LegacyOrderSparseLu lu = new LegacyOrderSparseLu(a.length);

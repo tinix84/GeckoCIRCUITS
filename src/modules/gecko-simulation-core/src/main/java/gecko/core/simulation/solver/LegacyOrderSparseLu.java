@@ -6,8 +6,9 @@ import org.ejml.data.DMatrixSparseCSC;
 /**
  * Sparse LU that repeats, nonzero by nonzero, the scalar arithmetic of {@code gecko.core.math.LUDecomposition} and
  * its {@code solve}: left-looking Crout columns, dot products summed from 0.0 in ascending {@code k}, the first
- * strictly largest pivot, whole-row swaps, and the same triangular solve order. For the same A and b it returns the
- * same bits as the dense LU, so a forced-sparse run of a small circuit follows the dense trace exactly.
+ * strictly largest pivot, whole-row swaps, and the same triangular solve order. For the same A and b it returns
+ * values that are exactly equal under Java {@code ==} to the dense LU's, with the sign of a zero ignored, so a
+ * forced-sparse run of a small circuit follows the dense trace numerically exactly.
  *
  * <p>L is kept by rows, U by columns, and no order-by-order array exists. Only products with an exact zero factor
  * are skipped; that changes at most the sign of a zero. Nothing is reordered, fused or compensated.
