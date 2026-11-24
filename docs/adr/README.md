@@ -17,3 +17,4 @@
 | 2026-02-05 | [ADR-0014: Java solver with optional native sparse backend](0014-java-solver-with-optional-native-sparse.md) |
 | 2026-11-24 | [ADR-0016: Locate diode switching inside a step with electrical sub-steps](0016-zero-crossing-event-location.md) |
 | 2026-11-24 | [ADR-0019: Headless circuit import writer](0019-headless-circuit-import-writer.md) |
+| 2026-11-24 | [ADR-0020: Native linear AC analysis](0020-native-linear-ac-analysis.md) |
