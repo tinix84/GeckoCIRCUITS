@@ -253,7 +253,7 @@ public final class NetListLK {
     }
 
     // zB. die im SubCircuit definierten ElementeLK werden in die LK-Netzliste integriert -->
-    public final void integriereSubCircuits() {
+    public void integriereSubCircuits() {
         Set<AbstractBlockInterface> eLKneuSet = new LinkedHashSet<AbstractBlockInterface>();
 
         for (AbstractCircuitBlockInterface elem : elements) {

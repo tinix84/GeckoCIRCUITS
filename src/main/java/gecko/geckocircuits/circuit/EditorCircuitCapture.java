@@ -97,7 +97,9 @@ public final class EditorCircuitCapture {
         model.setAcSettings(acSettings);
         model.setAcProvenance(provenance);
         model.setHierarchy(hierarchy);
-        for (var file : files._allAvailableFiles) captureResource(model, file);
+        for (var file : files._allAvailableFiles) {
+            captureResource(model, file);
+        }
         var ordinals = new HashMap<String, Integer>();
         for (var block : blocks) {
             String marker = block.getExportImportCharacters().trim();
@@ -135,8 +137,10 @@ public final class EditorCircuitCapture {
     }
 
     private static void appendHierarchy(StringBuffer ascii, CircuitHierarchy hierarchy) {
-        if (hierarchy != null) ascii.append('\n').append(HierarchyMetadataCodec.DOCUMENT).append(' ')
-                .append(HierarchyMetadataCodec.encode(hierarchy));
+        if (hierarchy != null) {
+            ascii.append('\n').append(HierarchyMetadataCodec.DOCUMENT).append(' ')
+                    .append(HierarchyMetadataCodec.encode(hierarchy));
+        }
     }
 
     private static void captureTerminals(CircuitModel.ComponentData component, List<AbstractTerminal> terminals,
@@ -157,7 +161,9 @@ public final class EditorCircuitCapture {
         List<Long> owners = file.getOwnerIds();
         try {
             byte[] bytes = resourceBytes(file);
-            if (bytes == null) throw new IOException("Resource bytes are missing");
+            if (bytes == null) {
+                throw new IOException("Resource bytes are missing");
+            }
             model.getResources().put(id, new CircuitResource(id, file.getName(), path, bytes, owners));
         } catch (IOException error) {
             model.getResourceFailures().put(id, new CircuitResourceFailure(id, path, owners,
@@ -166,7 +172,9 @@ public final class EditorCircuitCapture {
     }
 
     private static byte[] resourceBytes(GeckoFile file) throws IOException {
-        if (file.getStorageType() == GeckoFile.StorageType.INTERNAL) return file.getContentsByte();
+        if (file.getStorageType() == GeckoFile.StorageType.INTERNAL) {
+            return file.getContentsByte();
+        }
         try (var input = file.getInputStream()) {
             return input == null ? null : input.readAllBytes();
         }

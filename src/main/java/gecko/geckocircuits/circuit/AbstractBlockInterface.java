@@ -446,7 +446,7 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
         writeASCII(ascii, owned, values);
     }
 
-    public final void exportScopedAcASCII(StringBuffer ascii, java.util.Map<String, String> scope) {
+    public final void exportScopedAcASCII(StringBuffer ascii, Map<String, String> scope) {
         AcComponent owned = getAcComponentOrLiteral();
         double[] values = owned == null ? parameter : AcMetadataCodec.compatibilityValues(owned, getParameter(), scope);
         writeASCII(ascii, owned, values);
@@ -466,10 +466,16 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
 
     public final AcComponent getAcComponentOrLiteral() {
         var owned = getAcComponent();
-        if (owned != null) return owned;
-        if (getSimulationDomain() != ConnectorType.LK) return null;
+        if (owned != null) {
+            return owned;
+        }
+        if (getSimulationDomain() != ConnectorType.LK) {
+            return null;
+        }
         var descriptor = SpicePorts.find("LK", getTypeEnum().getTypeNumber());
-        if (descriptor == null) return null;
+        if (descriptor == null) {
+            return null;
+        }
         double[] values = getParameter();
         AcComponent.Law law = switch (descriptor) {
             case RES, CAP -> new AcComponent.Passive(Double.toString(values[0]));
@@ -491,7 +497,9 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
 
     final void setAcLawLocal(AcComponent.Law law) {
         var current = Objects.requireNonNull(getAcComponentOrLiteral(), "The component has no AC law.");
-        if (current.law().getClass() != law.getClass()) throw new IllegalArgumentException("Invalid AC component law.");
+        if (current.law().getClass() != law.getClass()) {
+            throw new IllegalArgumentException("Invalid AC component law.");
+        }
         acComponent.setValueWithoutUndo(Optional.of(current));
         acComponent.setValue(Optional.of(new AcComponent(current.instance(), current.spiceOrders(), current.aliases(),
                 current.mirrored(), law)));
@@ -522,7 +530,9 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
         ProjectData.appendAsString(ascii.append("\nx"), getSheetPosition().x);
         ProjectData.appendAsString(ascii.append("\ny"), getSheetPosition().y);
         ProjectData.appendAsString(ascii.append("\nparameter"), values);
-        if (owned != null) ascii.append('\n').append(AcMetadataCodec.COMPONENT).append(' ').append(AcMetadataCodec.encode(owned));
+        if (owned != null) {
+            ascii.append('\n').append(AcMetadataCodec.COMPONENT).append(' ').append(AcMetadataCodec.encode(owned));
+        }
 
         ProjectData.appendAsString(ascii.append("\nparameterString"), parameterString);
         updateNameOptArray();
@@ -538,7 +548,9 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
         for (UserParameter par : getRegisteredParameters()) {
             if (owned != null && ((owned.law() instanceof AcComponent.Passive || owned.law() instanceof AcComponent.Inductance)
                     && par.getParameterIndex() == 0 || (owned.law() instanceof AcComponent.Voltage
-                    || owned.law() instanceof AcComponent.Current) && par.getParameterIndex() == 1)) continue;
+                    || owned.law() instanceof AcComponent.Current) && par.getParameterIndex() == 1)) {
+                continue;
+            }
             par.writeXMLToFile(ascii);
         }
 
@@ -864,7 +876,9 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
         var settings = editor == null ? null : editor.getAcSettings();
         var owned = getAcComponent();
         if (settings != null && owned != null) {
-            if (getDisplayProperties().showParameter) addAcDisplayParameters(owned, settings);
+            if (getDisplayProperties().showParameter) {
+                addAcDisplayParameters(owned, settings);
+            }
         } else {
             this.addTextInfoParameters();
             _textInfo.addParameters(getRegisteredParameters(), getDisplayProperties());

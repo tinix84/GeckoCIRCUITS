@@ -73,7 +73,7 @@ public final class InitParameters {
      * Method to get language code (if the language != English)
      * @return Language code of the chosen language
      */
-    public static final String getCurrentLanguageCode() {
+    public static String getCurrentLanguageCode() {
         return LangInit.language.getLanguageCode();
     }
 

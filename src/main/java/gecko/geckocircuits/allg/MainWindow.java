@@ -861,7 +861,9 @@ public final class MainWindow extends JFrame
     }
 
     private boolean saveDocument(boolean askForPath) {
-        if (speicherVorgangLaeuft) return false;
+        if (speicherVorgangLaeuft) {
+            return false;
+        }
         speicherVorgangLaeuft = true;
         try {
             boolean rebaseResources = askForPath || aktuellerDateiName.equals(UNTITLED);
@@ -869,13 +871,17 @@ public final class MainWindow extends JFrame
             if (rebaseResources) {
                 var chooser = GeckoFileChooser.createSaveFileChooser(".ipes", "Circuit Simulation Files (*.ipes)",
                         this, askForPath ? target : null);
-                if (chooser.getUserResult() == GeckoFileChooser.FileChooserResult.CANCEL) return false;
+                if (chooser.getUserResult() == GeckoFileChooser.FileChooserResult.CANCEL) {
+                    return false;
+                }
                 target = chooser.getFileWithCheckedEnding();
             }
             if (target.getName().contains("autoBackup")) {
                 int response = JOptionPane.showConfirmDialog(this,
                         "Overwrite this backup file?", "Save circuit", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-                if (response != JOptionPane.YES_OPTION) return false;
+                if (response != JOptionPane.YES_OPTION) {
+                    return false;
+                }
             }
             saveDocumentTo(target, rebaseResources);
             return true;
@@ -892,12 +898,16 @@ public final class MainWindow extends JFrame
     }
 
     void saveDocumentTo(File target, boolean rebaseResources, OpenProjectOutput open) throws Exception {
-        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Save the document on the editor thread.");
+        if (!SwingUtilities.isEventDispatchThread()) {
+            throw new IllegalStateException("Save the document on the editor thread.");
+        }
         String path = target.getAbsolutePath();
         int fileId = FILE_ID_RANDOM.nextInt();
         String snapshot = exportProject(fileId, path, rebaseResources);
         writeProjectAtomically(target.toPath(), snapshot, open);
-        if (rebaseResources) _fileManager.recomputeRelativePaths(path);
+        if (rebaseResources) {
+            _fileManager.recomputeRelativePaths(path);
+        }
         uniqueFileID = fileId;
         GlobalFilePathes.DATNAM = path;
         aktuellerDateiName = path;
@@ -921,14 +931,16 @@ public final class MainWindow extends JFrame
 
     @FunctionalInterface
     interface OpenProjectOutput {
-        OutputStream open(Path staged) throws java.io.IOException;
+        OutputStream open(Path staged) throws IOException;
     }
 
     private static void writeProjectAtomically(Path file, String project, OpenProjectOutput open)
-            throws java.io.IOException {
+            throws IOException {
         var target = file.toAbsolutePath();
         Path directory = target.getParent();
-        if (directory == null) throw new IOException("A circuit save requires a file name: " + target);
+        if (directory == null) {
+            throw new IOException("A circuit save requires a file name: " + target);
+        }
         var staged = Files.createTempFile(directory, ".gecko-save-", ".partial");
         try {
             try (OutputStream fileOut = open.open(staged);
@@ -942,14 +954,16 @@ public final class MainWindow extends JFrame
                 input.transferTo(OutputStream.nullOutputStream());
             }
             Files.move(staged, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-        } catch (java.io.IOException failure) {
-            throw new java.io.IOException("Cannot save " + target + ". Staged output: " + staged
+        } catch (IOException failure) {
+            throw new IOException("Cannot save " + target + ". Staged output: " + staged
                     + ". " + failure.getMessage(), failure);
         }
     }
 
     private boolean canLeaveDocument(String title, String message) {
-        if (!_se.getZustandGeaendert()) return true;
+        if (!_se.getZustandGeaendert()) {
+            return true;
+        }
         int answer = JOptionPane.showConfirmDialog(this, message, title, JOptionPane.YES_NO_CANCEL_OPTION);
         return answer == JOptionPane.NO_OPTION || (answer == JOptionPane.YES_OPTION && saveDocument(false));
     }
@@ -957,7 +971,9 @@ public final class MainWindow extends JFrame
     private static final String SAVE_CHANGES = "The content of the file has changed.\nDo you want to save the changes?\n";
 
     private static <T> T captureOnEditorThread(java.util.concurrent.Callable<T> action) throws Exception {
-        if (SwingUtilities.isEventDispatchThread()) return action.call();
+        if (SwingUtilities.isEventDispatchThread()) {
+            return action.call();
+        }
         var capture = new java.util.concurrent.FutureTask<>(action);
         try {
             SwingUtilities.invokeAndWait(capture);
@@ -966,7 +982,9 @@ public final class MainWindow extends JFrame
             capture.cancel(false);
             throw error;
         } catch (java.util.concurrent.ExecutionException error) {
-            if (error.getCause() instanceof Exception cause) throw cause;
+            if (error.getCause() instanceof Exception cause) {
+                throw cause;
+            }
             throw error;
         }
     }
@@ -1251,8 +1269,11 @@ public final class MainWindow extends JFrame
                 _se.export_allesImBearbeitungsModus();
                 //========================================================================
             } else if (befehl.equals("Parameter")) {
-                if (_se.getAcSettings() == null) openParameterMenu(this);
-                else gecko.geckocircuits.circuit.AcEditorDialogs.editSettings(this, _se);
+                if (_se.getAcSettings() == null) {
+                    openParameterMenu(this);
+                } else {
+                    AcEditorDialogs.editSettings(this, _se);
+                }
             } else if (befehl.equals("Init & Start")) {
                 initStartWithErrorDialogMessage();
             } else if (befehl.equals("Pause")) {
@@ -1564,11 +1585,11 @@ public final class MainWindow extends JFrame
         mItemContinue.setEnabled(false);
         simMenu.add(mItemParameter);
         JMenuItem acSettings = new JMenuItem("AC analysis settings…");
-        acSettings.addActionListener(event -> gecko.geckocircuits.circuit.AcEditorDialogs.editSettings(this, _se));
+        acSettings.addActionListener(event -> AcEditorDialogs.editSettings(this, _se));
         simMenu.add(acSettings);
         JMenuItem hierarchyParameters = new JMenuItem("ASC hierarchy parameters…");
         hierarchyParameters.addActionListener(event ->
-                gecko.geckocircuits.circuit.AcEditorDialogs.editHierarchyParameters(this, _se));
+                AcEditorDialogs.editHierarchyParameters(this, _se));
         simMenu.add(hierarchyParameters);
         mItemParameter.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0));
         simMenu.add(mItemRun);
@@ -1672,7 +1693,9 @@ public final class MainWindow extends JFrame
                 "The model has changed since last save to the model\nfile. Do you like to save your model "
                 + "to the file:\n" + aktuellerDateiName + "\nbefore exiting GeckoCIRCUITS?")) {
             GeckoSim.saveProperties();
-            if (!dirty || GeckoSim.operatingmode == OperatingMode.STANDALONE) exitApplication();
+            if (!dirty || GeckoSim.operatingmode == OperatingMode.STANDALONE) {
+                exitApplication();
+            }
         }
     }
 
@@ -1763,10 +1786,6 @@ public final class MainWindow extends JFrame
 
     private static final Random FILE_ID_RANDOM = new Random();
 
-    private void generateNewFileId() {
-        uniqueFileID = FILE_ID_RANDOM.nextInt();
-    }
-
     private static String getAutoBackupFileName() {
         String userName = System.getProperty("user.name");
         String jarPath = GetJarPath.getJarPath();
@@ -1830,7 +1849,9 @@ public final class MainWindow extends JFrame
         if (_se.getHierarchy() != null) {
             throw new IllegalArgumentException("Open the imported hierarchy as a separate circuit document.");
         }
-        if (!new File(fileName).exists()) throw new FileNotFoundException(fileName);
+        if (!new File(fileName).exists()) {
+            throw new FileNotFoundException(fileName);
+        }
         String[] lines = getLinesArrayFromIpesFile(fileName);
         ProjectData.requireComponentImport(lines);
         ProjectData daten = new ProjectData(lines, false, null, fileName);
@@ -1890,7 +1911,9 @@ public final class MainWindow extends JFrame
         long requested = documentGeneration.get();
         String snapshot = captureOnEditorThread(() -> requested == documentGeneration.get() && _se.getZustandGeaendert()
                 ? exportProject(uniqueFileID, GlobalFilePathes.DATNAM, false) : null);
-        if (snapshot != null) writeProjectAtomically(target.toPath(), snapshot, open);
+        if (snapshot != null) {
+            writeProjectAtomically(target.toPath(), snapshot, open);
+        }
     }
 
     public static String getTextMenuItemRECENT(String txt, int txtSpace) {

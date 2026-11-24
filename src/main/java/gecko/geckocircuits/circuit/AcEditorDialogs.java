@@ -46,9 +46,13 @@ public final class AcEditorDialogs {
             try {
                 var parameters = new ArrayList<ParameterDefinition>();
                 for (String row : definitions.getText().split("\\R")) {
-                    if (row.isBlank()) continue;
+                    if (row.isBlank()) {
+                        continue;
+                    }
                     String[] assignment = row.split("=", 2);
-                    if (assignment.length != 2) throw new IllegalArgumentException("Enter one parameter assignment per line.");
+                    if (assignment.length != 2) {
+                        throw new IllegalArgumentException("Enter one parameter assignment per line.");
+                    }
                     parameters.add(new ParameterDefinition(assignment[0].strip(), assignment[1].strip()));
                 }
                 int density = Integer.parseInt(points.getText().strip());
@@ -147,7 +151,9 @@ public final class AcEditorDialogs {
         var pane = new JOptionPane(fields, JOptionPane.PLAIN_MESSAGE, JOptionPane.OK_CANCEL_OPTION);
         JDialog dialog = pane.createDialog("AC component " + block.getStringID());
         pane.addPropertyChangeListener(JOptionPane.VALUE_PROPERTY, event -> {
-            if (!Integer.valueOf(JOptionPane.OK_OPTION).equals(event.getNewValue())) return;
+            if (!Integer.valueOf(JOptionPane.OK_OPTION).equals(event.getNewValue())) {
+                return;
+            }
             try {
                 block.setAcLaw(updatedLaw.get());
             } catch (IllegalArgumentException error) {
@@ -177,13 +183,13 @@ public final class AcEditorDialogs {
         var owner = child._subBlock;
         var call = owner.getHierarchyCall();
         var definition = editor.getHierarchy().definition(call.definitionId());
-        var defaults = new javax.swing.JTextArea(parameterText(definition.defaults()), 5, 30);
-        var overrides = new javax.swing.JTextArea(parameterText(call.overrides()), 5, 30);
+        var defaults = new JTextArea(parameterText(definition.defaults()), 5, 30);
+        var overrides = new JTextArea(parameterText(call.overrides()), 5, 30);
         var fields = new JPanel(new GridLayout(0, 1, 6, 6));
         fields.add(new JLabel("Definition defaults"));
-        fields.add(new javax.swing.JScrollPane(defaults));
+        fields.add(new JScrollPane(defaults));
         fields.add(new JLabel("Overrides for " + call.instance()));
-        fields.add(new javax.swing.JScrollPane(overrides));
+        fields.add(new JScrollPane(overrides));
         while (JOptionPane.showConfirmDialog(window, fields, "ASC parameters", JOptionPane.OK_CANCEL_OPTION)
                 == JOptionPane.OK_OPTION) {
             try {
@@ -202,7 +208,9 @@ public final class AcEditorDialogs {
     private static List<ParameterDefinition> readParameters(String text) {
         return text.lines().filter(line -> !line.isBlank()).map(line -> {
             String[] assignment = line.split("=", 2);
-            if (assignment.length != 2) throw new IllegalArgumentException("Enter one parameter assignment per line.");
+            if (assignment.length != 2) {
+                throw new IllegalArgumentException("Enter one parameter assignment per line.");
+            }
             return new ParameterDefinition(assignment[0].strip(), assignment[1].strip());
         }).toList();
     }
