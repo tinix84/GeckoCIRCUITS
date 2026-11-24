@@ -70,6 +70,11 @@ public final class CircuitPreparation {
         if (settings.features().zeroCrossing() && model.getSolverType() == SolverType.SOLVER_GS) {
             diagnostics.add(invalidSetting("zeroCrossing", SimulationTiming.GS_ZERO_CROSSING_MESSAGE));
         }
+        for (var issue : SimulationTiming.periodicSteadyStateIssues(settings.features().periodicSteadyState(),
+                model.getTimeStep(), model.getSimulationDuration(), model.getPreSimulationTime(),
+                settings.features().controlSamplePeriod())) {
+            diagnostics.add(invalidSetting(issue.parameterPath(), issue.message()));
+        }
         model.getImportIssues().removeIf(issue -> issue.code().equals("INVALID_SETTING")
                 && switch (issue.parameterPath() == null ? "" : issue.parameterPath()) {
                     case "solver" -> settings.solver() != null;

@@ -176,6 +176,20 @@ public final class DelayHistory {
      * @return the delayed output for the current buffered step.
      * @throws IllegalStateException if the history has not been initialized.
      */
+    /**
+     * Emits the history in chronological order, so equal content compares equal whatever the ring cursor.
+     * The order is the samples from oldest to newest, the sample before the oldest, and a flag that tells
+     * whether every slot holds a real sample. The physical array and its cursor are not emitted.
+     *
+     * @param sink receives the values
+     */
+    public void exportChronological(StateSink sink) {
+        requireInitialized();
+        for (int position = 0; position < samples.length; position++) sink.value(sample(position));
+        sink.value(beforeOldest);
+        sink.flag(available >= samples.length);
+    }
+
     public double publish() {
         requireInitialized();
         return samples[next];

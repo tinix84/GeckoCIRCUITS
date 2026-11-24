@@ -1,5 +1,6 @@
 package gecko.core.simulation;
 
+import gecko.core.allg.PeriodicSteadyStateSettings;
 import gecko.core.allg.SolverSettingsCore;
 import gecko.core.allg.SolverType;
 import java.util.ArrayList;
@@ -8,6 +9,7 @@ import java.util.Objects;
 
 /** Shares scalar timing validation between preparation and persistent execution. */
 public final class SimulationTiming {
+    private static final double WHOLE_STEP = 1e-9;
     private static final int MAXIMUM_STEPS = Integer.MAX_VALUE - 2;
     private static final String STEP_MESSAGE = "Step width must be finite and positive.";
     private static final String DURATION_MESSAGE = "Simulation duration must be finite and positive.";
@@ -61,7 +63,53 @@ public final class SimulationTiming {
         if (mainCapacity > 0 && (long) mainCapacity + warmupCapacity > MAXIMUM_STEPS) {
             issues.add(new SettingIssue("duration", "Combined simulation step count is too large."));
         }
+        issues.addAll(periodicSteadyStateIssues(settings.getPeriodicSteadyState(), step, duration, preTime, samplePeriod));
         return List.copyOf(issues);
+    }
+
+    /**
+     * Checks the scalar periodic steady-state settings against the resolved step, duration and sample period.
+     * A null setting is off and has no issues.
+     *
+     * @param pss the settings, or null
+     * @param step the main electrical step in seconds
+     * @param duration the main duration in seconds
+     * @param preTime the pre-calculation time, which cannot combine with the search
+     * @param samplePeriod the CONTROL sample period, zero for every step
+     * @return one issue per violation, each with its parameter path
+     */
+    public static List<SettingIssue> periodicSteadyStateIssues(PeriodicSteadyStateSettings pss, double step,
+            double duration, double preTime, double samplePeriod) {
+        var issues = new ArrayList<SettingIssue>();
+        if (pss == null) return issues;
+        double period = pss.period();
+        boolean periodValid = positive(period);
+        if (!periodValid) issues.add(new SettingIssue("periodicSteadyState.period", "Period must be finite and positive."));
+        if (!(pss.tolerance() > 0 && pss.tolerance() <= PeriodicSteadyStateSettings.MAX_TOLERANCE)) {
+            issues.add(new SettingIssue("periodicSteadyState.tolerance", "Tolerance must be above 0 and at most 0.1."));
+        }
+        if (pss.maxPeriods() < PeriodicSteadyStateSettings.MIN_PERIODS || pss.maxPeriods() > PeriodicSteadyStateSettings.MAX_PERIODS) {
+            issues.add(new SettingIssue("periodicSteadyState.maxPeriods", "Period limit must be from 3 to 1000000."));
+        }
+        if (preTime > 0) {
+            issues.add(new SettingIssue("preSimulationTime", "Pre-calculation time cannot combine with the periodic steady-state search."));
+        }
+        if (periodValid && positive(step)) {
+            double steps = Math.rint(period / step);
+            if (steps < 2 || Math.abs(steps * step - period) > WHOLE_STEP * period) {
+                issues.add(new SettingIssue("periodicSteadyState.period", "Period must be a whole number of steps, at least 2."));
+            } else if (positive(duration) && pss.maxPeriods() >= PeriodicSteadyStateSettings.MIN_PERIODS
+                    && pss.maxPeriods() * steps + Math.ceil(duration / step) + 1 > MAXIMUM_STEPS) {
+                issues.add(new SettingIssue("periodicSteadyState.maxPeriods", "Search and main step count is too large."));
+            }
+        }
+        if (periodValid && positive(samplePeriod)) {
+            double ratio = period / samplePeriod;
+            if (Math.rint(ratio) < 1 || Math.abs(ratio - Math.rint(ratio)) > WHOLE_STEP * ratio) {
+                issues.add(new SettingIssue("periodicSteadyState.period", "Period must be a whole multiple of the CONTROL sample period."));
+            }
+        }
+        return issues;
     }
 
     /**

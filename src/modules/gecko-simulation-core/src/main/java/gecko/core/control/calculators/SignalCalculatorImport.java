@@ -13,12 +13,14 @@
  */
 package gecko.core.control.calculators;
 
+import gecko.core.control.StatelessCalculation;
+
 
 /**
  * Repeats an immutable time/value table with linear interpolation.
  * Times before the first sample hold its value. Exact period ends retain the final sample.
  */
-public final class SignalCalculatorImport extends AbstractSignalCalculator implements InitializableAtSimulationStart {
+public final class SignalCalculatorImport extends AbstractSignalCalculator implements InitializableAtSimulationStart, StatelessCalculation {
     private final double _signalDuration;
     private final double[][] _xy;
 
