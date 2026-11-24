@@ -4,7 +4,7 @@ ADR-0020 · Claude Opus 5.5 for tinix84 · 2026-11-24 · Status: Accepted · Ver
 Audience: maintainers who implement or review the sparse LU in `gecko-simulation-core`.
 Source: EJML 0.46.1, Java 21.
 
-**Decision:** Wire-reference systems below `thresholdNodes` use a sparse LU that repeats the dense LU's scalar operations; every other sparse system keeps EJML.
+**Decision:** When sparse is forced on a wire-reference system below `thresholdNodes`, it uses a sparse LU that repeats the dense LU's scalar operations, and every other sparse system keeps EJML.
 
 ## Context
 
@@ -12,7 +12,7 @@ Issue [#60](https://github.com/tinix84/GeckoCIRCUITS/issues/60) requires dense a
 With the EJML LU, 4 of 21 circuits miss that bound on node potentials, by 5.8e-9 to 2.6e-6, while switch states and time grids agree exactly [M, High].
 These circuits are wired captures, so both backends drop row and column 0 and the 1e15 pin is not factored ([ADR-0011](0011-numerical-reference-compatibility.md)) [C, High].
 Their switch conductances span 1e-7 S to 100 S, and conditioning can amplify a different rounding order (the condition number was not computed) [E, Medium].
-EJML `LuUpLooking_DSCC` uses axpy updates and reach-order pivot ties; the dense LU uses Crout dot products and the lowest row, and EJML exposes neither [C from bytecode, High].
+EJML `LuUpLooking_DSCC` uses axpy updates and reach-order pivot ties, while the dense LU uses Crout dot products and the lowest row, and EJML exposes neither [C from bytecode, High].
 
 ## Options
 
@@ -34,10 +34,10 @@ Storage is L by rows, U by columns and one scratch column. No n×n array exists.
 
 Only products with an exact zero factor are skipped, which changes at most the sign of a zero [C, High]. Java 17+ floating point is strict, without FMA contraction (JEP 306).
 
-A prototype solved 3000 seeded wire-reference MNA matrices of order 3 to 66. All 2931 nonsingular solutions were bit-identical to `LUDecomposition` and all 69 singular verdicts agreed; EJML matched bit for bit in 79 [M, High]. Wired RC ladders up to 1000 nodes kept about 6 factor nonzeros per row [M, Medium].
+A prototype solved 3000 seeded wire-reference MNA matrices of order 3 to 66. All 2931 nonsingular solutions were numerically identical to `LUDecomposition` (signed zero ignored) and all 69 singular verdicts agreed. EJML matched in 79 [M, High]. Wired RC ladders up to 1000 nodes kept about 6 factor nonzeros per row [M, Medium].
 
-Pinned systems keep EJML with node 0 last (option E fills them); pinned ladders agree to 6.7e-14 or better [M, Medium].
-Legacy order runs only where AUTO would choose dense. Larger wired systems stay supported through EJML. The strict trace evidence covers the tested corpus, not every circuit.
+Pinned systems keep EJML with node 0 last, because option E fills them. Pinned ladders agree to 6.7e-14 or better [M, Medium].
+Legacy order runs only where the threshold exceeds the node count, so AUTO would choose dense. Larger wired systems stay supported through EJML. The strict trace evidence covers the tested corpus, not every circuit.
 
 ## Consequences
 
