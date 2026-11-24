@@ -53,5 +53,6 @@ Metric inputs can refer to parameters or earlier metrics by name.
 - Any metric can specify `scale`. For example, the duty cycle scales the estimated conduction loss of the active switch.
 
 The 48 V example uses a 1.2 Ω load and a 12 V target with a ±1 % tolerance.
-Its loss objective estimates active-switch loss. It uses the inductor current to estimate switch current.
+Its loss objective adds active-switch conduction and switching losses and freewheel diode conduction loss.
+The inductor current estimates the semiconductor currents.
 The ripple limit uses peak-to-peak voltage divided by the average voltage.
