@@ -1,6 +1,7 @@
 package gecko.core.simulation;
 
 import gecko.core.allg.SolverSettingsCore;
+import gecko.core.allg.SolverType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -38,7 +39,14 @@ public final class SimulationTiming {
         double preStep = settings.getPreCalculationStepWidth();
         if (!positive(step)) issues.add(new SettingIssue("timeStep", STEP_MESSAGE));
         if (!positive(duration)) issues.add(new SettingIssue("duration", DURATION_MESSAGE));
+        double samplePeriod = settings.getControlSamplePeriod();
+        if (!Double.isFinite(samplePeriod) || samplePeriod < 0) {
+            issues.add(new SettingIssue("controlSamplePeriod", "CONTROL sample period must be finite and non-negative."));
+        }
         if (settings.getSolverType() == null) issues.add(new SettingIssue("solver", "A solver type is required."));
+        else if (settings.isZeroCrossing() && settings.getSolverType() == SolverType.SOLVER_GS) {
+            issues.add(new SettingIssue("zeroCrossing", GS_ZERO_CROSSING_MESSAGE));
+        }
         int mainCapacity = capacityIssue(step, duration, "duration", issues);
         int warmupCapacity = 0;
         if (!Double.isFinite(preTime)) {
@@ -116,6 +124,8 @@ public final class SimulationTiming {
             return 0;
         }
     }
+
+    public static final String GS_ZERO_CROSSING_MESSAGE = "Zero-crossing location does not support the Gear-Shichman solver.";
 
     private static boolean positive(double value) { return Double.isFinite(value) && value > 0; }
 }

@@ -16,6 +16,7 @@ package gecko.core.simulation;
 import gecko.core.allg.SolverSettingsCore;
 import gecko.core.allg.SolverType;
 import gecko.core.io.CircuitModel;
+import gecko.core.preparation.SolverFeatures;
 import gecko.core.preparation.SolverOverrides;
 
 import java.util.Collections;
@@ -61,7 +62,8 @@ public final class SimulationConfig {
     SolverOverrides explicitSolverOverrides() {
         return new SolverOverrides(solverTypeExplicit ? solverSettings.getSolverType() : null,
                 stepWidthExplicit ? solverSettings.getStepWidth() : null,
-                durationExplicit ? solverSettings.getSimulationDuration() : null);
+                durationExplicit ? solverSettings.getSimulationDuration() : null,
+                new SolverFeatures(solverSettings.getControlSamplePeriod(), solverSettings.isZeroCrossing()));
     }
     /** Uses file defaults only for settings the caller did not supply. */
     SolverSettingsCore resolveSolverSettings(CircuitModel model) {
@@ -180,6 +182,31 @@ public final class SimulationConfig {
         public Builder stepWidth(double dt) {
             this.solverSettings.setStepWidth(dt);
             stepWidthExplicit = true;
+            return this;
+        }
+
+        /**
+         * Sets the CONTROL sample period. Zero, the default, runs CONTROL every step.
+         * A positive period runs CONTROL at the first step at or after each multiple of it
+         * and holds its outputs between samples.
+         *
+         * @param period sample period in seconds, finite and not negative
+         * @return this builder
+         */
+        public Builder controlSamplePeriod(double period) {
+            this.solverSettings.withControlSamplePeriod(period);
+            return this;
+        }
+
+        /**
+         * Locates diode, thyristor and IGBT switching inside each electrical step. Off by default.
+         * CONTROL and recordings stay on the fixed grid. Gear-Shichman is rejected when this is on.
+         *
+         * @param enabled true to split steps at located switching times
+         * @return this builder
+         */
+        public Builder zeroCrossing(boolean enabled) {
+            this.solverSettings.withZeroCrossing(enabled);
             return this;
         }
 
