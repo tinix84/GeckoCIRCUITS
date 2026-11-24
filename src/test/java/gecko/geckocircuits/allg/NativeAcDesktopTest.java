@@ -229,7 +229,8 @@ class NativeAcDesktopTest {
                         () -> window.saveDocumentTo(input.toFile(), false, failsAfterHeader));
                 assertTrue(error.getMessage().contains("Injected partial output failure."));
                 assertArrayEquals(original, Files.readAllBytes(input));
-                assertEquals(input.toString(), MainWindow.getOpenFileName());
+                assertEquals(input.toAbsolutePath().normalize(),
+                        Path.of(MainWindow.getOpenFileName()).toAbsolutePath().normalize());
                 assertTrue(MainWindow._se.getZustandGeaendert());
                 error = assertThrows(java.io.IOException.class,
                         () -> window.backUpDocument(recovery.toFile(), failsAfterHeader));
@@ -237,7 +238,8 @@ class NativeAcDesktopTest {
                 assertArrayEquals(backup, Files.readAllBytes(recovery));
                 assertEquals(2, stagedFiles.size());
                 for (Path staged : stagedFiles) {
-                    assertEquals(evidence, staged.getParent());
+                    assertEquals(evidence.toAbsolutePath().normalize(),
+                            staged.getParent().toAbsolutePath().normalize());
                     assertEquals(20, Files.size(staged), "The fault must leave actual compressed bytes.");
                 }
                 assertHierarchyOutputs(solve(), 1000, 4000, 2000);
@@ -287,7 +289,8 @@ class NativeAcDesktopTest {
                         tryLeaving(window, command, false);
                         assertTrue(window.isDisplayable());
                         assertSame(sheet, MainWindow._se._circuitSheet);
-                        assertEquals(input.toString(), MainWindow.getOpenFileName());
+                        assertEquals(input.toAbsolutePath().normalize(),
+                                Path.of(MainWindow.getOpenFileName()).toAbsolutePath().normalize());
                         assertEquals(unwritable.toString(), GlobalFilePathes.DATNAM);
                         assertTrue(MainWindow._se.getZustandGeaendert());
                     }
