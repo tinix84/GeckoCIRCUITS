@@ -17,11 +17,20 @@ metrics:
   ripple_pp: {kind: analysis, signal: u2, field: peak_to_peak}
   ripple_ratio: {kind: ratio, terms: [ripple_pp, vout]}
   i_rms: {kind: analysis, signal: iL, field: rms}
+  i_mean: {kind: analysis, signal: iL, field: average}
   i_peak: {kind: analysis, signal: iL, field: max}
-  conduction_loss:
+  switch_conduction_loss:
     kind: conduction
     inputs: {current: i_rms, on_resistance: 0.010, threshold_voltage: 0.0}
     scale: D
+  negative_duty: {kind: sum, terms: [D], scale: -1.0}
+  diode_duty: {kind: sum, terms: [1.0, negative_duty]}
+  diode_ohmic_loss:
+    kind: conduction
+    inputs: {current: i_rms, on_resistance: 0.010, threshold_voltage: 0.0}
+    scale: diode_duty
+  diode_forward_power: {kind: sum, terms: [i_mean], scale: 0.6}
+  diode_forward_loss: {kind: sum, terms: [diode_forward_power], scale: diode_duty}
   switching_loss:
     kind: switching
     inputs:
@@ -32,7 +41,7 @@ metrics:
       turn_on_energy: 0.000030
       turn_off_energy: 0.000015
     frequency: fsw
-  total_loss: {kind: sum, terms: [conduction_loss, switching_loss]}
+  total_loss: {kind: sum, terms: [switch_conduction_loss, switching_loss, diode_ohmic_loss, diode_forward_loss]}
 objectives:
   - {metric: total_loss}
   - {metric: L}
