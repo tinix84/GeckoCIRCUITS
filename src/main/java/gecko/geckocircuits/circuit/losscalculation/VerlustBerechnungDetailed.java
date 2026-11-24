@@ -332,11 +332,15 @@ public final class VerlustBerechnungDetailed
 
     /** Imports the CSV as an embedded loss file for this component. */
     public void importVendorLosses(java.nio.file.Path csv) throws java.io.IOException {
+        java.nio.file.Path filename = csv.getFileName();
+        if (filename == null) {
+            throw new java.io.IOException("Select a loss CSV file.");
+        }
         byte[] contents;
         try (var reader = java.nio.file.Files.newBufferedReader(csv)) {
             contents = VendorLossCsv.toDetailedLossFile(reader);
         }
-        String name = csv.getFileName().toString().replaceFirst("(?i)\\.csv$", "");
+        String name = filename.toString().replaceFirst("(?i)\\.csv$", "");
         GeckoFile imported = new GeckoFile(new File(name + ".scl"), _fileAccessor.getOpenFileName(), contents);
         if (!leseDetailVerlusteVonDatei(imported)) {
             throw new java.io.IOException("Cannot read the converted detailed loss file.");
