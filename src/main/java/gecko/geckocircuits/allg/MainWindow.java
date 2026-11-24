@@ -1950,7 +1950,7 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
     public static void importComponentsFromFile(final String fileName, final String importIntoSubCircuitName) throws FileNotFoundException {
         ProjectData daten = loadProjectDataFromFile(fileName, false, null);
         daten.shiftComponentReferences();
-        _se.ladeGespeicherteNetzlisteVonProjectData(daten, importIntoSubCircuitName);
+        _se.importProjectComponents(daten, importIntoSubCircuitName);
         _se.initAdditionalFiles(daten._allSheetComponents);
         _se.updateAllComponentReferences();
     }

@@ -1,9 +1,6 @@
 package gecko.core.io;
 
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -72,41 +69,7 @@ final class CircuitDescriptionReader {
         // File-manager contents become owned resources, not executable text sections.
         project.orderedSections().stream().filter(section -> !section.tag().equals("GeckoFileManager"))
                 .forEach(model.getSavedSections()::add);
-        retainImporterIssues(model, global);
-    }
-
-    private static void retainImporterIssues(CircuitModel model, String[] global) throws CircuitParseException {
-        for (int start = 0; start < global.length; start++) {
-            String line = global[start].strip();
-            if (!line.startsWith("<") || !line.endsWith(">") || line.startsWith("<\\")) continue;
-            String tag = line.substring(1, line.length() - 1);
-            int end = SavedCircuitBlock.closingLine(global, start, tag);
-            if (tag.equals("ImportIssues")) {
-                if (end == global.length) throw new CircuitParseException("Close the saved import diagnostics section.");
-                for (int index = start + 1; index < end; index++) {
-                    if (global[index].isBlank()) continue;
-                    model.addConversionIssue(readImporterIssue(global[index]));
-                }
-            }
-            start = end;
-        }
-    }
-
-    private static ImportIssue readImporterIssue(String line) throws CircuitParseException {
-        try {
-            String[] fields = line.split(" ", -1);
-            if (fields.length != 8 || !fields[0].equals("issue")) throw new IllegalArgumentException();
-            for (int i = 1; i < fields.length; i++) {
-                fields[i] = fields[i].equals("-") ? null
-                        : new String(Base64.getDecoder().decode(fields[i]), StandardCharsets.UTF_8);
-            }
-            if (fields[1] == null || fields[1].isBlank() || fields[4] == null || fields[4].isBlank()
-                    || !("true".equals(fields[6]) || "false".equals(fields[6]))) throw new IllegalArgumentException();
-            return new ImportIssue(fields[1], fields[2], fields[3], fields[4],
-                    fields[5], Boolean.parseBoolean(fields[6]), fields[7]);
-        } catch (IllegalArgumentException error) {
-            throw new CircuitParseException("The saved import diagnostic is invalid.", error);
-        }
+        ImportIssueCodec.decodeDocument(global).forEach(model::addConversionIssue);
     }
 
     private static int integer(SavedCircuitBlock block, String token) {

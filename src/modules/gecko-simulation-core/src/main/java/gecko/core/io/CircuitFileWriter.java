@@ -82,7 +82,7 @@ public final class CircuitFileWriter {
         }
         appendTokens(text, settings);
         for (var section : model.getSavedSections()) {
-            if (!section.tag().equals("ImportIssues")) section(text, section.tag(), section.text());
+            if (!section.tag().equals(ImportIssueCodec.TAG)) section(text, section.tag(), section.text());
         }
         if (!model.getResources().isEmpty()) {
             text.append("GeckoFileManager\n<GeckoFileManager>\n");
@@ -97,19 +97,7 @@ public final class CircuitFileWriter {
             }
             text.append("<\\GeckoFileManager>\n");
         }
-        var conversionIssues = model.getConversionIssues();
-        if (!conversionIssues.isEmpty()) {
-            var issues = new StringBuilder();
-            for (var issue : conversionIssues) {
-                String[] fields = {issue.code(), issue.domain(), issue.component(), issue.message(),
-                    issue.sourceLocation(), Boolean.toString(issue.unsupported()), issue.parameterPath()};
-                issues.append("issue");
-                for (String field : fields) issues.append(' ').append(field == null ? "-" : java.util.Base64.getEncoder()
-                        .encodeToString(field.getBytes(StandardCharsets.UTF_8)));
-                issues.append('\n');
-            }
-            section(text, "ImportIssues", issues.toString());
-        }
+        text.append(ImportIssueCodec.encodeSection(model.getConversionIssues()));
         var bytes = new ByteArrayOutputStream();
         try (var gzip = new GZIPOutputStream(bytes)) { gzip.write(text.toString().getBytes(StandardCharsets.UTF_8)); }
         return bytes.toByteArray();

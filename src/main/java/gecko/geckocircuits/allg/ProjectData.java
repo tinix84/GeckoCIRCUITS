@@ -14,6 +14,9 @@
 package gecko.geckocircuits.allg;
 
 import gecko.core.allg.GeckoFile;
+import gecko.core.io.CircuitFileParser.CircuitParseException;
+import gecko.core.io.ImportIssue;
+import gecko.core.io.ImportIssueCodec;
 import gecko.core.circuit.TokenMap;
 import gecko.geckocircuits.circuit.circuitcomponents.CircuitTyp;
 import gecko.geckocircuits.circuit.circuitcomponents.SubcircuitBlock;
@@ -39,6 +42,11 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
         justification = "readFileVersion is intentionally mutable; constructor stores external references; public fields for file format serialization compatibility; transient fields are repopulated during project load")
 public final class ProjectData implements Serializable {
     private static final long serialVersionUID = 1L;
+    private transient List<ImportIssue> conversionIssues = List.of();
+
+    public List<ImportIssue> getConversionIssues() {
+        return conversionIssues;
+    }
 
     private static final Random RANDOM = new Random();
 
@@ -86,6 +94,7 @@ public final class ProjectData implements Serializable {
             int uniqueFileId, SimulationAccess scripter, GeckoFileManager fileMgr, SchematicEditor2 se,
             SolverSettings solverSettings) {
         this._allSheetComponents.addAll(se._circuitSheet.getAllElements());
+        this.conversionIssues = se.getConversionIssues();
         this._dt = solverSettings.dt.getValue();
         this._tDURATION = solverSettings._tDURATION.getValue();
         this._T_pre = solverSettings._T_pre.getValue();
@@ -142,6 +151,7 @@ public final class ProjectData implements Serializable {
 
         asc.append("\n");
         _fileManager.exportASCII(asc);
+        asc.append(ImportIssueCodec.encodeSection(conversionIssues));
 //        geckoOpt.exportASCII(asc);
         asc.append("\n\n");
         //------------------
@@ -203,6 +213,11 @@ public final class ProjectData implements Serializable {
 
         if (isBackupRead) {
             return uniqueFileId;
+        }
+        try {
+            conversionIssues = ImportIssueCodec.decodeDocument(ascii);
+        } catch (CircuitParseException error) {
+            throw new IllegalArgumentException(error.getMessage(), error);
         }
 
         /**
