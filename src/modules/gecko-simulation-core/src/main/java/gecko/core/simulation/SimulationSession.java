@@ -122,13 +122,14 @@ public final class SimulationSession implements AutoCloseable {
         ControlRuntime constructedControl = suppliedControl;
         try {
             CircuitNetlist constructedNetlist = NetlistBuilder.buildFromCircuitModel(model);
+            ThermalNetwork constructedThermal = ThermalNetwork.build(model, constructedNetlist, settings.getSolverType());
             if (constructedControl == null) {
                 constructedControl = ControlRuntime.fromDeferred(model, dt, constructedNetlist,
-                        settings.getControlSamplePeriod());
+                        settings.getControlSamplePeriod(), constructedThermal == null ? null : constructedThermal.netlist());
             }
             if (periodic) {
                 var issues = PeriodicSteadyStateValidation.circuitIssues(search.period(), constructedNetlist,
-                        constructedControl.calculators());
+                        constructedControl.calculators(), constructedThermal != null);
                 if (!issues.isEmpty()) {
                     throw new IllegalArgumentException(issues.stream()
                             .map(issue -> issue.parameterPath() + ": " + issue.message())
@@ -146,6 +147,7 @@ public final class SimulationSession implements AutoCloseable {
             Status constructedStatus = statusFor(State.READY, 0, 0, 0, duration, dt);
             boolean hasElectrical = constructedNetlist != null && constructedNetlist.getElementCount() > 0;
             if (hasElectrical) constructedControl.seedSources(constructedNetlist);
+            if (constructedThermal != null) constructedControl.seedThermalSources(constructedThermal);
             if (hasElectrical && dcStart) {
                 // The DC solve needs the gates the first step will use. Initializing CONTROL here is the same
                 // call the first step makes, so the default order is unchanged when the feature is off.
@@ -156,7 +158,6 @@ public final class SimulationSession implements AutoCloseable {
                     ? new ElectricalTimeStep(constructedNetlist, settings.getSolverType(),
                             new SolverFeatures(0, settings.isZeroCrossing(), dcStart, null,
                                     settings.getAdaptiveStep(), settings.getSparseSolver())) : null;
-            ThermalNetwork constructedThermal = ThermalNetwork.build(model, constructedNetlist, settings.getSolverType());
             netlist = constructedNetlist;
             thermal = constructedThermal;
             control = constructedControl;
@@ -210,6 +211,9 @@ public final class SimulationSession implements AutoCloseable {
 
     Sample step(HeadlessSimulationEngine.StepTraceListener listener) { return step(listener, false); }
 
+    /** @return the number of thermal solves so far, which is one per committed grid step, or 0 without a thermal network */
+    int thermalSolves() { return thermal == null ? 0 : thermal.committedSteps(); }
+
     private Sample step(HeadlessSimulationEngine.StepTraceListener listener, boolean pauseAfterStep) {
         Trace[] trace = new Trace[1];
         Sample sample;
@@ -247,7 +251,7 @@ public final class SimulationSession implements AutoCloseable {
                     else electrical.advance(before.stepWidth(), time, capture);
                 }
                 if (thermal != null) thermal.advance(before.stepWidth(), time, netlist);
-                control.advanceAfterElectricalStep(netlist, time);
+                control.advanceAfterElectricalStep(netlist, thermal, time);
                 float[] values = new float[signalNames.length];
                 if (control.hasScope()) values = control.sampleScope();
                 else if (electrical != null) electrical.copyNodeVoltagesTo(values);
