@@ -81,7 +81,7 @@ public final class CircuitPreparation {
         }
         for (var issue : SimulationTiming.periodicSteadyStateIssues(settings.features().periodicSteadyState(),
                 model.getTimeStep(), model.getSimulationDuration(), model.getPreSimulationTime(),
-                settings.features().controlSamplePeriod())) {
+                settings.features().controlSamplePeriod(), settings.features().controlSubsystemPeriods())) {
             diagnostics.add(invalidSetting(issue.parameterPath(), issue.message()));
         }
         for (var issue : SimulationTiming.adaptiveStepIssues(settings.features().adaptiveStep(), model.getSolverType(),
@@ -110,9 +110,15 @@ public final class CircuitPreparation {
             return rejected ? new PreparationResult.Rejected(report) : new PreparationResult.Inspectable(snapshot, report);
         }
         diagnostics.addAll(CircuitConfiguration.validate(execution));
+        for (var issue : SimulationTiming.controlSubsystemIssues(execution, model.getTimeStep(),
+                settings.features().controlSamplePeriod(), settings.features().controlSubsystemPeriods())) {
+            diagnostics.add(invalidSetting(issue.parameterPath(), issue.message()));
+            rejected = true;
+        }
         if (settings.features().periodicSteadyState() != null && !rejected) {
             for (var issue : SimulationTiming.periodicSteadyStateCircuitIssues(execution, model.getTimeStep(),
-                    settings.features().controlSamplePeriod(), settings.features().periodicSteadyState())) {
+                    settings.features().controlSamplePeriod(), settings.features().controlSubsystemPeriods(),
+                    settings.features().periodicSteadyState())) {
                 diagnostics.add(invalidSetting(issue.parameterPath(), issue.message()));
                 rejected = true;
             }

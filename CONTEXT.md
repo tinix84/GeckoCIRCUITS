@@ -125,6 +125,10 @@ _Avoid_: Thermal circuit, heat model
 A heat-flow source in the thermal network whose value is the power loss of one coupled electrical component.
 _Avoid_: Pv chip, heat source
 
+**CONTROL subsystem**:
+The CONTROL blocks of one sheet path and of its nested sheets that have no sample period of their own. Blocks outside every configured subsystem use the global sample period.
+_Avoid_: Task, rate group, sheet
+
 **v2.02 reference trace**:
 An ordered record of committed steps from an identified GeckoCIRCUITS v2.02 release, with recorded capture provenance.
 _Avoid_: Current legacy baseline, unversioned golden trace
