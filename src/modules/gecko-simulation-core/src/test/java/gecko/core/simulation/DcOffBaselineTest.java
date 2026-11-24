@@ -11,11 +11,11 @@ import static gecko.core.simulation.ControlReviewRegressionTest.component;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * With the DC operating point off, the raw double traces equal the ones recorded on the
- * commit before the feature existed. Every dynamic element starts from a nonzero configured state.
+ * With the DC operating point off, the raw double traces equal reference fingerprints that were
+ * independently verified against the original compiled core. Every dynamic element starts from a nonzero configured state.
  */
 class DcOffBaselineTest {
-    /** Fingerprints of the step-by-step raw bits, recorded on the base commit. */
+    /** Fingerprints of the step-by-step raw bits, verified against the original compiled core. */
     private static final Map<String, Long> BASELINE = Map.of(
             "SOLVER_BE", -7727171700999625526L,
             "SOLVER_TRZ", -1185240888484387106L,

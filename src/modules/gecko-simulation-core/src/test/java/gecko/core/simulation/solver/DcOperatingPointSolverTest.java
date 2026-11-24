@@ -83,8 +83,16 @@ class DcOperatingPointSolverTest {
             solve(method, gated);
             assertEquals((5 - 0.7) / 10.01, gated.matrix().getIALT()[2], 1e-9, type + " gated");
             var open = deviceCircuit(method, type, 5, diode(0.01, 0.7, 0));
+            double[] stored = open.netlist().getParameter(2).clone();
             solve(method, open);
-            assertEquals(5.0 / (10 + 1e9), open.matrix().getIALT()[2], 1e-12, type + " saved on, gate off");
+            // A stored conducting thyristor stays latched without a gate. An IGBT without a gate blocks.
+            double expected = type == LK_THYR ? (5 - 0.7) / 10.01 : 5.0 / (10 + 1e9);
+            assertEquals(expected, open.matrix().getIALT()[2], 1e-9, type + " stored on, gate off");
+            assertArrayEquals(stored, open.netlist().getParameter(2), "the caller's device state is untouched");
+            var reversed = deviceCircuit(method, type, -5, diode(0.01, 0.7, 0));
+            solve(method, reversed);
+            assertEquals((-5 * 1e9 / (10 + 1e9)) / 1e9, reversed.matrix().getIALT()[2], 1e-15,
+                    type + " stored on, reverse biased, unlatches");
             var cold = deviceCircuit(method, type, 5, diode(1e9, 0.7, 0));
             solve(method, cold);
             assertEquals(5.0 / (10 + 1e9), cold.matrix().getIALT()[2], 1e-12, type + " blocking, gate off");

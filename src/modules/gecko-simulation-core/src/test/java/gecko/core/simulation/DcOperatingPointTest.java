@@ -2,6 +2,8 @@ package gecko.core.simulation;
 
 import gecko.core.allg.SolverSettingsCore;
 import gecko.core.allg.SolverType;
+import gecko.core.circuit.circuitcomponents.CircuitTypCore;
+import gecko.core.circuit.netlist.CircuitNetlist;
 import gecko.core.io.CircuitModel;
 import gecko.core.preparation.*;
 import java.util.ArrayList;
@@ -165,7 +167,7 @@ class DcOperatingPointTest {
 
     @ParameterizedTest
     @EnumSource(SolverType.class)
-    void theDirectFirstStepHistoriesAreTheSteadyState(SolverType solver) {
+    void theDirectFirstStepHistoriesAreTheDcOperatingPoint(SolverType solver) {
         // A wrong capacitor current or inductor history would show in the first step, not only later.
         var trace = run(interleaved(), solver, DC, 2);
         assertArrayEquals(trace.currents().get(0), trace.currents().get(1), 1e-12);
@@ -268,19 +270,100 @@ class DcOperatingPointTest {
                 .solverSettings().isDcOperatingPoint());
     }
 
-    @Test
-    void theEnginePathSeedsTheDcPointToo() throws Exception {
-        var file = java.nio.file.Path.of(DcOperatingPointTest.class.getResource("/ipes/buck_simple.ipes").toURI()).toString();
-        var off = new HeadlessSimulationEngine().runSimulation(SimulationConfig.builder().circuitFile(file).build());
-        var on = new HeadlessSimulationEngine().runSimulation(SimulationConfig.builder().circuitFile(file)
-                .dcOperatingPoint(true).build());
-        assertTrue(off.isSuccess(), off.getErrorMessage());
-        assertTrue(on.isSuccess(), on.getErrorMessage());
-        boolean differs = false;
-        for (int signal = 0; signal < on.getSignalNames().length; signal++) {
-            differs |= !java.util.Arrays.equals(on.getSignalData(signal), off.getSignalData(signal));
+    private static double[] device(double current, double gate) {
+        double[] values = new double[13];
+        values[0] = current;
+        values[1] = 0.7;
+        values[2] = 0.01;
+        values[3] = 1e9;
+        values[8] = gate;
+        return values;
+    }
+
+    /** 5 V, 10 ohm, then a thyristor in parallel with a 1 mF capacitor. */
+    private static CircuitNetlist latchedThyristor(double storedResistance, double gate, double volts) {
+        double[] source = new double[21], load = {10, 0, 0}, capacitor = new double[13];
+        source[0] = gecko.core.circuit.SourceType.QUELLE_DC_NEW;
+        source[1] = volts;
+        capacitor[0] = 1e-3;
+        capacitor[6] = capacitor[7] = 1e-3;
+        var netlist = new CircuitNetlist();
+        netlist.initNetlist(new CircuitTypCore[]{CircuitTypCore.LK_U, CircuitTypCore.LK_R, CircuitTypCore.LK_THYR,
+                        CircuitTypCore.LK_C},
+                new int[]{1, 1, 2, 2}, new int[]{0, 2, 0, 0}, new int[]{1, -1, -1, -1},
+                new double[][]{source, load, device(storedResistance, gate), capacitor}, 2, 1, 4);
+        return netlist;
+    }
+
+    @ParameterizedTest
+    @EnumSource(SolverType.class)
+    void aLatchedThyristorStartsTheFirstStepAtItsDcPointWithoutATransient(SolverType solver) {
+        double latched = 0.7 + 0.01 * (5 - 0.7) / 10.01;
+        var netlist = latchedThyristor(0.01, 0, 5);
+        var configured = netlist.getParameter(2).clone();
+        var step = new ElectricalTimeStep(netlist, solver, DC);
+        assertArrayEquals(configured, netlist.getParameter(2), "the caller's state survives construction");
+        for (int index = 0; index < 3; index++) {
+            step.advance(1e-6, index * 1e-6, null);
+            assertEquals(latched, netlist.getLastNodeVoltages()[2], 1e-6, solver + " step " + index);
+            assertEquals(0, netlist.getLastComponentCurrents()[3], 1e-6, "capacitor current, step " + index);
+            assertEquals(0.01, netlist.getParameter(2)[0], "still latched");
         }
-        assertTrue(differs, "the engine started from a different state");
+    }
+
+    @ParameterizedTest
+    @EnumSource(SolverType.class)
+    void aThyristorStoredOffStaysOffWithoutAGateAndConductsWithOne(SolverType solver) {
+        var closed = latchedThyristor(1e9, 0, 5);
+        var blocking = new ElectricalTimeStep(closed, solver, DC);
+        blocking.advance(1e-6, 0, null);
+        assertEquals(5, closed.getLastNodeVoltages()[2], 1e-4, "blocking, no gate");
+        assertEquals(0, closed.getLastComponentCurrents()[3], 1e-6);
+        var gated = latchedThyristor(1e9, 1, 5);
+        var conducting = new ElectricalTimeStep(gated, solver, DC);
+        conducting.advance(1e-6, 0, null);
+        assertEquals(0.7 + 0.01 * (5 - 0.7) / 10.01, gated.getLastNodeVoltages()[2], 1e-6, "gated, forward bias");
+        assertEquals(0, gated.getLastComponentCurrents()[3], 1e-6);
+    }
+
+    @ParameterizedTest
+    @EnumSource(SolverType.class)
+    void aReverseBiasUnlatchesAStoredConductingThyristor(SolverType solver) {
+        var netlist = latchedThyristor(0.01, 0, -5);
+        var step = new ElectricalTimeStep(netlist, solver, DC);
+        step.advance(1e-6, 0, null);
+        assertEquals(-5, netlist.getLastNodeVoltages()[2], 1e-4);
+        assertEquals(0, netlist.getLastComponentCurrents()[3], 1e-6);
+    }
+
+    /** Capacitor voltage and switch node of the first engine step, read from the trace. */
+    private static double[] firstBuckStep(SimulationConfig config) {
+        double[] first = new double[2];
+        boolean[] seen = {false};
+        var engine = new HeadlessSimulationEngine();
+        engine.setStepTraceListener((time, volts, currents, circuit) -> {
+            if (seen[0]) return;
+            seen[0] = true;
+            first[0] = volts[circuit.getNodeX(4)] - volts[circuit.getNodeY(4)];
+            first[1] = volts[circuit.getNodeX(2)] - volts[circuit.getNodeY(2)];
+        });
+        var result = engine.runSimulation(config);
+        assertTrue(result.isSuccess(), result.getErrorMessage());
+        return first;
+    }
+
+    @Test
+    void theEnginePathStartsTheBuckOutputCapacitorAtItsFrozenGateDcPoint() throws Exception {
+        var file = java.nio.file.Path.of(DcOperatingPointTest.class.getResource("/ipes/buck_simple.ipes").toURI()).toString();
+        // buck_simple: U.1 = 48 V, S.1 Ron 10 mohm, L.1 short at DC, C.1 open, R.1 = 10 ohm, D.1 blocks.
+        double vin = 48, closed = vin * 10 / (10 + 0.01);
+        // The frozen gate is the one the transient's first step uses: a closed switch puts the inductor's
+        // switch-side node near Vin, an open one lets the diode pull it to ground.
+        double[] undisturbed = firstBuckStep(SimulationConfig.builder().circuitFile(file).build());
+        double expected = undisturbed[1] > vin / 2 ? closed : 0;
+        double[] dc = firstBuckStep(SimulationConfig.builder().circuitFile(file).dcOperatingPoint(true).build());
+        assertEquals(expected, dc[0], 1e-3 * vin, "first output-capacitor voltage");
+        assertEquals(expected, dc[1], 1e-3 * vin, "the inductor node sits at the same DC level");
     }
 
     @Test

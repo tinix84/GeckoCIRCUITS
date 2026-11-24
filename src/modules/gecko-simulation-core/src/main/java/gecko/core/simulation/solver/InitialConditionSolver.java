@@ -202,7 +202,7 @@ public class InitialConditionSolver {
     /**
      * Solves the DC operating point and seeds every integration history with it.
      * Capacitors are open, inductors (coupled or not) are shorts, sources take their t=0 value, and switches keep
-     * the state their parameters hold now. Diode-family states are the bias-consistent set found here.
+     * the state their parameters hold now. Diode-family states are the bias-consistent set found here; a stored conducting thyristor stays latched unless reverse biased.
      * The netlist, including its configured initial states, is not modified.
      *
      * @param matrixSolver the runtime solver whose histories are seeded
@@ -246,7 +246,8 @@ public class InitialConditionSolver {
                         throw new IllegalArgumentException("Voltage source " + i + " has no auxiliary number");
                     }
                 }
-                case LK_D, LK_THYR, LK_IGBT -> parameters[i][0] = parameters[i][3]; // start blocking
+                // A diode or IGBT starts blocking. A thyristor keeps its stored state, because its latch outlives the gate.
+                case LK_D, LK_IGBT -> parameters[i][0] = parameters[i][3];
                 default -> { }
             }
         }
