@@ -35,7 +35,7 @@ Set the master's start time to zero. Set its communication step to the circuit g
 The GeckoCIRCUITS solver holds the input values for each communication step.
 The electrical source retains the same update order as the desktop solver.
 The FMU can run beyond the circuit's saved duration.
-Each reset starts a fresh circuit session. This interface does not support state save or rollback.
+Each reset starts a fresh circuit session. State save and rollback are unavailable.
 
 The FMI host needs Java 21 and a Python runtime that its platform's PythonFMU binary supports.
 Use `GECKO_FMU_JAVA` to specify the Java executable if it is outside `PATH`.

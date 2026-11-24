@@ -54,13 +54,13 @@ class GeckoFmu(Fmi2Slave):
         for index, port in enumerate(data["inputs"]):
             self.register_variable(Real(
                 port["name"], causality=Fmi2Causality.input, start=port["start"],
-                getter=lambda index=index: self.inputs[index],
-                setter=lambda value, index=index: self.inputs.__setitem__(index, value),
+                getter=lambda index=index, values=self.inputs: values[index],
+                setter=lambda value, index=index, values=self.inputs: values.__setitem__(index, value),
             ), nested=False)
         for index, name in enumerate(data["outputs"]):
             self.register_variable(Real(
                 name, causality=Fmi2Causality.output, initial=Fmi2Initial.calculated,
-                getter=lambda index=index: self.outputs[index],
+                getter=lambda index=index, values=self.outputs: values[index],
             ), nested=False)
         self.process = None
         self.cleanup = None
@@ -114,7 +114,7 @@ class GeckoFmu(Fmi2Slave):
             raise RuntimeError(f"Expected circuit time {expected_time}. Got {time}.")
         if len(outputs) != len(self.outputs):
             raise RuntimeError("The worker returned an incorrect number of outputs.")
-        self.outputs = outputs
+        self.outputs[:] = outputs
 
     def do_step(self, current_time, step_size):
         if not math.isclose(self.step, step_size, rel_tol=1e-9, abs_tol=0.0):

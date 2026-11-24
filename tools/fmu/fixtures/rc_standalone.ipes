@@ -2,6 +2,8 @@ dt 2e-6
 tDURATION 0.004
 e (1)
 <ElementLK>
+x 0
+y 0
 typ 4
 idStringDialog Vs
 orientierung 503
@@ -12,8 +14,11 @@ labelEndKnoten[] /0
 <\ElementLK>
 e (2)
 <ElementLK>
+x 0
+y 0
 typ 1
 idStringDialog R1
+parameterString[] /NIX_NIX_NIX
 orientierung 503
 parameter[] 500
 labelAnfangsKnoten[] /1
@@ -21,8 +26,11 @@ labelEndKnoten[] /2
 <\ElementLK>
 e (3)
 <ElementLK>
+x 0
+y 0
 typ 3
 idStringDialog C1
+parameterString[] /NIX_NIX_NIX
 orientierung 503
 parameter[] 1e-6 0
 labelAnfangsKnoten[] /2
@@ -37,7 +45,7 @@ labelEndKnoten[] /vin
 x 0
 y 0
 orientierung 503
-parameterString[]
+parameterString[] /NIX_NIX_NIX
 labelAnfangsKnoten[]
 <\ElementCONTROL>
 c (2)
@@ -61,6 +69,6 @@ x 0
 y 0
 orientierung 503
 parameter[]
-parameterString[]
+parameterString[] /NIX_NIX_NIX
 labelEndKnoten[]
 <\ElementCONTROL>
