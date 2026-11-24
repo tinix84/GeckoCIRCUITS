@@ -1,0 +1,6 @@
+-r ../optimize/requirements.txt
+joblib>=1.4,<2
+numpy>=2,<3
+pyarrow>=18,<25
+scikit-learn>=1.6,<2
+scipy>=1.14,<2
