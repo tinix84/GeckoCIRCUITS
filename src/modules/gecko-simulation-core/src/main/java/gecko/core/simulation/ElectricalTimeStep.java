@@ -20,6 +20,9 @@ import gecko.core.circuit.netlist.INetList;
 import gecko.core.simulation.solver.ComponentCurrentCalculator;
 import gecko.core.simulation.solver.MatrixSolver;
 import gecko.core.simulation.solver.InitialConditionSolver;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /** Owns one converged electrical step and commits its histories exactly once. */
 final class ElectricalTimeStep {
@@ -34,7 +37,32 @@ final class ElectricalTimeStep {
     private final double[][] matrixInputs;
     private double matrixDt = Double.NaN;
 
+    /** Most diode-family events located by splitting inside one grid step. */
+    static final int MAX_LOCATED_PER_STEP = 16;
+    static final int MAX_RETAINED_EVENTS = 100_000;
+    private static final double BOUNDARY_FRACTION = 1e-3;
+    private static final int REFINEMENTS = 2;
+    private final boolean zeroCrossing;
+    private final int[] diodeElements;
+    private final int[] sourceElements;
+    private final double[] savedDiodeStates;
+    private final double[] savedSourceStates;
+    private final boolean[] locatedInStep;
+    private final ZeroCrossingDetector detector = new ZeroCrossingDetector();
+    private final List<ZeroCrossingEvent> events = new ArrayList<>();
+    private int eventRetention = MAX_RETAINED_EVENTS;
+    private long locatedCount;
+    private long unlocatedCount;
+    private long droppedCount;
+    private double firstUnlocatedTime = Double.NaN;
+    private boolean committedOnce;
+
     ElectricalTimeStep(CircuitNetlist netlist, SolverType solverType) {
+        this(netlist, solverType, false);
+    }
+
+    ElectricalTimeStep(CircuitNetlist netlist, SolverType solverType, boolean zeroCrossing) {
+        this.zeroCrossing = zeroCrossing;
         this.netlist = netlist;
         nodeOrder = netlist.getNumericalNodeOrder();
         numericalNetlist = nodeOrder.length == 0 ? netlist : new NumericalNetlist(netlist, nodeOrder);
@@ -45,6 +73,24 @@ final class ElectricalTimeStep {
         matrixInputs = new double[netlist.getElementCount()][4];
         publicPotentials = new double[matrixSolver.getMatrixSize()];
         new InitialConditionSolver(solverType).setDialogInitialConditions(matrixSolver, numericalNetlist);
+        int[] diodes = new int[netlist.getElementCount()];
+        int[] sources = new int[netlist.getElementCount()];
+        int diodeCount = 0;
+        int sourceCount = 0;
+        for (int element = 0; element < diodes.length; element++) {
+            CircuitTypCore type = netlist.getType(element);
+            if (isDiodeFamily(type)) diodes[diodeCount++] = element;
+            else if (type == CircuitTypCore.LK_U && netlist.getParameter(element).length > 14) sources[sourceCount++] = element;
+        }
+        diodeElements = Arrays.copyOf(diodes, diodeCount);
+        sourceElements = Arrays.copyOf(sources, sourceCount);
+        savedDiodeStates = new double[diodeCount];
+        savedSourceStates = new double[sourceCount];
+        locatedInStep = new boolean[diodeCount];
+    }
+
+    private static boolean isDiodeFamily(CircuitTypCore type) {
+        return type == CircuitTypCore.LK_D || type == CircuitTypCore.LK_THYR || type == CircuitTypCore.LK_IGBT;
     }
 
     void advance(double dt, double time, HeadlessSimulationEngine.StepTraceListener traceListener) {
@@ -76,6 +122,250 @@ final class ElectricalTimeStep {
         if (traceListener != null) {
             traceListener.onStep(time, publicPotentials, currents, netlist);
         }
+    }
+
+    /**
+     * Advances one grid step like {@link #advance}, but splits the interval at diode-family switching times.
+     * Each sub-step commits its solver histories once. Results and the trace publish once, at the grid time.
+     * A trial may change only diode-family parameter 0, source-limit parameter 14 and matrix scratch,
+     * and all three are restored before the split sub-step runs.
+     */
+    void advanceInterval(double dt, double time, HeadlessSimulationEngine.StepTraceListener traceListener) {
+        if (!zeroCrossing) {
+            advance(dt, time, traceListener);
+            return;
+        }
+        if (!Double.isFinite(dt) || dt <= 0 || !Double.isFinite(time) || time < 0) {
+            throw new IllegalArgumentException("Time step must be finite and positive; time must be finite and non-negative");
+        }
+        double start = time - dt;
+        boolean locate = committedOnce && start >= 0 && start < time;
+        double current = start;
+        double epsilon = BOUNDARY_FRACTION * dt;
+        int locatedThisStep = 0;
+        boolean wholeStep = true;
+        Arrays.fill(locatedInStep, false);
+        double[] g0 = new double[diodeElements.length];
+        double[] gFirst = new double[diodeElements.length];
+        while (true) {
+            double width = wholeStep ? dt : time - current;
+            if (!locate) {
+                solveFree(width, time);
+                commitSubStep(width, time);
+                break;
+            }
+            saveTrialState();
+            computeG(matrixSolver.getPALT(), g0);
+            solveStartTopology(width, time);
+            computeG(matrixSolver.getP(), gFirst);
+            runIteration(width, time, null);
+            boolean[] candidate = new boolean[diodeElements.length];
+            int blocked = 0;
+            boolean any = false;
+            boolean capReached = locatedThisStep >= MAX_LOCATED_PER_STEP;
+            for (int slot = 0; slot < diodeElements.length; slot++) {
+                if (!toggled(slot) || !(g0[slot] * gFirst[slot] < 0) || gateRemoved(slot)) continue;
+                if (locatedInStep[slot] || capReached) blocked++;
+                else { candidate[slot] = true; any = true; }
+            }
+            if (!any) {
+                commitSubStep(width, time);
+                countUnlocated(blocked, time);
+                break;
+            }
+            int best = -1;
+            double bestTime = Double.NaN;
+            for (int slot = 0; slot < candidate.length; slot++) {
+                if (!candidate[slot]) continue;
+                double crossing = refine(slot, g0[slot], gFirst[slot], current, time, epsilon);
+                if (best < 0 || crossing < bestTime) { best = slot; bestTime = crossing; }
+            }
+            boolean turnOn = savedDiodeStates[best] > 10000;
+            locatedInStep[best] = true;
+            locatedThisStep++;
+            recordEvent(best, bestTime, turnOn, g0[best], gFirst[best]);
+            if (bestTime >= time - epsilon) {
+                // The event is on the grid point, so the free trial is the committed step.
+                restoreTrialState();
+                solveStartTopology(width, time);
+                runIteration(width, time, null);
+                commitSubStep(width, time);
+                countUnlocated(blocked, time);
+                break;
+            }
+            restoreTrialState();
+            if (bestTime > current + epsilon) {
+                subStep(bestTime - current, bestTime, diodeElements[best]);
+                current = bestTime;
+                wholeStep = false;
+            }
+            toggleDiode(best);
+        }
+        publishGrid(time, traceListener);
+    }
+
+    /** Solves, iterates with {@code pinnedElement} held (or -1 for none), and commits histories once. */
+    private void subStep(double width, double time, int pinnedElement) {
+        boolean[] pinned = null;
+        if (pinnedElement >= 0) {
+            pinned = new boolean[netlist.getElementCount()];
+            pinned[pinnedElement] = true;
+        }
+        solveStartTopology(width, time);
+        runIteration(width, time, pinned);
+        commitSubStep(width, time);
+    }
+
+    /** Solves and iterates like the committed step does, without recording anything. */
+    private void solveFree(double width, double time) {
+        solveStartTopology(width, time);
+        runIteration(width, time, null);
+    }
+
+    private void solveStartTopology(double width, double time) {
+        if (!numericalNetlist.usesWireReference() || matrixInputsChanged(width)) {
+            matrixSolver.buildMatrixA(numericalNetlist, width, time, false);
+        }
+        matrixSolver.buildVectorB(numericalNetlist, width, time, false);
+        matrixSolver.solve();
+    }
+
+    private void runIteration(double width, double time, boolean[] pinned) {
+        doDiodeIteration(numericalNetlist, width, time, pinned);
+    }
+
+    /** Commits histories for one sub-step. Public values stay unchanged until {@link #publishGrid}. */
+    private void commitSubStep(double width, double time) {
+        componentCurrentCalculator.calculateComponentCurrents(
+                matrixSolver, numericalNetlist, computedCurrents, 0.0, width, time, true);
+        matrixSolver.shiftHistory();
+        System.arraycopy(computedCurrents, 0, matrixSolver.getIALT(), 0, computedCurrents.length);
+        rememberMatrixInputs(width);
+        committedOnce = true;
+    }
+
+    private void publishGrid(double time, HeadlessSimulationEngine.StepTraceListener traceListener) {
+        double[] currents = matrixSolver.getIALT();
+        double[] potentials = matrixSolver.getPALT();
+        System.arraycopy(potentials, 0, publicPotentials, 0, potentials.length);
+        if (nodeOrder.length != 0) {
+            double reference = potentials[nodeOrder[0]];
+            for (int node = 0; node < nodeOrder.length; node++) publicPotentials[node] = potentials[nodeOrder[node]] - reference;
+        }
+        netlist.storeResults(publicPotentials, currents);
+        if (traceListener != null) traceListener.onStep(time, publicPotentials, currents, netlist);
+    }
+
+    private void saveTrialState() {
+        for (int slot = 0; slot < diodeElements.length; slot++) savedDiodeStates[slot] = netlist.getParameter(diodeElements[slot])[0];
+        for (int slot = 0; slot < sourceElements.length; slot++) savedSourceStates[slot] = netlist.getParameter(sourceElements[slot])[14];
+    }
+
+    /** Restores every parameter a trial may change and forces the next solve to rebuild the matrix. */
+    private void restoreTrialState() {
+        for (int slot = 0; slot < diodeElements.length; slot++) netlist.getParameter(diodeElements[slot])[0] = savedDiodeStates[slot];
+        for (int slot = 0; slot < sourceElements.length; slot++) netlist.getParameter(sourceElements[slot])[14] = savedSourceStates[slot];
+        matrixDt = Double.NaN;
+    }
+
+    private boolean toggled(int slot) {
+        return netlist.getParameter(diodeElements[slot])[0] != savedDiodeStates[slot];
+    }
+
+    private boolean gateRemoved(int slot) {
+        int element = diodeElements[slot];
+        return netlist.getType(element) == CircuitTypCore.LK_IGBT && netlist.getParameter(element)[8] < 0.5;
+    }
+
+    private void toggleDiode(int slot) {
+        double[] parameters = netlist.getParameter(diodeElements[slot]);
+        // An element that was off turns on at the event, and the reverse.
+        parameters[0] = savedDiodeStates[slot] > 10000 ? parameters[2] : parameters[3];
+        matrixDt = Double.NaN;
+    }
+
+    /** Fills the threshold quantity {@code vX - vY - Uf} that the diode iteration compares. */
+    private void computeG(double[] potentials, double[] target) {
+        for (int slot = 0; slot < diodeElements.length; slot++) {
+            int element = diodeElements[slot];
+            target[slot] = potentials[numericalNetlist.getNodeX(element)] - potentials[numericalNetlist.getNodeY(element)]
+                    - netlist.getParameter(element)[1];
+        }
+    }
+
+    /** Refines the crossing time with regula falsi trials that keep the start topology and do not iterate. */
+    private double refine(int slot, double gLow, double gHigh, double start, double end, double epsilon) {
+        double low = start;
+        double high = end;
+        double crossing = detector.detectCrossings(new double[]{gLow}, new double[]{gHigh}, 0, start, end)
+                .getFirst().getCrossingTime();
+        double[] probe = new double[diodeElements.length];
+        for (int round = 0; round < REFINEMENTS; round++) {
+            if (!(crossing > start + epsilon && crossing < end - epsilon)) break;
+            restoreTrialState();
+            solveStartTopology(crossing - start, crossing);
+            computeG(matrixSolver.getP(), probe);
+            double value = probe[slot];
+            if (value == 0) break;
+            if (value * gLow > 0) { low = crossing; gLow = value; } else { high = crossing; gHigh = value; }
+            double next = low - gLow * (high - low) / (gHigh - gLow);
+            if (!(next > low && next < high)) break;
+            crossing = next;
+        }
+        return Math.max(start, Math.min(end, crossing));
+    }
+
+    private void recordEvent(int slot, double crossing, boolean turnOn, double before, double after) {
+        locatedCount++;
+        if (events.size() >= eventRetention) { droppedCount++; return; }
+        events.add(new ZeroCrossingEvent(diodeElements[slot], crossing,
+                turnOn ? ZeroCrossingEvent.Direction.RISING : ZeroCrossingEvent.Direction.FALLING, before, after));
+    }
+
+    private void countUnlocated(int transitions, double time) {
+        if (transitions == 0) return;
+        unlocatedCount += transitions;
+        if (Double.isNaN(firstUnlocatedTime)) firstUnlocatedTime = time;
+    }
+
+    // Package-private seams for the rollback and sub-step contract tests.
+
+    /** @return the solver whose histories the contract tests compare */
+    MatrixSolver solverForTest() { return matrixSolver; }
+
+    /** Runs one free trial and restores every parameter it may change, without committing. */
+    void trialAndRestoreForTest(double width, double time) {
+        saveTrialState();
+        solveFree(width, time);
+        restoreTrialState();
+    }
+
+    /** Forces the next solve to rebuild the matrix, as a rollback does. */
+    void invalidateMatrixForTest() { matrixDt = Double.NaN; }
+
+    /** Commits one sub-step directly, with {@code pinnedElement} held or -1 for none. */
+    void subStepForTest(double width, double time, int pinnedElement) { subStep(width, time, pinnedElement); }
+
+    /** Flips one diode-family element and forces a matrix rebuild, as a located event does. */
+    void toggleForTest(int element) {
+        saveTrialState();
+        for (int slot = 0; slot < diodeElements.length; slot++) if (diodeElements[slot] == element) toggleDiode(slot);
+    }
+
+    /** Publishes results and the trace once, as the grid commit does. */
+    void publishForTest(double time, HeadlessSimulationEngine.StepTraceListener listener) { publishGrid(time, listener); }
+
+    /** Limits the retained log for tests. Retained events are never overwritten. */
+    void setEventRetention(int limit) { eventRetention = limit; }
+
+    /** @return a detached window of the located events, at most {@code count} entries from {@code firstIndex} */
+    List<ZeroCrossingEvent> events(int firstIndex, int count) {
+        int from = Math.min(firstIndex, events.size());
+        return List.copyOf(events.subList(from, Math.min(events.size(), (int) Math.min((long) from + count, Integer.MAX_VALUE))));
+    }
+
+    EventLocationReport eventReport() {
+        return new EventLocationReport(locatedCount, unlocatedCount, firstUnlocatedTime, events.size(), droppedCount);
     }
 
     private boolean matrixInputsChanged(double dt) {
@@ -132,6 +422,11 @@ final class ElectricalTimeStep {
      * @return true if a diode or source limit changes during this step
      */
     private boolean doDiodeIteration(INetList netlist, double dt, double time) {
+        return doDiodeIteration(netlist, dt, time, null);
+    }
+
+    /** @param pinned by element index, elements whose state this iteration must not change, or null to let all elements switch */
+    private boolean doDiodeIteration(INetList netlist, double dt, double time, boolean[] pinned) {
         double stoergroesse = 1.0;
         int iterCount = 0;
         boolean anyChangedOverall = false;
@@ -148,6 +443,9 @@ final class ElectricalTimeStep {
                 CircuitTypCore type = netlist.getType(i);
                 if (type != CircuitTypCore.LK_D && type != CircuitTypCore.LK_THYR
                         && type != CircuitTypCore.LK_IGBT) {
+                    continue;
+                }
+                if (pinned != null && pinned[i]) {
                     continue;
                 }
 
