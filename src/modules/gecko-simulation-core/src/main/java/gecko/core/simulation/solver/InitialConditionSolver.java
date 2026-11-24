@@ -271,6 +271,11 @@ public class InitialConditionSolver {
         double[] potentials = new double[matrixSolver.getMatrixSize()];
         System.arraycopy(dcSolver.getP(), 0, potentials, 0, nodeMax + 1);
         for (int i = 0; i < count; i++) {
+            double[] state = dcNetwork.getParameter(i);
+            if ((types[i] == CircuitTypCore.LK_THYR || types[i] == CircuitTypCore.LK_IGBT) && state[0] >= 10000) {
+                // Blocking: the network stamps a plain resistor with no Uf source (MatrixSolver.buildVectorB).
+                currents[i] = (dcSolver.getP()[x[i]] - dcSolver.getP()[y[i]]) / state[0];
+            }
             if (!Double.isFinite(currents[i])) {
                 throw new IllegalStateException("Nonfinite DC current for element " + i);
             }
