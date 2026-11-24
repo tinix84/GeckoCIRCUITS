@@ -29,7 +29,7 @@ conda run -n ntbees2 python tools/optimize/acceptance.py
 
 Set `GECKO_API_BASE_URL` to override `http://localhost:8080/gecko`.
 Set `GECKO_API_KEY` or `GECKO_ACCESS_TOKEN` if the API requires authentication.
-For a local acceptance server, increase the API request and simulation submission limits to fit the trial count.
+For the full acceptance run, use a local REST server with a 2.5 GiB Java heap and higher request limits.
 
 ## Problem format
 
