@@ -198,6 +198,46 @@ public final class SyntheticCircuitBuilder {
     // ========================================================================
 
     /**
+     * RC ladder: a DC source at node 1 and, for k = 1..nodes-1, a series resistor between nodes k and k+1 with a
+     * shunt capacitor from node k+1 to ground. The netlist has {@code nodes} non-ground nodes (getNodeMax() == nodes),
+     * one voltage source, and a matrix order of {@code nodes + 2}.
+     */
+    public static CircuitNetlist rcLadder(int nodes, double vin, double r, double c) {
+        if (nodes < 2) throw new IllegalArgumentException("A ladder needs at least 2 nodes");
+        int elementCount = 1 + 2 * (nodes - 1);
+        CircuitTypCore[] types = new CircuitTypCore[elementCount];
+        int[] nodeX = new int[elementCount];
+        int[] nodeY = new int[elementCount];
+        int[] vSrcNr = new int[elementCount];
+        double[][] params = new double[elementCount][];
+        java.util.Arrays.fill(vSrcNr, -1);
+        types[0] = CircuitTypCore.LK_U;
+        nodeX[0] = 1;
+        nodeY[0] = 0;
+        vSrcNr[0] = 1;
+        params[0] = makeParams();
+        params[0][0] = SourceType.QUELLE_DC_NEW;
+        params[0][1] = vin;
+        for (int k = 1; k < nodes; k++) {
+            int resistor = 2 * k - 1;
+            int capacitor = 2 * k;
+            types[resistor] = CircuitTypCore.LK_R;
+            nodeX[resistor] = k;
+            nodeY[resistor] = k + 1;
+            params[resistor] = makeParams();
+            params[resistor][0] = r;
+            types[capacitor] = CircuitTypCore.LK_C;
+            nodeX[capacitor] = k + 1;
+            nodeY[capacitor] = 0;
+            params[capacitor] = makeParams();
+            params[capacitor][0] = c;
+            params[capacitor][6] = c;
+            params[capacitor][7] = c;
+        }
+        return buildNetlist(types, nodeX, nodeY, vSrcNr, params, nodes, 1, null);
+    }
+
+    /**
      * Creates a resistor-diode circuit.
      *
      * <pre>

@@ -26,6 +26,8 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <junit.version>5.11.3</junit.version>
+        <!-- Benchmarks run only when requested with -Dgroups=benchmark (see the benchmark profile). -->
+        <gecko.excludedGroups>application,benchmark</gecko.excludedGroups>
     </properties>
 
     <dependencies>
@@ -470,13 +472,27 @@
                 <version>3.5.4</version>
                 <configuration>
                     <!-- Default: run unit + integration, skip application tests -->
-                    <excludedGroups>application</excludedGroups>
+                    <excludedGroups>${gecko.excludedGroups}</excludedGroups>
                 </configuration>
             </plugin>
         </plugins>
     </build>
 
     <profiles>
+        <!-- Activated by -Dgroups=benchmark: keeps the benchmark tag selectable while application stays excluded. -->
+        <profile>
+            <id>benchmark</id>
+            <activation>
+                <property>
+                    <name>groups</name>
+                    <value>benchmark</value>
+                </property>
+            </activation>
+            <properties>
+                <gecko.excludedGroups>application</gecko.excludedGroups>
+            </properties>
+        </profile>
+
         <!-- Profile: application tests only (needs golden traces) -->
         <profile>
             <id>application</id>
