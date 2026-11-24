@@ -139,3 +139,4 @@ Never run `python -m venv`, `uv venv`, or `virtualenv`.
 | 2026-11-24 | [ADR-0022: Native ASC hierarchy](docs/adr/0022-native-asc-hierarchy.md) |
 | 2026-11-24 | [ADR-0023: Run the thermal network in the core once per grid step](docs/adr/0023-core-thermal-network.md) |
 | 2026-11-24 | [ADR-0024: Run CONTROL subsystems on their own sample clocks](docs/adr/0024-control-subsystem-sample-clocks.md) |
+| 2026-11-25 | [ADR-0025: Use registered LTI platforms and course-scoped identities](docs/adr/0025-lti-registration-and-course-identity.md) |
