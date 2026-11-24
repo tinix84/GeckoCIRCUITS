@@ -1,5 +1,6 @@
 package gecko.core.simulation;
 
+import gecko.core.circuit.netlist.CircuitNetlist;
 import gecko.core.allg.AdaptiveStepSettings;
 import gecko.core.allg.PeriodicSteadyStateSettings;
 import gecko.core.allg.SolverSettingsCore;
@@ -137,14 +138,23 @@ public final class SimulationTiming {
         if (pss == null || !positive(pss.period()) || !positive(step) || !Double.isFinite(samplePeriod) || samplePeriod < 0) {
             return List.of();
         }
-        boolean thermal = model.getThermalComponents().stream().anyMatch(component -> component.getType() != 49
-                && component.getType() != 50);
+        // Only active thermal elements count, like the runtime. If the network cannot be built, any element counts.
+        CircuitNetlist thermalNetlist = null;
+        boolean thermal;
+        try {
+            thermalNetlist = gecko.core.circuit.netlist.NetlistBuilder.buildThermalFromCircuitModel(model);
+            thermal = thermalNetlist.getElementCount() > 0;
+        } catch (RuntimeException unbuildable) {
+            thermal = model.getThermalComponents().stream().anyMatch(component -> component.getType() != 49
+                    && component.getType() != 50);
+        }
         ControlRuntime runtime = null;
         try {
             var netlist = gecko.core.circuit.netlist.NetlistBuilder.buildFromCircuitModel(model);
             // The thermal netlist resolves TEMP and FLOW probes. Without it they would fail before the check runs.
-            var thermalNetlist = thermal ? gecko.core.circuit.netlist.NetlistBuilder.buildThermalFromCircuitModel(model) : null;
-            runtime = ControlRuntime.fromDeferred(model, step, netlist, samplePeriod, thermalNetlist, subsystemPeriods);
+            runtime = ControlRuntime.fromDeferred(model, step, netlist, samplePeriod,
+                    thermalNetlist == null || thermalNetlist.getElementCount() == 0 ? null : thermalNetlist,
+                    subsystemPeriods);
             return PeriodicSteadyStateValidation.circuitIssues(pss.period(), netlist, runtime.calculators(), thermal);
         } catch (RuntimeException unassembled) {
             // A thermal circuit is rejected whatever else fails to assemble.
@@ -175,9 +185,10 @@ public final class SimulationTiming {
         if (!positive(step)) return List.of();
         try {
             var netlist = gecko.core.circuit.netlist.NetlistBuilder.buildFromCircuitModel(model);
-            boolean thermal = !model.getThermalComponents().isEmpty();
-            var thermalNetlist = thermal ? gecko.core.circuit.netlist.NetlistBuilder.buildThermalFromCircuitModel(model) : null;
-            new ControlCalculatorFactory().buildCircuit(model, step, netlist, thermalNetlist, spec);
+            // Only an active thermal network counts, like the runtime.
+            var thermalNetlist = gecko.core.circuit.netlist.NetlistBuilder.buildThermalFromCircuitModel(model);
+            new ControlCalculatorFactory().buildCircuit(model, step, netlist,
+                    thermalNetlist.getElementCount() == 0 ? null : thermalNetlist, spec);
         } catch (ControlCalculatorFactory.DependencyCycleException cycle) {
             return List.of(new SettingIssue(ControlSubsystems.PATH, cycle.getMessage()));
         } catch (RuntimeException unassembled) {
