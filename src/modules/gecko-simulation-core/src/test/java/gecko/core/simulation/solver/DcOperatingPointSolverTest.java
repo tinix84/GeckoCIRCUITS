@@ -99,6 +99,41 @@ class DcOperatingPointSolverTest {
         }
     }
 
+    /** KCL oracle: the series device and resistor carry the same branch current, independent of any hard-coded value. */
+    @ParameterizedTest
+    @EnumSource(SolverType.class)
+    void aReverseBiasedLatchedDeviceCarriesTheSeriesResistorCurrent(SolverType method) {
+        for (var type : new CircuitTypCore[]{LK_THYR, LK_IGBT}) {
+            var circuit = deviceCircuit(method, type, -7, diode(0.01, 0.7, 0));
+            solve(method, circuit);
+            double[] currents = circuit.matrix().getIALT();
+            assertEquals(currents[1], currents[2], 1e-15, type + " device vs series resistor current");
+        }
+    }
+
+    /** KCL oracle for blocking devices: reported currents follow the series resistor and the device's own V/Roff. */
+    @ParameterizedTest
+    @EnumSource(SolverType.class)
+    void blockingControlledDeviceCurrentsSatisfyKcl(SolverType method) {
+        for (var type : new CircuitTypCore[]{LK_THYR, LK_IGBT}) {
+            // {circuit, volts, device}: stored on reverse biased, IGBT stored on with gate off, cold
+            Object[][] cases = {{-5.0, diode(0.01, 0.7, 0)}, {5.0, diode(0.01, 0.7, 0)}, {5.0, diode(1e9, 0.7, 0)}};
+            for (Object[] c : cases) {
+                double volts = (double) c[0];
+                if (type == LK_THYR && volts > 0 && ((double[]) c[1])[0] < 1) continue; // a latched THYR conducts
+                var circuit = deviceCircuit(method, type, volts, (double[]) c[1]);
+                solve(method, circuit);
+                double[] i = circuit.matrix().getIALT();
+                double[] p = circuit.matrix().getP();
+                String label = type + " " + volts + " V";
+                assertEquals(0, i[0] + i[1], 1e-15, label + " source vs resistor");
+                assertEquals((p[1] - p[2]) / 10, i[1], 1e-15, label + " resistor");
+                assertEquals(i[1], i[2], 1e-15, label + " KCL at the device node");
+                assertEquals(p[2] / 1e9, i[2], 1e-15, label + " device current V/Roff");
+            }
+        }
+    }
+
     @ParameterizedTest
     @EnumSource(SolverType.class)
     void aSwitchKeepsItsInitialGateState(SolverType method) {
