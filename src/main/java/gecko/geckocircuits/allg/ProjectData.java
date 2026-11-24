@@ -107,6 +107,11 @@ public final class ProjectData implements Serializable {
     }
 
     public ProjectData(String[] ascii, final boolean isBackupRead, OptimizerParameterData optimizer) {
+        this(ascii, isBackupRead, optimizer, GlobalFilePathes.DATNAM);
+    }
+
+    public ProjectData(String[] ascii, final boolean isBackupRead, OptimizerParameterData optimizer,
+                       final String modelFileName) {
 //        if(!isBackupRead) {
 //            for(String tmp : ascii) {
 //                System.out.println(tmp);
@@ -114,7 +119,7 @@ public final class ProjectData implements Serializable {
 //        }
         _optimizer = optimizer;
         optimizerParameterData = new OptimizerParameterData();
-        _uniqueFileId = this.importASCII(ascii, isBackupRead);
+        _uniqueFileId = this.importASCII(ascii, isBackupRead, modelFileName);
     }
 
     public String exportASCII() {
@@ -187,7 +192,7 @@ public final class ProjectData implements Serializable {
         return asc.toString();
     }
 
-    private int importASCII(String[] ascii, final boolean isBackupRead) {
+    private int importASCII(String[] ascii, final boolean isBackupRead, final String modelFileName) {
         final TokenMap tokenMap = new TokenMap(ascii, true);
         //tokenMap.makeBlockTokenMap(ascii, true);
 
@@ -427,7 +432,7 @@ public final class ProjectData implements Serializable {
             for (TokenMap fileSubBlock = fileBlock.getBlockTokenMap("<GeckoFile>"); fileSubBlock != null;
                     fileSubBlock = fileBlock.getBlockTokenMap("<GeckoFile>")) {
                 try {
-                    GeckoFile newFile = new GeckoFile(fileSubBlock, _allSheetComponents);
+                    GeckoFile newFile = new GeckoFile(fileSubBlock, _allSheetComponents, modelFileName, null);
                     fileMgrFiles.add(newFile);
                 } catch (FileNotFoundException e) {
                     JOptionPane.showMessageDialog(null, e.getMessage(), "ERROR: File not found", JOptionPane.ERROR_MESSAGE);

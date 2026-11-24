@@ -15,9 +15,12 @@ import gecko.geckocircuits.control.ReglerOSZI;
 import gecko.geckocircuits.control.ReglerSignalSource;
 import gecko.geckocircuits.control.ReglerVOLT;
 import gecko.geckocircuits.datacontainer.ContainerStatus;
+import gecko.geckocircuits.newscope.AxisConnection;
+import gecko.geckocircuits.newscope.DiagramCurve;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.Window;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
@@ -178,7 +181,17 @@ class SpiceImportDesktopTest {
         resource.exportASCII(resourceBlock);
         assertTrue(resourceBlock.toString().contains("\n<usageList>\n" + signal.getUniqueObjectIdentifier()
                 + "\n<\\usageList>\n"), "The embedded waveform owner must be SIGNAL.V1");
-        return assertInstanceOf(ReglerOSZI.class, control.get("SCOPE.IMPORT"));
+        var scope = assertInstanceOf(ReglerOSZI.class, control.get("SCOPE.IMPORT"));
+        var diagrams = scope._scopeFrame.getGrafer().getManager().getDiagrams();
+        assertEquals(1, diagrams.size(), "The imported SCOPE must open with a voltage plot");
+        var diagram = assertInstanceOf(DiagramCurve.class, diagrams.getFirst());
+        assertEquals(2, diagram.getCurves().size());
+        for (int channel = 0; channel < diagram.getCurves().size(); channel++) {
+            var curve = diagram.getCurve(channel);
+            assertEquals(channel, curve.getValueDataIndex());
+            assertEquals(AxisConnection.ZUORDNUNG_Y, curve.getAxisConnection());
+        }
+        return scope;
     }
 
     private static void captureEvidence(ReglerOSZI scope, int steps, Path circuit, Path evidence) throws Exception {
@@ -207,10 +220,7 @@ class SpiceImportDesktopTest {
         viewport.setViewPosition(new Point());
         writePng(viewport, evidence.resolve("m6-spice-rc-schematic.png"));
 
-        scope._scopeFrame.setVisible(true);
-        scope._scopeFrame.getGrafer().setAxisPositions();
-        scope._scopeFrame.getGrafer().doZoomAutoFit();
-        writePng(scope._scopeFrame._scope, evidence.resolve("m6-spice-rc-scope.png"));
+        captureScope(scope, evidence.resolve("m6-spice-rc-scope.png"));
         Files.writeString(evidence.resolve("receipt.txt"), String.format(Locale.ROOT, """
                 source=%s
                 imported_circuit=%s
@@ -223,6 +233,7 @@ class SpiceImportDesktopTest {
                 embedded_waveform_owner=SIGNAL.V1
                 scope=SCOPE.IMPORT
                 channels=V_N1,V_N2
+                rendered_traces=2
                 samples=%d
                 step_seconds=%.9f
                 last_time_seconds=%.9f
@@ -248,7 +259,42 @@ class SpiceImportDesktopTest {
         return status;
     }
 
-    private static void writePng(Component component, Path file) throws Exception {
+    private static void captureScope(ReglerOSZI scope, Path file) throws Exception {
+        var frame = scope._scopeFrame;
+        frame.setVisible(true);
+        frame.validate();
+        var graph = frame.getGrafer();
+        var diagram = graph.getManager().getDiagrams().getFirst();
+        assertSame(scope.getZVDatenImRAM(), graph.getDataContainer());
+        assertTrue(diagram.isShowing(), "The SCOPE plot must be visible");
+        graph.setAxisPositions();
+        graph.doZoomAutoFit();
+        var image = writePng(frame._scope, file);
+
+        int left = graph.getXPixFromValue(0) + 2;
+        int top = diagram.getTopOffset() + 1;
+        int width = graph.getXPixFromValue(END) - left - 2;
+        int height = diagram.getHeight() - diagram.getBottomOffset() - top - 1;
+        assertTrue(width > 0 && height > 0, "The SCOPE plot must have a drawable area");
+        var plot = SwingUtilities.convertRectangle(diagram, new Rectangle(left, top, width, height), frame._scope);
+        int[] pixels = image.getRGB(plot.x, plot.y, plot.width, plot.height, null, 0, plot.width);
+        for (var curve : diagram.getCurves()) {
+            Color color = curve.getColor().getJavaColor();
+            double opacity = curve.getTransparency();
+            long tracePixels = Arrays.stream(pixels).filter(pixel -> hasTraceColor(pixel, color, opacity)).limit(20).count();
+            assertEquals(20, tracePixels, "Missing rendered trace for channel " + curve.getValueDataIndex());
+        }
+    }
+
+    private static boolean hasTraceColor(int pixel, Color trace, double opacity) {
+        var actual = new Color(pixel);
+        double background = 255 * (1 - opacity);
+        return Math.abs(actual.getRed() - (trace.getRed() * opacity + background)) <= 3
+                && Math.abs(actual.getGreen() - (trace.getGreen() * opacity + background)) <= 3
+                && Math.abs(actual.getBlue() - (trace.getBlue() * opacity + background)) <= 3;
+    }
+
+    private static BufferedImage writePng(Component component, Path file) throws Exception {
         assertTrue(component.isShowing(), "The component to capture must be visible");
         var image = new BufferedImage(component.getWidth(), component.getHeight(), BufferedImage.TYPE_INT_RGB);
         var graphics = image.createGraphics();
@@ -263,6 +309,7 @@ class SpiceImportDesktopTest {
         int[] pixels = image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
         assertTrue(Arrays.stream(pixels).anyMatch(pixel -> pixel != pixels[0]), "The capture is blank " + file);
         assertTrue(ImageIO.write(image, "png", file.toFile()), "No PNG writer is available");
+        return image;
     }
 
     private static <T> T onEventThread(Callable<T> action) throws Exception {
