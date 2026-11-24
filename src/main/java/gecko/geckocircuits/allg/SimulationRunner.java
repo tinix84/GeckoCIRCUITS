@@ -47,6 +47,7 @@ public final class SimulationRunner {
     private volatile Execution execution;
     private SimulationTraceLogger pendingTraceLogger;
     private final DesktopSimulationController controller;
+    private final DesktopAcAnalysis acAnalysis;
 
     private record PreparationOwner(Object token, SolverSettings settings) { }
     private record Preparation(Object token, Execution previous, SimulationTraceLogger logger) { }
@@ -71,6 +72,7 @@ public final class SimulationRunner {
         _mainwindow = mainwindow;
         _se = schematicEntry;
         controller = new DesktopSimulationController(mainwindow, schematicEntry, prepareCorePresentation);
+        acAnalysis = new DesktopAcAnalysis(mainwindow);
     }
 
     private Preparation beginPreparation(Execution expected, boolean requireCurrent, boolean takeLogger,
@@ -169,7 +171,16 @@ public final class SimulationRunner {
     }
 
     public void startCalculation(boolean createNewSimThread, SolverSettings settings) throws Exception {
+        _se.requireCompleteConversion();
         controller.reset();
+        if (_se.getAcSettings() != null) {
+            acAnalysis.start(_se, settings, createNewSimThread);
+            return;
+        }
+        if (_se.getHierarchy() != null || _se.getElementLK().stream().anyMatch(block -> block.getAcComponent() != null
+                && block.getAcComponent().law() instanceof gecko.core.ac.AcComponent.Inductance)) {
+            throw new IllegalArgumentException("Select AC analysis for the imported hierarchy or series resistance law.");
+        }
         if (createNewSimThread && controller.startAsync(settings)) {
             execution = null;
             simKern = null;
@@ -226,6 +237,8 @@ public final class SimulationRunner {
     }
 
     public void continueCalculation(boolean createNewSimThread, SolverSettings settings) throws Exception {
+        _se.requireCompleteConversion();
+        if (_se.getAcSettings() != null) throw new IllegalArgumentException("Start a new AC analysis.");
         if (controller.hasAsyncExecution()) {
             controller.continueAsync(settings);
             return;
@@ -282,6 +295,9 @@ public final class SimulationRunner {
 
     /** Stops the captured execution without pausing a replacement started by its completion callbacks. */
     public void endSimulation() {
+        if (acAnalysis.stop()) {
+            return;
+        }
         if (controller.endAsync()) {
             return;
         }
@@ -298,6 +314,9 @@ public final class SimulationRunner {
     }
 
     public void pauseSimulation() {
+        if (acAnalysis.stop()) {
+            return;
+        }
         if (controller.pauseAsync()) {
             return;
         }
@@ -309,6 +328,7 @@ public final class SimulationRunner {
     }
 
     public void initSim(double dt, double end) {
+        _se.requireCompleteConversion();
         SolverSettings settings = MainWindow._solverSettings;
         settings._tDURATION.setValueWithoutUndo(end);
         settings.dt.setValueWithoutUndo(dt);
@@ -356,6 +376,7 @@ public final class SimulationRunner {
     }
 
     public void external_init(double end) {
+        _se.requireCompleteConversion();
         SolverSettings settings = MainWindow._solverSettings;
         controller.reset();
         try {
@@ -369,6 +390,8 @@ public final class SimulationRunner {
         }
         initializeScript(settings, end, settings.dt.getValue(), false);
     }
+
+    void cancelAcAnalysis() { acAnalysis.invalidate(); }
 
     public void external_step(double time) {
         if (controller.hasCoreExecution()) {

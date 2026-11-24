@@ -17,27 +17,59 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.swing.undo.CannotRedoException;
 import javax.swing.undo.CannotUndoException;
+import javax.swing.undo.CompoundEdit;
 import javax.swing.undo.UndoManager;
 import javax.swing.undo.UndoableEdit;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
-@SuppressFBWarnings(
-        value = "EI_EXPOSE_REP",
-        justification = "Undo manager must share edit references for grouped undo operations")
-public final class GroupableUndoManager extends UndoManager {
-    @Override
-    public synchronized void undo() throws CannotUndoException {
+@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "Undo manager must share edit references for grouped undo operations")
+public final class GroupableUndoManager extends UndoManager{
+  private final transient ThreadLocal<CompoundEdit> pending = new ThreadLocal<>();
+
+  @Override
+  public synchronized void undo() throws CannotUndoException{
     super.undo();
   }
 
-    @Override
-    public synchronized boolean addEdit(final UndoableEdit anEdit) {
-        //System.out.println("adding edit: " + anEdit.getUndoPresentationName());
+  @Override
+  public synchronized boolean addEdit(final UndoableEdit anEdit){
+    var staged = pending.get();
+    if (staged != null) return staged.addEdit(anEdit);
     return super.addEdit(anEdit);
   }
 
-    @Override
-    public synchronized void redo() {
+  /** Adds one undo unit only after all model changes succeed. */
+  public void atomicEdit(Runnable action) {
+    if (pending.get() != null) throw new IllegalStateException("Finish the current editor transaction first.");
+    var edit = new CompoundEdit();
+    pending.set(edit);
+    try {
+      action.run();
+    } catch (RuntimeException | Error failure) {
+      pending.remove();
+      edit.end();
+      try {
+        edit.undo();
+      } catch (RuntimeException | Error rollback) {
+        throw new RollbackFailure(failure, rollback);
+      }
+      throw failure;
+    } finally {
+      pending.remove();
+    }
+    edit.end();
+    if (edit.isSignificant()) addEdit(edit);
+  }
+
+  public static final class RollbackFailure extends IllegalStateException {
+    RollbackFailure(Throwable failure, Throwable rollback) {
+      super("The editor could not restore the complete transaction.", failure);
+      addSuppressed(rollback);
+    }
+  }
+
+  @Override
+  public synchronized void redo(){
     super.redo();
   }
 

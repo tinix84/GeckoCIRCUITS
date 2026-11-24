@@ -1,7 +1,10 @@
 package gecko.core.preparation;
 
+import gecko.core.allg.SolverType;
+import gecko.core.ac.AcExecutionPlan;
 import gecko.core.io.CircuitModel;
 import gecko.core.io.ImportIssue;
+import gecko.core.simulation.SimulationTiming;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,6 +47,14 @@ public final class CircuitPreparation {
      */
     public PreparationResult prepare(CircuitSnapshot base, PreparationRequest request) {
         var model = base.toModel();
+        if (model.getAcSettings() != null) return prepareAc(base, model, request);
+        if (model.getHierarchy() != null || model.getCircuitComponents().stream().anyMatch(component ->
+                component.getAcComponent() != null && component.getAcComponent().law() instanceof gecko.core.ac.AcComponent.Inductance)) {
+            return new PreparationResult.Rejected(new ReadinessReport(ReadinessReport.Outcome.UNSUPPORTED,
+                    List.of(new Diagnostic("UNSUPPORTED_TRANSIENT_LAW", Diagnostic.Category.CAPABILITY, Diagnostic.Severity.ERROR,
+                            "Select AC analysis for the imported hierarchy or series resistance law.",
+                            "LK", null, "analysis", model.getFilePath()))));
+        }
         for (var finding : CircuitConfiguration.normalize(model)) {
             var issue = new ImportIssue(finding.code(), finding.domain(), finding.component(), finding.message(),
                     finding.sourceLocation(), false, finding.parameterPath());
@@ -61,6 +72,21 @@ public final class CircuitPreparation {
         if (settings.duration() != null) {
             if (positive(settings.duration())) model.setSimulationDuration(settings.duration());
             else diagnostics.add(invalidSetting("duration", "Simulation duration must be finite and positive"));
+        }
+        if (!settings.features().valid()) {
+            diagnostics.add(invalidSetting("controlSamplePeriod", "CONTROL sample period must be finite and non-negative"));
+        }
+        if (settings.features().zeroCrossing() && model.getSolverType() == SolverType.SOLVER_GS) {
+            diagnostics.add(invalidSetting("zeroCrossing", SimulationTiming.GS_ZERO_CROSSING_MESSAGE));
+        }
+        for (var issue : SimulationTiming.periodicSteadyStateIssues(settings.features().periodicSteadyState(),
+                model.getTimeStep(), model.getSimulationDuration(), model.getPreSimulationTime(),
+                settings.features().controlSamplePeriod())) {
+            diagnostics.add(invalidSetting(issue.parameterPath(), issue.message()));
+        }
+        for (var issue : SimulationTiming.adaptiveStepIssues(settings.features().adaptiveStep(), model.getSolverType(),
+                model.getTimeStep(), model.getPreSimulationTime(), model.getPreSimulationTimeStep())) {
+            diagnostics.add(invalidSetting(issue.parameterPath(), issue.message()));
         }
         model.getImportIssues().removeIf(issue -> issue.code().equals("INVALID_SETTING")
                 && switch (issue.parameterPath() == null ? "" : issue.parameterPath()) {
@@ -84,6 +110,13 @@ public final class CircuitPreparation {
             return rejected ? new PreparationResult.Rejected(report) : new PreparationResult.Inspectable(snapshot, report);
         }
         diagnostics.addAll(CircuitConfiguration.validate(execution));
+        if (settings.features().periodicSteadyState() != null && !rejected) {
+            for (var issue : SimulationTiming.periodicSteadyStateCircuitIssues(execution, model.getTimeStep(),
+                    settings.features().controlSamplePeriod(), settings.features().periodicSteadyState())) {
+                diagnostics.add(invalidSetting(issue.parameterPath(), issue.message()));
+                rejected = true;
+            }
+        }
         diagnostics.addAll(CircuitReadiness.check(execution, diagnostics));
         boolean invalid = diagnostics.stream().anyMatch(item -> item.severity() == Diagnostic.Severity.ERROR
                 && item.category() != Diagnostic.Category.CAPABILITY);
@@ -93,7 +126,38 @@ public final class CircuitPreparation {
         var report = new ReadinessReport(outcome, diagnostics);
         if (rejected) return new PreparationResult.Rejected(report);
         if (!report.readyForHeadless()) return new PreparationResult.Inspectable(snapshot, report);
-        return new PreparationResult.Ready(snapshot, new PreparedCircuit(snapshot), report);
+        return new PreparationResult.Ready(snapshot, new PreparedCircuit(snapshot, settings.features()), report);
+    }
+
+    private PreparationResult prepareAc(CircuitSnapshot snapshot, CircuitModel model, PreparationRequest request) {
+        if (!request.equals(PreparationRequest.defaults())) {
+            return new PreparationResult.Rejected(new ReadinessReport(ReadinessReport.Outcome.INVALID,
+                    List.of(invalidSetting("analysis", "AC does not accept transient settings or numeric overrides."))));
+        }
+        var diagnostics = new ArrayList<Diagnostic>();
+        AcExecutionPlan plan = null;
+        // Before the plan: a hierarchy document reaches the same rejection.
+        for (var component : model.getThermalComponents()) {
+            diagnostics.add(new Diagnostic("UNSUPPORTED_DOMAIN", Diagnostic.Category.CAPABILITY, Diagnostic.Severity.ERROR,
+                    "AC analysis does not support THERMAL elements.", "THERMAL", component.getName(), null,
+                    component.getSourceLocation()));
+        }
+        try {
+            if (model.getHierarchy() == null) model = snapshot.executionModel();
+            plan = new AcExecutionPlan(model);
+        } catch (IllegalArgumentException error) {
+            diagnostics.add(new Diagnostic("INVALID_AC", Diagnostic.Category.CONFIGURATION, Diagnostic.Severity.ERROR,
+                    error.getMessage(), "LK", null, "analysis", model.getFilePath()));
+        }
+        var parserTimingIssues = model.getSavedTransientSettingIssues();
+        var conversionIssues = model.getConversionIssues();
+        model.getImportIssues().removeIf(issue -> parserTimingIssues.contains(issue) && !conversionIssues.contains(issue));
+        CircuitReadiness.appendImportDiagnostics(model, diagnostics);
+        if (diagnostics.stream().anyMatch(diagnostic -> diagnostic.severity() == Diagnostic.Severity.ERROR)) {
+            return new PreparationResult.Inspectable(snapshot, new ReadinessReport(ReadinessReport.Outcome.INVALID, diagnostics));
+        }
+        return new PreparationResult.Ready(snapshot, new PreparedCircuit(snapshot, plan),
+                new ReadinessReport(ReadinessReport.Outcome.READY, diagnostics));
     }
     private static boolean positive(double value) { return Double.isFinite(value) && value > 0; }
     private static Diagnostic invalidSetting(String path, String message) {

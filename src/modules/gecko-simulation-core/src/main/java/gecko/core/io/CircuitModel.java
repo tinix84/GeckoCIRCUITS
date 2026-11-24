@@ -14,6 +14,8 @@
 package gecko.core.io;
 
 import gecko.core.allg.SolverType;
+import gecko.core.ac.AcComponent;
+import gecko.core.ac.AcDocumentSettings;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,6 +29,17 @@ import java.util.Map;
  * <p>This class is designed for headless operation and contains no Swing/AWT dependencies.</p>
  */
 public class CircuitModel {
+    private AcDocumentSettings acSettings;
+    private CircuitHierarchy hierarchy;
+
+    public CircuitHierarchy getHierarchy() { return hierarchy; }
+    public void setHierarchy(CircuitHierarchy hierarchy) { this.hierarchy = hierarchy; }
+    private AcProvenance acProvenance;
+
+    public AcDocumentSettings getAcSettings() { return acSettings; }
+    public void setAcSettings(AcDocumentSettings settings) { acSettings = settings; }
+    public AcProvenance getAcProvenance() { return acProvenance; }
+    public void setAcProvenance(AcProvenance provenance) { acProvenance = provenance; }
     /** Captured grid geometry. Hidden proxy terminals do not have physical junctions. */
     public record TerminalData(String domain, long sheetIdentifier, CircuitTopology.Side side, int port,
                                int x, int y, boolean geometric) { }
@@ -76,6 +89,17 @@ public class CircuitModel {
     public Map<Long, CircuitResourceFailure> getResourceFailures() { return resourceFailures; }
 
     private final List<ImportIssue> importIssues = new ArrayList<>();
+    private final List<ImportIssue> conversionIssues = new ArrayList<>();
+    private final List<ImportIssue> savedTransientSettingIssues = new ArrayList<>();
+
+    public void addSavedTransientSettingIssue(ImportIssue issue) {
+        savedTransientSettingIssues.add(issue);
+        if (!importIssues.contains(issue)) importIssues.add(issue);
+    }
+
+    public List<ImportIssue> getSavedTransientSettingIssues() {
+        return savedTransientSettingIssues.stream().filter(importIssues::contains).toList();
+    }
 
     // Optimizer parameters
     private final Map<String, Double> optimizerParameters = new HashMap<>();
@@ -228,6 +252,17 @@ public class CircuitModel {
         return importIssues;
     }
 
+    /** Records a diagnostic from a source format for serialization with the circuit. */
+    public void addConversionIssue(ImportIssue issue) {
+        if (!importIssues.contains(issue)) importIssues.add(issue);
+        if (!conversionIssues.contains(issue)) conversionIssues.add(issue);
+    }
+
+    /** Returns source-format diagnostics. Native parser diagnostics are generated on each read. */
+    public List<ImportIssue> getConversionIssues() {
+        return conversionIssues.stream().filter(importIssues::contains).toList();
+    }
+
     public void addCircuitComponent(ComponentData component) {
         circuitComponents.add(component);
     }
@@ -341,6 +376,10 @@ public class CircuitModel {
      * Represents a circuit component's data.
      */
     public static class ComponentData {
+        private AcComponent acComponent;
+
+        public AcComponent getAcComponent() { return acComponent; }
+        public void setAcComponent(AcComponent component) { acComponent = component; }
         private final int type;
         private final String name;
         private final Map<String, Object> parameters;
