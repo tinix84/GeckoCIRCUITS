@@ -238,7 +238,9 @@ public final class SimulationRunner {
 
     public void continueCalculation(boolean createNewSimThread, SolverSettings settings) throws Exception {
         _se.requireCompleteConversion();
-        if (_se.getAcSettings() != null) throw new IllegalArgumentException("Start a new AC analysis.");
+        if (_se.getAcSettings() != null) {
+            throw new IllegalArgumentException("Start a new AC analysis.");
+        }
         if (controller.hasAsyncExecution()) {
             controller.continueAsync(settings);
             return;

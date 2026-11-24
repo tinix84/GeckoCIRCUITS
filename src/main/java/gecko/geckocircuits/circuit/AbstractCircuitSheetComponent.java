@@ -187,8 +187,10 @@ public abstract class AbstractCircuitSheetComponent {
     }
 
     public void exportASCII(final StringBuffer ascii) {
-        if (hierarchyMember != null) ascii.append('\n').append(gecko.core.io.HierarchyMetadataCodec.MEMBER).append(' ')
-                .append(gecko.core.io.HierarchyMetadataCodec.encode(hierarchyMember));
+        if (hierarchyMember != null) {
+            ascii.append('\n').append(gecko.core.io.HierarchyMetadataCodec.MEMBER).append(' ')
+                    .append(gecko.core.io.HierarchyMetadataCodec.encode(hierarchyMember));
+        }
         ProjectData.appendAsString(ascii.append("\nenabledShorted"), _isEnabled.getValue().ordinal());
 
         if (getParentCircuitSheet() instanceof SubCircuitSheet) {

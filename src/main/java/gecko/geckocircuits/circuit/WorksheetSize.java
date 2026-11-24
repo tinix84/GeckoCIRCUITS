@@ -102,7 +102,9 @@ public final class WorksheetSize {
                     if (allSheetTerminals != null) {
                         for (SubCircuitTerminable term : allSheetTerminals) {
                         if (term instanceof gecko.geckocircuits.circuit.circuitcomponents.AbstractCircuitTerminal imported
-                                && imported.importedBlockOffset() != null) continue;
+                                && imported.importedBlockOffset() != null) {
+                            continue;
+                        }
                         if (term.getTerminalLocation() == EnumTerminalLocation.RIGHT) {
                             setCheckedTerminalSheetPosition(term, sizeX - 1, term.getSheetPosition().y, allSheetTerminals);
                         }

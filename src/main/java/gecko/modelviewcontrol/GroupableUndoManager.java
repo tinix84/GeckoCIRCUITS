@@ -34,13 +34,17 @@ public final class GroupableUndoManager extends UndoManager{
   @Override
   public synchronized boolean addEdit(final UndoableEdit anEdit){
     var staged = pending.get();
-    if (staged != null) return staged.addEdit(anEdit);
+    if (staged != null) {
+      return staged.addEdit(anEdit);
+    }
     return super.addEdit(anEdit);
   }
 
   /** Adds one undo unit only after all model changes succeed. */
   public void atomicEdit(Runnable action) {
-    if (pending.get() != null) throw new IllegalStateException("Finish the current editor transaction first.");
+    if (pending.get() != null) {
+      throw new IllegalStateException("Finish the current editor transaction first.");
+    }
     var edit = new CompoundEdit();
     pending.set(edit);
     try {
@@ -58,7 +62,9 @@ public final class GroupableUndoManager extends UndoManager{
       pending.remove();
     }
     edit.end();
-    if (edit.isSignificant()) addEdit(edit);
+    if (edit.isSignificant()) {
+      addEdit(edit);
+    }
   }
 
   public static final class RollbackFailure extends IllegalStateException {

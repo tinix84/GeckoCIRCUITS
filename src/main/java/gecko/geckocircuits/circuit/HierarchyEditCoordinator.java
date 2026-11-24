@@ -72,10 +72,16 @@ final class HierarchyEditCoordinator {
                 validateLaw(block.getAcComponent().law(), scope(block.getParentCircuitSheet(), newDocument, owner, newCall));
             }
         }
-        if (newDocument.equals(oldDocument) && newCall.equals(existing)) return;
+        if (newDocument.equals(oldDocument) && newCall.equals(existing)) {
+            return;
+        }
         group(() -> {
-            if (!newDocument.equals(oldDocument)) editor.setHierarchy(newDocument);
-            if (!newCall.equals(existing)) owner.setHierarchyCall(newCall);
+            if (!newDocument.equals(oldDocument)) {
+                editor.setHierarchy(newDocument);
+            }
+            if (!newCall.equals(existing)) {
+                owner.setHierarchyCall(newCall);
+            }
         });
     }
 
@@ -97,7 +103,9 @@ final class HierarchyEditCoordinator {
         var targets = expandRemoval(selected);
         group(() -> {
             for (var component : targets) {
-                if (shortCommand && component instanceof Verbindung) continue;
+                if (shortCommand && component instanceof Verbindung) {
+                    continue;
+                }
                 Enabled next = switch (component.isCircuitEnabled()) {
                     case ENABLED -> shortCommand ? Enabled.DISABLED_SHORT : Enabled.DISABLED;
                     case DISABLED, DISABLED_SHORT -> Enabled.ENABLED;
@@ -113,10 +121,14 @@ final class HierarchyEditCoordinator {
         group(() -> {
             var edit = new GeckoUndoableEdit() {
                 @Override public void undo() {
-                    for (var placement : placements) placement.element().setParentCircuitSheet(placement.sheet());
+                    for (var placement : placements) {
+                        placement.element().setParentCircuitSheet(placement.sheet());
+                    }
                 }
                 @Override public void redo() {
-                    for (var placement : placements.reversed()) placement.element().deleteComponent();
+                    for (var placement : placements.reversed()) {
+                        placement.element().deleteComponent();
+                    }
                 }
                 @Override public boolean canUndo() { return true; }
                 @Override public boolean canRedo() { return true; }
@@ -133,7 +145,9 @@ final class HierarchyEditCoordinator {
         for (var element : selected) {
             if (element instanceof Verbindung
                     || element instanceof AbstractBlockInterface block && !(block instanceof SubcircuitBlock)
-                        && block.getAcComponentOrLiteral() != null) continue;
+                        && block.getAcComponentOrLiteral() != null) {
+                continue;
+            }
             throw new IllegalArgumentException("Copy only supported AC components and wires in this circuit.");
         }
     }
@@ -144,11 +158,15 @@ final class HierarchyEditCoordinator {
         SchematicEditor2.requireEditThread();
         var additions = new ArrayList<Placement>();
         var used = new java.util.HashSet<Long>();
-        for (var element : editor._circuitSheet.getAllElements()) used.add(element.getUniqueObjectIdentifier());
+        for (var element : editor._circuitSheet.getAllElements()) {
+            used.add(element.getUniqueObjectIdentifier());
+        }
         used.add(0L);
         try {
             requireSupportedCopies(previews);
-            for (var source : previews) prepareAddition(source, additions, used);
+            for (var source : previews) {
+                prepareAddition(source, additions, used);
+            }
         } catch (RuntimeException | Error error) {
             previews.forEach(AbstractCircuitSheetComponent::deleteComponent);
             throw error;
@@ -157,12 +175,16 @@ final class HierarchyEditCoordinator {
             var edit = new GeckoUndoableEdit() {
                 @Override
                 public void undo() {
-                    for (var placement : additions.reversed()) placement.element().deleteComponent();
+                    for (var placement : additions.reversed()) {
+                        placement.element().deleteComponent();
+                    }
                 }
 
                 @Override
                 public void redo() {
-                    for (var placement : additions) placement.element().setParentCircuitSheet(placement.sheet());
+                    for (var placement : additions) {
+                        placement.element().setParentCircuitSheet(placement.sheet());
+                    }
                 }
 
                 @Override public boolean canUndo() { return true; }
@@ -173,8 +195,11 @@ final class HierarchyEditCoordinator {
             for (var placement : additions) {
                 var element = placement.element();
                 element.setParentCircuitSheet(placement.sheet());
-                if (element instanceof Verbindung wire) wire.initializeHierarchyPoints(List.copyOf(wire.getAllPointCoordinates()));
-                else element.absetzenElement();
+                if (element instanceof Verbindung wire) {
+                    wire.initializeHierarchyPoints(List.copyOf(wire.getAllPointCoordinates()));
+                } else {
+                    element.absetzenElement();
+                }
             }
             editor.inspectHierarchy();
         });
@@ -183,8 +208,12 @@ final class HierarchyEditCoordinator {
     private void prepareAddition(AbstractCircuitSheetComponent source, List<Placement> additions, java.util.Set<Long> used) {
         var sheet = source.getParentCircuitSheet();
         additions.add(new Placement(source, sheet));
-        if (source instanceof Verbindung wire) validatePoints(wire.getAllPointCoordinates());
-        if (!(sheet instanceof SubCircuitSheet child) || child._subBlock.getHierarchyCall() == null) return;
+        if (source instanceof Verbindung wire) {
+            validatePoints(wire.getAllPointCoordinates());
+        }
+        if (!(sheet instanceof SubCircuitSheet child) || child._subBlock.getHierarchyCall() == null) {
+            return;
+        }
         var owners = occurrences(child._subBlock.getHierarchyCall().definitionId());
         var key = new CircuitHierarchy.Member("member:edit:" + java.util.UUID.randomUUID());
         if (source instanceof AbstractBlockInterface block) {
@@ -201,7 +230,9 @@ final class HierarchyEditCoordinator {
         }
         source.setHierarchyMember(key);
         for (var owner : owners) {
-            if (owner == child._subBlock) continue;
+            if (owner == child._subBlock) {
+                continue;
+            }
             AbstractCircuitSheetComponent peer;
             if (source instanceof Verbindung wire) {
                 peer = wire.copyShape();
@@ -300,9 +331,13 @@ final class HierarchyEditCoordinator {
 
     private <T extends AbstractCircuitSheetComponent> List<T> peers(AbstractCircuitSheetComponent selected, Class<T> type) {
         if (!(selected.getParentCircuitSheet() instanceof SubCircuitSheet sheet)
-                || sheet._subBlock.getHierarchyCall() == null) return List.of(type.cast(selected));
+                || sheet._subBlock.getHierarchyCall() == null) {
+            return List.of(type.cast(selected));
+        }
         var key = selected.getHierarchyMember();
-        if (key == null) throw new IllegalArgumentException("The ASC member has no definition key.");
+        if (key == null) {
+            throw new IllegalArgumentException("The ASC member has no definition key.");
+        }
         var result = new ArrayList<T>();
         for (var owner : occurrences(sheet._subBlock.getHierarchyCall().definitionId())) {
             var matches = owner._myCircuitSheet.getLocalSheetComponents().stream()
@@ -324,7 +359,9 @@ final class HierarchyEditCoordinator {
             editor.retainFailedHierarchyEdit();
             throw failure;
         } catch (RuntimeException | Error failure) {
-            if (!dirty) editor.resetModelModified();
+            if (!dirty) {
+                editor.resetModelModified();
+            }
             throw failure;
         }
         editor.setDirtyFlag();
@@ -341,8 +378,11 @@ final class HierarchyEditCoordinator {
             case AcComponent.Voltage voltage -> validateSource(voltage.dc(), voltage.magnitude(), voltage.phaseDegrees(), scope);
             case AcComponent.Current current -> validateSource(current.dc(), current.magnitude(), current.phaseDegrees(), scope);
             case AcComponent.Controlled controlled -> {
-                if (controlled.laplace()) SpiceValue.transfer(controlled.expression(), scope);
-                else SpiceValue.evaluate(controlled.expression(), scope);
+                if (controlled.laplace()) {
+                    SpiceValue.transfer(controlled.expression(), scope);
+                } else {
+                    SpiceValue.evaluate(controlled.expression(), scope);
+                }
             }
         }
     }
@@ -350,10 +390,14 @@ final class HierarchyEditCoordinator {
     private static void validateSource(String dc, String magnitude, String phase, Map<String, String> scope) {
         SpiceValue.evaluate(dc, scope);
         SpiceValue.evaluate(phase, scope);
-        if (SpiceValue.evaluate(magnitude, scope) < 0) throw new IllegalArgumentException("Require a nonnegative AC magnitude.");
+        if (SpiceValue.evaluate(magnitude, scope) < 0) {
+            throw new IllegalArgumentException("Require a nonnegative AC magnitude.");
+        }
     }
 
     private static void requirePositive(double value) {
-        if (value <= 0) throw new IllegalArgumentException("Require a positive component value.");
+        if (value <= 0) {
+            throw new IllegalArgumentException("Require a positive component value.");
+        }
     }
 }

@@ -98,7 +98,9 @@ public class Verbindung extends AbstractCircuitSheetComponent implements Compone
     }
 
     public final boolean setSharedProperties(String label, Enabled enabled) {
-        if (getHierarchyMember() == null) return false;
+        if (getHierarchyMember() == null) {
+            return false;
+        }
         SchematicEditor2.Singleton.hierarchyEdits.editWireProperties(this, label, enabled);
         return true;
     }
@@ -258,7 +260,9 @@ public class Verbindung extends AbstractCircuitSheetComponent implements Compone
     public void paintComponentForeGround(Graphics2D graphics) {
         var editor = SchematicEditor2.Singleton;
         if (editor == null || editor.getAcSettings() == null || _connectorType != ConnectorType.LK
-                || _connectorPoints.isEmpty() || getLabel().isEmpty()) return;
+                || _connectorPoints.isEmpty() || getLabel().isEmpty()) {
+            return;
+        }
         Point start = getStartPoint();
         graphics.setFont(SchematicEditor2.circuitFont);
         graphics.setColor(GlobalColors.farbeFertigVerbindungLK);
