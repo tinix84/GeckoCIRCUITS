@@ -459,10 +459,10 @@ class NativeAcDesktopTest {
         Path evidence = evidence();
         Path input = createHierarchyInput(evidence);
         try {
-            onEdt(() -> {
-                editAndSaveHierarchy(evidence, input);
-                return null;
-            });
+            Path repaired = onEdt(() -> editAndSaveHierarchy(evidence, input));
+            var writer = onEdt(() -> startBackgroundSaves(evidence, repaired));
+            writer.get(15, TimeUnit.SECONDS);
+            verifyBackgroundSaves(evidence);
         } finally {
             onEdt(() -> { closeDesktop(); return null; });
         }
@@ -477,7 +477,7 @@ class NativeAcDesktopTest {
         return input;
     }
 
-    private static void editAndSaveHierarchy(Path evidence, Path input) throws Exception {
+    private static Path editAndSaveHierarchy(Path evidence, Path input) throws Exception {
                 open(input);
                 assertHierarchyOutputs(solve(), 1000, 4000, 2000);
                 showOccurrence("X1", "Xleaf");
@@ -514,7 +514,7 @@ class NativeAcDesktopTest {
                 Path repaired = evidence.resolve("repaired.ipes");
                 saveAndReopenHierarchy(repaired);
                 assertHierarchyOutputs(solve(), 2000, 4000, 5000);
-                verifyBackgroundSaves(evidence, repaired);
+                return repaired;
     }
 
     private static CircuitSheet showOccurrence(String... path) {
@@ -594,20 +594,14 @@ class NativeAcDesktopTest {
         }
     }
 
-    private static void verifyBackgroundSaves(Path evidence, Path current) throws Exception {
-        var eventQueue = java.awt.Toolkit.getDefaultToolkit().getSystemEventQueue();
-        var loop = eventQueue.createSecondaryLoop();
+    private static FutureTask<Void> startBackgroundSaves(Path evidence, Path current) throws Exception {
         var started = new java.util.concurrent.CountDownLatch(1);
         var firstSave = new java.util.concurrent.CountDownLatch(1);
         var writer = new FutureTask<Void>(() -> {
             started.countDown();
-            try {
-                for (int i = 0; i < 8; i++) {
-                    GeckoSim._win.rawSaveFile(evidence.resolve("backup-" + i + ".ipes").toFile());
-                    firstSave.countDown();
-                }
-            } finally {
-                SwingUtilities.invokeLater(loop::exit);
+            for (int i = 0; i < 8; i++) {
+                GeckoSim._win.rawSaveFile(evidence.resolve("backup-" + i + ".ipes").toFile());
+                firstSave.countDown();
             }
             return null;
         });
@@ -618,16 +612,10 @@ class NativeAcDesktopTest {
             GeckoSim._win.createNewFile();
             open(current);
         }
-        var timer = new Timer(15000, event -> loop.exit());
-        timer.setRepeats(false);
-        timer.start();
-        try {
-            if (!writer.isDone()) loop.enter();
-        } finally {
-            timer.stop();
-        }
-        assertTrue(writer.isDone(), "The background save did not finish.");
-        writer.get();
+        return writer;
+    }
+
+    private static void verifyBackgroundSaves(Path evidence) throws Exception {
         var reader = new CircuitFileParser();
         var preparation = new CircuitPreparation();
         for (int i = 0; i < 8; i++) {
