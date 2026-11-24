@@ -14,13 +14,14 @@ reference:
   signal_identity: "component and terminal connectivity, physical unit, reference, and direction"
 
 comparison:
-  enabled: false
+  enabled: true
   requires_user_absolute_tolerance_review: true
-  absolute_tolerances_approved: false
+  absolute_tolerances_approved: true
+  review_decision: "User instructed go on after the numerical checkpoint review; issue #62 records the decision."
   timestamp_absolute_tolerance_s: 1.0e-12
   binary_command_and_conduction_comparison: exact
   analog_rule: "abs(actual-reference) <= max(absolute_tolerance, 0.01*abs(reference))"
-  proposed_absolute_tolerances:
+  absolute_tolerances:
     V: 6.0e-11
     A: 6.0e-11
     ohm: 4.0e-9

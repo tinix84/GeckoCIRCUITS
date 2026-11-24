@@ -27,6 +27,51 @@ public final class TraceComparisonHelper {
     private TraceComparisonHelper() {
     }
 
+    /** A physical quantity with a stable identity and an explicit comparison mode. */
+    public record PhysicalSignal(String name, String unit, boolean discrete) {
+        public PhysicalSignal {
+            if (name == null || name.isBlank() || unit == null || unit.isBlank()) {
+                throw new IllegalArgumentException("A physical signal requires its identity and unit.");
+            }
+            if (!Set.of("V", "A", "ohm", "1").contains(unit) || discrete != unit.equals("1")) {
+                throw new IllegalArgumentException("The physical unit must match the signal comparison mode.");
+            }
+        }
+    }
+
+    /** Compares one aligned committed step using physical units and exact binary states. */
+    public static ComparisonResult comparePhysicalStep(int step, double expectedTime, double actualTime,
+            List<PhysicalSignal> signals, double[] expected, double[] actual,
+            double relativeTolerance, Map<String, Double> absoluteTolerances, double timestampTolerance) {
+        if (!Double.isFinite(relativeTolerance) || relativeTolerance < 0
+                || !Double.isFinite(timestampTolerance) || timestampTolerance < 0
+                || absoluteTolerances.values().stream().anyMatch(value -> value == null || !Double.isFinite(value) || value < 0)) {
+            throw new IllegalArgumentException("Physical comparison limits must be finite and nonnegative.");
+        }
+        if (!Double.isFinite(expectedTime) || !Double.isFinite(actualTime)
+                || Math.abs(expectedTime - actualTime) > timestampTolerance) {
+            return ComparisonResult.mismatch(step, "time [s]", expectedTime, actualTime);
+        }
+        if (expected.length != signals.size() || actual.length != signals.size()) {
+            return ComparisonResult.mismatch(step, "physical signal count", expected.length, actual.length);
+        }
+        for (int index = 0; index < signals.size(); index++) {
+            PhysicalSignal signal = signals.get(index);
+            double reference = expected[index];
+            double observed = actual[index];
+            double limit = signal.discrete() ? 0 : Math.max(absoluteTolerances.get(signal.unit()),
+                    relativeTolerance * Math.abs(reference));
+            boolean invalidBinary = signal.discrete()
+                    && ((reference != 0 && reference != 1) || (observed != 0 && observed != 1));
+            if (!Double.isFinite(reference) || !Double.isFinite(observed) || invalidBinary
+                    || Math.abs(reference - observed) > limit) {
+                return ComparisonResult.mismatch(step, signal.name() + " [" + signal.unit() + "] limit=" + limit,
+                        reference, observed);
+            }
+        }
+        return ComparisonResult.ok();
+    }
+
     /**
      * One time step of simulation trace data.
      */

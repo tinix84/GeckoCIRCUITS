@@ -91,5 +91,38 @@ To preserve existing fixtures, use `--supplement --evidence-name reference-accep
 Supplement mode requires exact decoded trace equality and matching physical schemas before it appends evidence.
 
 Stop for the user's absolute-tolerance review before any Core comparison.
-The manifest keeps comparison disabled until that review.
+The manifest records approval before comparison becomes enabled.
 The existing application, reactor, and regression gates remain necessary after the review.
+
+## Compare Core with the accepted references
+
+The user approved absolute floors of `6e-11 V`, `6e-11 A`, and `4e-9 ohm` on 2026-11-23.
+The manifest records this decision.
+The comparison retains the 1% relative limit, exact binary checks, and 1 ps timestamp limit.
+
+```bash
+mvn -f src/modules/gecko-simulation-core/pom.xml test -Papplication
+bash scripts/verify-ci.sh
+xvfb-run -a mvn -f pom-reactor.xml test -pl . -am -Pregression
+```
+
+`ReleaseTraceApplicationTest` runs all ten circuits and rejects a 5% in-memory reference mutation.
+It also rejects command/state flips and shifted or missing steps during matching simulations.
+`PhysicalTraceComparisonTest` checks binary flips, timestamp shifts, missing values, nonfinite values, and unit-specific floors.
+`ReleaseTraceFixtureValidationTest` rejects malformed schemas, missing signals, truncated rows, duplicate times, and empty traces.
+Accepted files remain unchanged during these controls.
+
+The Core mapping resolves saved component identifiers and terminal connectivity before reading numerical values.
+Node voltage comparisons use the release's explicit physical datum.
+Auxiliary currents remain separate from component current reports.
+
+Release compatibility includes two observable semiconductor conventions in `LKMatrices.java`:
+
+- THYR and IGBT current reports subtract `Uf` even while the device blocks.
+- Incremental switching corrections use `Uf/R` in both states. The next ordinary vector build omits the blocking source term.
+
+These conventions can make a reported device current differ from the MNA branch current.
+Focused tests check both quantities separately and retain source-to-resistor current balance.
+The standalone stamper equations retain their existing behavior.
+Saved anonymous CONTROL ports use the release terminal layouts to recover connections that touch on the schematic.
+Explicit captured terminal positions take precedence over this recovery.
