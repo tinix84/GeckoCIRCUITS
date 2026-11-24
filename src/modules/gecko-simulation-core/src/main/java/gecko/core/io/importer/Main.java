@@ -6,6 +6,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 
 /** Command-line circuit conversion. Diagnostics use one structured JSON object per line. */
 public final class Main {
@@ -15,10 +16,13 @@ public final class Main {
 
     /** Returns zero for a complete import, two for a partial import, or one for an input/output error. */
     public static int run(String[] args, PrintStream output, PrintStream errors) {
-        if (args.length != 2) { errors.println("Usage: gecko.core.io.importer.Main <input.cir> <output.ipes>"); return 1; }
+        if (args.length != 2) { errors.println("Usage: gecko.core.io.importer.Main <input.cir|input.plecs> <output.ipes>"); return 1; }
         try {
             Path input = Path.of(args[0]);
-            var model = new SpiceImporter().convert(Files.readString(input, StandardCharsets.UTF_8), input.toString());
+            String source = Files.readString(input, StandardCharsets.UTF_8);
+            var model = input.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".plecs")
+                    ? new PlecsImporter().convert(source, input.toString())
+                    : new SpiceImporter().convert(source, input.toString());
             new CircuitFileWriter().write(model, Path.of(args[1]));
             for (var issue : model.getImportIssues()) output.println("{\"code\":" + json(issue.code())
                     + ",\"domain\":" + json(issue.domain()) + ",\"component\":" + json(issue.component())
