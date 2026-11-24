@@ -1,7 +1,9 @@
 package gecko.core.preparation;
 
+import gecko.core.allg.SolverType;
 import gecko.core.io.CircuitModel;
 import gecko.core.io.ImportIssue;
+import gecko.core.simulation.SimulationTiming;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -62,6 +64,12 @@ public final class CircuitPreparation {
             if (positive(settings.duration())) model.setSimulationDuration(settings.duration());
             else diagnostics.add(invalidSetting("duration", "Simulation duration must be finite and positive"));
         }
+        if (!settings.features().valid()) {
+            diagnostics.add(invalidSetting("controlSamplePeriod", "CONTROL sample period must be finite and non-negative"));
+        }
+        if (settings.features().zeroCrossing() && model.getSolverType() == SolverType.SOLVER_GS) {
+            diagnostics.add(invalidSetting("zeroCrossing", SimulationTiming.GS_ZERO_CROSSING_MESSAGE));
+        }
         model.getImportIssues().removeIf(issue -> issue.code().equals("INVALID_SETTING")
                 && switch (issue.parameterPath() == null ? "" : issue.parameterPath()) {
                     case "solver" -> settings.solver() != null;
@@ -93,7 +101,7 @@ public final class CircuitPreparation {
         var report = new ReadinessReport(outcome, diagnostics);
         if (rejected) return new PreparationResult.Rejected(report);
         if (!report.readyForHeadless()) return new PreparationResult.Inspectable(snapshot, report);
-        return new PreparationResult.Ready(snapshot, new PreparedCircuit(snapshot), report);
+        return new PreparationResult.Ready(snapshot, new PreparedCircuit(snapshot, settings.features()), report);
     }
     private static boolean positive(double value) { return Double.isFinite(value) && value > 0; }
     private static Diagnostic invalidSetting(String path, String message) {
