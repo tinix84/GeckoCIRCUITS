@@ -96,13 +96,21 @@ public class UPbot {
             progress = Math.min(progress + 6, 99); // update progress
             String wikiCode = sa.getText();
             progress = Math.min(progress + 1, 99); // update progress
-            wikiCode = wikiCode.replace(InitParameters.END_DELIMITER + key, newTranslation + InitParameters.SEPARATOR + title + "\n" + InitParameters.END_DELIMITER + key);
+            wikiCode =
+                    wikiCode.replace(
+                            InitParameters.END_DELIMITER + key,
+                            newTranslation
+                                    + InitParameters.SEPARATOR
+                                    + title
+                                    + "\n"
+                                    + InitParameters.END_DELIMITER
+                                    + key);
             progress = Math.min(progress + 1, 99); // update progress
             sa.setText(wikiCode);
             progress = Math.min(progress + 4, 99); // update progress
             b.writeContent(sa);
             connected = true;
-        } catch(Exception e) {
+        } catch (Exception e) {
             new TranslationDialog(InitParameters.DATABASE_ERROR_MESSAGEa,InitParameters.DATABASE_ERROR_MESSAGEc).setVisible(true);
             connected = false;
         }
@@ -165,7 +173,15 @@ public class UPbot {
 
             SimpleArticle sa = b.readData(InitParameters.MULTIPLE_SUGGESTIONS_PAGE + "_" + InitParameters.getCurrentLanguageCode());
             String wikiCode = sa.getText();
-            wikiCode = wikiCode.replace(InitParameters.END_DELIMITER + key, suggestionTitle + InitParameters.SEPARATOR + commentTitle + "\n" + InitParameters.END_DELIMITER + key);
+            wikiCode =
+                    wikiCode.replace(
+                            InitParameters.END_DELIMITER + key,
+                            suggestionTitle
+                                    + InitParameters.SEPARATOR
+                                    + commentTitle
+                                    + "\n"
+                                    + InitParameters.END_DELIMITER
+                                    + key);
             sa.setText(wikiCode);
             b.writeContent(sa);
             connected = true;

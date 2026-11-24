@@ -87,17 +87,17 @@ public final class ReglerSmallSignalAnalysis extends RegelBlock {
         XIN.add(new TerminalControlInputWithLabel(this, -4, XIN.size(), "measure"));
         XIN.add(new TerminalControlInputWithLabel(this, -4, -XIN.size(), "signal"));
         YOUT.add(new TerminalControlOutputWithLabel(this, 3, YOUT.size(), "out"));
-        _signalType.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if(_signalType.getValue() == SSAShape.EXTERNAL) {
-                    XIN.add(externalExcitationTerm);
-                } else {
-                    XIN.remove(externalExcitationTerm);
-                }
-
-            }
-        });
+        _signalType.addActionListener(
+                new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        if (_signalType.getValue() == SSAShape.EXTERNAL) {
+                            XIN.add(externalExcitationTerm);
+                        } else {
+                            XIN.remove(externalExcitationTerm);
+                        }
+                    }
+                });
     }
 
     @Override

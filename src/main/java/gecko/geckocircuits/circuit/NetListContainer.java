@@ -24,19 +24,22 @@ public final class NetListContainer {
 
     public static NetListContainer fabricStartSimulation(final SchematicEditor2 schematicEntry, SimulationsKern simKern) {
         schematicEntry.checkNameOptParameters();
-        NetzlisteAllg nlC1 = NetzlisteAllg.fabricNetzlistDisabledParentSubsRemoved(schematicEntry.getConnection(ConnectorType.CONTROL), schematicEntry.getElementCONTROL());
+        NetzlisteAllg nlC1 =
+                NetzlisteAllg.fabricNetzlistDisabledParentSubsRemoved(
+                        schematicEntry.getConnection(ConnectorType.CONTROL),
+                        schematicEntry.getElementCONTROL());
         NetListLK nlL = schematicEntry.getNetzliste(ConnectorType.LK_AND_RELUCTANCE);
 
         NetListLK nlT = schematicEntry.getNetzliste(ConnectorType.THERMAL);
         NetzlisteCONTROL nlC = NetzlisteCONTROL.fabricRunSimulation(nlC1);
 
-        for(AbstractCircuitSheetComponent elem : schematicEntry._circuitSheet.getAllElements()) {
-            if(elem instanceof AbstractCircuitBlockInterface) {
+        for (AbstractCircuitSheetComponent elem : schematicEntry._circuitSheet.getAllElements()) {
+            if (elem instanceof AbstractCircuitBlockInterface) {
                 AbstractCircuitBlockInterface comp = (AbstractCircuitBlockInterface) elem;
                 comp._currentInAmps = 0;
                 comp._voltage = 0;
             }
-            if(elem instanceof AbstractCircuitBlockInterface) {
+            if (elem instanceof AbstractCircuitBlockInterface) {
                 ((AbstractCircuitBlockInterface) elem).setzeParameterZustandswerteAufNULL();
             }
 

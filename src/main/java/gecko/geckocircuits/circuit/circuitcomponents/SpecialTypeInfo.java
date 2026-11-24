@@ -27,7 +27,11 @@ public class SpecialTypeInfo extends AbstractTypeInfo {
         super(typeClass, idString, typeDescription);
     }
 
-    public SpecialTypeInfo(Class<? extends AbstractBlockInterface> typeClass, String idString, I18nKeys typeDescription, I18nKeys typeDescriptionVerbose) {
+    public SpecialTypeInfo(
+            Class<? extends AbstractBlockInterface> typeClass,
+            String idString,
+            I18nKeys typeDescription,
+            I18nKeys typeDescriptionVerbose) {
         super(typeClass, idString, typeDescription, typeDescriptionVerbose);
     }
 

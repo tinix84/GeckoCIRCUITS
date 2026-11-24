@@ -37,13 +37,14 @@ public class DiodeCharacteristic {
         double[][] data = curve.data;
 
         final List<DiodeSegment> diodeSegments = new ArrayList<DiodeSegment>();
-        for(int i = 0; i < data[0].length; i++) {
-            if( i > 0) {
-                DiodeSegment ds = new DiodeSegment(data[0][i-1], data[0][i], data[1][i-1], data[1][i]);
-                if(i == 1) {
+        for (int i = 0; i < data[0].length; i++) {
+            if (i > 0) {
+                DiodeSegment ds =
+                        new DiodeSegment(data[0][i - 1], data[0][i], data[1][i - 1], data[1][i]);
+                if (i == 1) {
                     ds.setLargeLowerVoltage();
                 }
-                if(i == data[0].length -1) {
+                if (i == data[0].length - 1) {
                     ds.setLargeUpperVoltage();
                 }
                 diodeSegments.add(ds);
@@ -57,7 +58,9 @@ public class DiodeCharacteristic {
 
     public boolean testIfWrongSegment(double time, double voltage, double stoergroesse, double acceptanceThreshold) {
         int result = activeSegment.testIfInInterval(time, voltage, stoergroesse, acceptanceThreshold);
-        if(result == 0) { return false; }
+        if (result == 0) {
+            return false;
+        }
         activeIndex += result;
         activeSegment = _diodeSegments[activeIndex];
 

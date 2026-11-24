@@ -62,8 +62,8 @@ public class DetailedSwitchingLossesPanel extends DetailledLossPanel<SwitchingLo
     @Override
     LossCurve createNewCurve(final double curveTemperatureParameter) {
         final double blockingVoltage = _jtfUb.getNumberFromField();
-        final SwitchingLossCurve messkurve = new SwitchingLossCurve(curveTemperatureParameter, blockingVoltage);
-        return messkurve;
+
+        return new SwitchingLossCurve(curveTemperatureParameter, blockingVoltage);
     }
 
     @Override

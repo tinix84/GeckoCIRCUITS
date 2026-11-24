@@ -27,7 +27,11 @@ public abstract class AbstractCircuitTypeInfo extends AbstractTypeInfo {
         super(typeClass, idString, typeDescription);
     }
 
-    public AbstractCircuitTypeInfo(Class<? extends AbstractBlockInterface> typeClass, String idString, I18nKeys typeDescription, I18nKeys typeDescriptionVerbose) {
+    public AbstractCircuitTypeInfo(
+            Class<? extends AbstractBlockInterface> typeClass,
+            String idString,
+            I18nKeys typeDescription,
+            I18nKeys typeDescriptionVerbose) {
         super(typeClass, idString, typeDescription, typeDescriptionVerbose);
     }
 

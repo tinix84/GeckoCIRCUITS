@@ -13,6 +13,8 @@
  */
 package gecko.geckoscript;
 
+import java.util.Map;
+
 import gecko.Category;
 import gecko.Declaration;
 import gecko.Documentation;
@@ -52,7 +54,7 @@ public final class ScriptWindow extends JFrame {
     String _advancedVariables = "";
     String _advancedConstructor = "";
     boolean _advancedOption = false;
-    HashMap<String, Object> _advancedObjects;
+    Map<String, Object> _advancedObjects;
 
     String _compileSourceCode = "";
     String _workingDirectory;

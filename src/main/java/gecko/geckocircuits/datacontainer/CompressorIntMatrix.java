@@ -41,7 +41,7 @@ public class CompressorIntMatrix {
 
     public CompressorIntMatrix(int[][] dataToCompress) {
         _m = dataToCompress.length;
-        if(_m > 0) {
+        if (_m > 0) {
             _n = dataToCompress[0].length;
         } else { // this could happen if we don't have a scope in the model!
             _n = 0;
@@ -154,7 +154,7 @@ public class CompressorIntMatrix {
     }
 
     private static void recycleByteArray(final byte[] toRecycle) {
-        if(_byteArrayCache.size() > 50) {
+        if (_byteArrayCache.size() > 50) {
             _byteArrayCache.clear();
         }
         _byteArrayCache.put(toRecycle.length, toRecycle);
@@ -164,7 +164,7 @@ public class CompressorIntMatrix {
 
 
         int m = 0;
-        if(val.length > 0) { // == 0 can happen when no scope is available!
+        if (val.length > 0) { // == 0 can happen when no scope is available!
             m = val[0].length;
         }
 

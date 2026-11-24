@@ -37,17 +37,18 @@ public final class ReglerGain extends AbstractReglerSingleInputSingleOutput {
 
     public ReglerGain() {
         super();
-        _gain.addActionListener(new ActionListener() {
+        _gain.addActionListener(
+                new ActionListener() {
 
-            @Override
-            public void actionPerformed(final ActionEvent event) {
-                if(_calculator instanceof GainCalculator) {
-                    ((GainCalculator) _calculator).setGain(_gain.getValue());
-                    return;
-                }
-                assert _calculator == null;
-            }
-        });
+                    @Override
+                    public void actionPerformed(final ActionEvent event) {
+                        if (_calculator instanceof GainCalculator) {
+                            ((GainCalculator) _calculator).setGain(_gain.getValue());
+                            return;
+                        }
+                        assert _calculator == null;
+                    }
+                });
     }
 
 

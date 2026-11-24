@@ -280,8 +280,10 @@ public enum I18nKeys {
     PLEASE_CONSIDER_UPDATE("Please consider to update your Software to the newest version."),
     YOU_CAN_FIND_UPDATE_INFO("You can find update information in the menu Help -> Updates."),
     SELECT_A_SIMULATION_MODE_FROM_LIST("Select a simulation model from the list. "),
-    WE_WANT_TO_IMPROVE_OUR_SOFTWARE("<html>We want to improve our software! If you would like to submit a bug-report, <br>give us suggestions about features that we should implement in the software, <br>or you have other issues, then please visit our bugtracking homepage:"),
-    BATIK_LICENSE("GeckoCIRCUITS uses the \"Batik SVG Vector-Graphics libraries\" and \"JSyntaxPane\", which are both licensed under the Apache License (Version 2.0):"),
+    WE_WANT_TO_IMPROVE_OUR_SOFTWARE(
+            "<html>We want to improve our software! If you would like to submit a bug-report, <br>give us suggestions about features that we should implement in the software, <br>or you have other issues, then please visit our bugtracking homepage:"),
+    BATIK_LICENSE(
+            "GeckoCIRCUITS uses the \"Batik SVG Vector-Graphics libraries\" and \"JSyntaxPane\", which are both licensed under the Apache License (Version 2.0):"),
     YOU_ATTEMPTED_TO_CLOSE_WHILE_SIMULINK("You attempted to close GeckoCIRCUITS while running in Simulink-mode."),
     ONLY_CLOSING_MATLAB("Please note that only closing your MATLAB session will close GeckoCIRCUITS."),
     BEFORE_EXITING_GECKOCIRCITS("before exiting GeckoCIRCUITS?"),
@@ -372,7 +374,7 @@ public enum I18nKeys {
     TEMPERATURE_MEASUREMENT("Temperature Measurement"),
     NO_THERMAL_COMPONENTS_DETECTED("No thermal components detected in circuit sheet."),
     MEASURED_TEMPERATURE_K("measured temperature (K)"),
-    TANGENS_OF_INPUT_RAD("Tangens of input (rad)" ),
+    TANGENS_OF_INPUT_RAD("Tangens of input (rad)"),
     INPUT_1_MINUS_INPUT_2("input 1 minus input 2"),
     SPACE_VECTOR_DIAGRAM("Space Vector Diagram"),
     SDFT("SDFT"),
@@ -814,36 +816,39 @@ public enum I18nKeys {
                 + " reached (1 if yes, 0 if no), the second the time at which steady state was reached and the third"
                 + " the steady-state period.<br><br>"
                 + "Example: double steadyStateResults = simulateUntilSteadyState(true);"),
-    SIMULATE_TO_STEADY_STATE_DEFAULT("Simulates a model until periodic steady-state is detected or until the end of the defined simulation time."
-                + " The function \"initSteadyStateDetection()\" must be called first with the appropriate arguments. Setting "
-                + " \"supressMessages\" to \"true\" omits the printing of messages by the function to the GeckoSCRIPT output"
-                + " pane and thus speeds up execution. Returned is an array with the results of the steady-state"
-                + " detection procedure. The first element in the returned array indicates if steady state has been"
-                + " reached (1 if yes, 0 if no), the second the time at which steady state was reached and the third"
-                + " the steady-state period. This function uses the default internal GeckoCIRCUITS values for the steady-state detection criteria. To specify these criteria directly, use the version of this function with the two extra arguments.<br><br>"
-                + "Example: double steadyStateResults = simulateToSteadyState(true);"),
-    SIMULATE_TO_STEADY_STATE("Simulates a model until periodic steady-state is detected or until the end of the defined simulation time."
-                + " The function \"initSteadyStateDetection()\" must be called first with the appropriate arguments. Setting "
-                + " \"supressMessages\" to \"true\" omits the printing of messages by the function to the GeckoSCRIPT output"
-                + " pane and thus speeds up execution. Steady-state is detected by comparing two subsequent periods of simulation"
-                + " by two criteria: the cross-correlation coefficient between the two periods, and the difference between the average values (RMS for waveforms with no DC offset)"
-                + " of the two periods. In an ideal case, these are 1.0 and 0.0 respectively, but in reality this rarely occurs. Therefore, more realistic values"
-                + " must be specified by the arguments \"targetCorrelation\" and \"targetMeanPctDiff\", respectively, e.g. 0.998 and 0.005 (corresponding to 0.5%)."
-                + " Steady-state is considered to be reached when the calculated correlation is above the target value, and the average (mean or RMS) percent difference is below the target value."
-                + " Returned is an array with the results of the steady-state"
-                + " detection procedure. The first element in the returned array indicates if steady state has been"
-                + " reached (1 if yes, 0 if no), the second the time at which steady state was reached and the third"
-                + " the steady-state period.<br><br>"
-                + "Example: double steadyStateResults = simulateToSteadyState(true,0.98,0.01);"),
-    GET_FOURIER_1_DOC("Performs an FFT on the data stored in the specified channel of the specified SCOPE, where SCOPE ports are numbered"
-                + " from zero starting with the upper-most port on the SCOPE circuit symbol. This function gives the same functionality as the"
-                + " \"Analysis -> Fourier\" menu in the SCOPE window. The times in between which the calculation is to take place must also"
-                + " be specified; \"startTime\" cannot be less than 0 and \"endTime\" cannot be greater than the total simulation time. "
-                + "The number of terms of the Fourier series expansion i.e. harmonics must also be specified. Returned is a two-dimensional "
-                + "array which contains the Fourier series coefficients in the following format: [coefficient][coefficient value for <i>n</i>th harmonic]"
-                + " where the first (cofficient) index 0 contains coefficient a<sub><i>n</i></sub>, index 1 coefficient b<sub><i>n</i></sub>, index 2 the magnitude c<sub><i>n</i></sub> and index 3"
-                + " the phase angle <i>&phi;<sub>n</sub></i>.<br><br>"
-                + "Example: double FFT = getFourier(\"SCOPE.1\",2,0.00001,150e-3,20);<br> where the aforementioned coefficients for the e.g. 5th harmonic would be located in FFT[0][5], FFT[1][5], FFT[2][5], FFT[3][5]."),
+    SIMULATE_TO_STEADY_STATE_DEFAULT(
+            "Simulates a model until periodic steady-state is detected or until the end of the defined simulation time."
+                    + " The function \"initSteadyStateDetection()\" must be called first with the appropriate arguments. Setting "
+                    + " \"supressMessages\" to \"true\" omits the printing of messages by the function to the GeckoSCRIPT output"
+                    + " pane and thus speeds up execution. Returned is an array with the results of the steady-state"
+                    + " detection procedure. The first element in the returned array indicates if steady state has been"
+                    + " reached (1 if yes, 0 if no), the second the time at which steady state was reached and the third"
+                    + " the steady-state period. This function uses the default internal GeckoCIRCUITS values for the steady-state detection criteria. To specify these criteria directly, use the version of this function with the two extra arguments.<br><br>"
+                    + "Example: double steadyStateResults = simulateToSteadyState(true);"),
+    SIMULATE_TO_STEADY_STATE(
+            "Simulates a model until periodic steady-state is detected or until the end of the defined simulation time."
+                    + " The function \"initSteadyStateDetection()\" must be called first with the appropriate arguments. Setting "
+                    + " \"supressMessages\" to \"true\" omits the printing of messages by the function to the GeckoSCRIPT output"
+                    + " pane and thus speeds up execution. Steady-state is detected by comparing two subsequent periods of simulation"
+                    + " by two criteria: the cross-correlation coefficient between the two periods, and the difference between the average values (RMS for waveforms with no DC offset)"
+                    + " of the two periods. In an ideal case, these are 1.0 and 0.0 respectively, but in reality this rarely occurs. Therefore, more realistic values"
+                    + " must be specified by the arguments \"targetCorrelation\" and \"targetMeanPctDiff\", respectively, e.g. 0.998 and 0.005 (corresponding to 0.5%)."
+                    + " Steady-state is considered to be reached when the calculated correlation is above the target value, and the average (mean or RMS) percent difference is below the target value."
+                    + " Returned is an array with the results of the steady-state"
+                    + " detection procedure. The first element in the returned array indicates if steady state has been"
+                    + " reached (1 if yes, 0 if no), the second the time at which steady state was reached and the third"
+                    + " the steady-state period.<br><br>"
+                    + "Example: double steadyStateResults = simulateToSteadyState(true,0.98,0.01);"),
+    GET_FOURIER_1_DOC(
+            "Performs an FFT on the data stored in the specified channel of the specified SCOPE, where SCOPE ports are numbered"
+                    + " from zero starting with the upper-most port on the SCOPE circuit symbol. This function gives the same functionality as the"
+                    + " \"Analysis -> Fourier\" menu in the SCOPE window. The times in between which the calculation is to take place must also"
+                    + " be specified; \"startTime\" cannot be less than 0 and \"endTime\" cannot be greater than the total simulation time. "
+                    + "The number of terms of the Fourier series expansion i.e. harmonics must also be specified. Returned is a two-dimensional "
+                    + "array which contains the Fourier series coefficients in the following format: [coefficient][coefficient value for <i>n</i>th harmonic]"
+                    + " where the first (cofficient) index 0 contains coefficient a<sub><i>n</i></sub>, index 1 coefficient b<sub><i>n</i></sub>, index 2 the magnitude c<sub><i>n</i></sub> and index 3"
+                    + " the phase angle <i>&phi;<sub>n</sub></i>.<br><br>"
+                    + "Example: double FFT = getFourier(\"SCOPE.1\",2,0.00001,150e-3,20);<br> where the aforementioned coefficients for the e.g. 5th harmonic would be located in FFT[0][5], FFT[1][5], FFT[2][5], FFT[3][5]."),
     GET_FOURIER_2_DOC("Returns, as a two-dimensional array of doubles, calculated Fourier series coefficients for the"
                 + " waveform at SCOPE channel at port 0 (the upper-most port). Convenient for use with single-port SCOPEs."),
     SET_LOSS_FILE_DOC("Sets the detailed loss model file for a semiconductor element (IGBT, ideal"
@@ -864,8 +869,9 @@ public enum I18nKeys {
     DELETE_COMPONENT_DOC("Deletes the component with the name \"elementName\". In case you like to delete a component"
             + " inside a subcircuit block, please use the path separator \"#\". <br><br>"
             + "Example: deleteComponent(\"SUBCIRCUIT.1#C.5\");"),
-    DELETE_ALL_COMPONENTS_DOC("Deletes all component within the given subcircuit sheet. In case \"null\" <br>is passed as parameter, the whole circuit model will be removed."
-            + "Example: deleteAllComponents(\"SUBCIRCUIT.1\");"),
+    DELETE_ALL_COMPONENTS_DOC(
+            "Deletes all component within the given subcircuit sheet. In case \"null\" <br>is passed as parameter, the whole circuit model will be removed."
+                    + "Example: deleteAllComponents(\"SUBCIRCUIT.1\");"),
     SET_OUTPUT_NODE_NAME_DOC("Sets the output node label to the given value."),
     SET_INPUT_NODE_NAME_DOC("Sets the input node label to the given value."),
     GET_OUTPUT_NODE_NAME_DOC("Return the output node label to the given value."),
@@ -964,12 +970,10 @@ public enum I18nKeys {
             + "   // Function parameter type: String, no return value."),
     SET_COMPONENT_COUPLING("Example: doOperation(\"GATE.1\", \"setComponentCoupling\", \"IGBT.1\");"
             + "   // Function parameter type: String, no return value."),
-    SET_COUPLING_LABEL("Example: doOperation(\"VOLT.1\", \"setCouplingLabel\", \"signal\");"
-            + "   // Function parameter type: String, no return value."),
+    SET_COUPLING_LABEL(
+            "Example: doOperation(\"VOLT.1\", \"setCouplingLabel\", \"signal\");"
+                    + "   // Function parameter type: String, no return value."),
     ;
-
-
-
 
     private final static Map<String, I18nKeys> _keyStringToEnumConstant = new HashMap<String, I18nKeys>();
     final String _keyName;
@@ -991,7 +995,7 @@ public enum I18nKeys {
 
     @Override
     public String toString() {
-        if(_keyName == null) {
+        if (_keyName == null) {
             return super.toString();
         } else {
             return _keyName;

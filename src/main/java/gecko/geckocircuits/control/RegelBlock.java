@@ -12,6 +12,8 @@
  *  GeckoCIRCUITS.  If not, see <http://www.gnu.org/licenses/>.
  */
 package gecko.geckocircuits.control;
+
+import java.util.List;
 import gecko.core.circuit.TokenMap;
 
 import gecko.geckocircuits.allg.*;
@@ -129,11 +131,11 @@ public abstract class RegelBlock extends AbstractBlockInterface implements Seria
 
     public abstract I18nKeys[] getOutputDescription();
 
-    public ArrayList<String[]> getOutputs() {
+    public List<String[]> getOutputs() {
         String[] outputs = getOutputNames();
         I18nKeys[] outputkeys = getOutputDescription();
         String[] output_description = new String[outputkeys.length];
-        for(int i = 0; i < outputkeys.length; i++) {
+        for (int i = 0; i < outputkeys.length; i++) {
             output_description[i] = LangInit.getTranslatedString(outputkeys[i]);
         }
 
@@ -141,7 +143,7 @@ public abstract class RegelBlock extends AbstractBlockInterface implements Seria
             return new ArrayList<>();
         }
 
-        ArrayList<String[]> outputList = new ArrayList<String[]>();
+        List<String[]> outputList = new ArrayList<String[]>();
         String[] output;
         for (int i = 0; i < outputs.length; i++) {
             output = new String[2];
@@ -291,7 +293,7 @@ public abstract class RegelBlock extends AbstractBlockInterface implements Seria
         String toDraw = getCenteredDrawString();
         final Font oldFont = g2d.getFont();
 
-        int newFontSize = Math.min(dpix-3, oldFont.getSize());
+        int newFontSize = Math.min(dpix - 3, oldFont.getSize());
         final Font newFont = new Font(oldFont.getName(), oldFont.getStyle(), newFontSize);
         g2d.setFont(newFont);
         String secondLine = "";
@@ -420,19 +422,19 @@ public abstract class RegelBlock extends AbstractBlockInterface implements Seria
     }
 
     public ControlType getType() {
-        if(!XIN.isEmpty() && !YOUT.isEmpty()) {
+        if (!XIN.isEmpty() && !YOUT.isEmpty()) {
             return ControlType.TRANSFER;
         }
 
-        if(XIN.isEmpty() && !YOUT.isEmpty()) {
+        if (XIN.isEmpty() && !YOUT.isEmpty()) {
             return ControlType.SOURCE;
         }
 
-        if(!XIN.isEmpty() && YOUT.isEmpty()) {
+        if (!XIN.isEmpty() && YOUT.isEmpty()) {
             return ControlType.SINK;
         }
 
-        if(XIN.isEmpty() && YOUT.isEmpty()) {
+        if (XIN.isEmpty() && YOUT.isEmpty()) {
             // data export has no inputs, but should be executed at the end
             return ControlType.SINK;
         }

@@ -40,7 +40,7 @@ public class DragTest extends JFrame implements DragSourceListener,
 
   StringSelection transferable;
 
-  String[] items = { "Java", "C", "C++", "Lisp", "Perl", "Python" };
+    String[] items = {"Java", "C", "C++", "Lisp", "Perl", "Python"};
 
   public DragTest() {
     super("Drag Test");

@@ -49,7 +49,7 @@ public class Verbindung extends AbstractCircuitSheetComponent implements Compone
 
     public Verbindung(final ConnectorType connectorType, final CircuitSheet parentSheet) {
         this(connectorType);
-        if(! (this instanceof VerbindungShortConnector)) {
+        if (!(this instanceof VerbindungShortConnector)) {
             setParentCircuitSheet(parentSheet);
         }
     }

@@ -30,7 +30,7 @@ public enum LabelPriority {
     }
 
     public static LabelPriority getHighesPriority(LabelPriority prio1, LabelPriority prio2) {
-        if(prio1._numericValue >= prio2._numericValue) {
+        if (prio1._numericValue >= prio2._numericValue) {
             return prio1;
         } else {
             return prio2;

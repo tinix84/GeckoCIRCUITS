@@ -54,14 +54,15 @@ public class DialogAbout extends JDialog {
     public static final int RELEASENUMBER = 202;
     public static final int BUILD_NUMBER = 82;
 
-
     /**
      * Creates and initializes the About dialog.
      *
      * Loads application icons, formats the release date, and builds the GUI.
      * The dialog is modal and will dispose when closed.
      */
-    @SuppressWarnings("this-escape")  // JDialog superclass is fully initialized, setIconImage() call is safe; refactoring would make code more complex without benefit
+    @SuppressWarnings(
+            "this-escape") // JDialog superclass is fully initialized, setIconImage() call is safe;
+                           // refactoring would make code more complex without benefit
     public DialogAbout() {
         super.setModal(true);
         try {

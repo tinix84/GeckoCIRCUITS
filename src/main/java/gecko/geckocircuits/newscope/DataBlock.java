@@ -67,7 +67,7 @@ public class DataBlock {
     }
 
     public final int findTimeIndex(final double time) {
-        final int blockIndex = (int) ((time - _startValue)/_dt);
+        final int blockIndex = (int) ((time - _startValue) / _dt);
         return _startIndex + blockIndex;
     }
 

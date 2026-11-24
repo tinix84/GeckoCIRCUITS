@@ -42,8 +42,15 @@ class MotorSmRoundDialog extends AbstractMotorDialog<MotorSmRound> {
 
     @Override
     List<UserParameter<Double>> getInitPanelParameters() {
-        return Arrays.asList(element._initialRotationalSpeed, element._initialRotorPosition, element.initialStatorCurrentA, element.initialStatorCurrentB,
-                element.initialFieldCurrent, element._initDampCurrentPar, element.initialStatorFluxD, element.initialStatorFluxQ);
+        return Arrays.asList(
+                element._initialRotationalSpeed,
+                element._initialRotorPosition,
+                element.initialStatorCurrentA,
+                element.initialStatorCurrentB,
+                element.initialFieldCurrent,
+                element._initDampCurrentPar,
+                element.initialStatorFluxD,
+                element.initialStatorFluxQ);
     }
 
     @Override

@@ -36,8 +36,8 @@ public enum SolverType {
     }
 
     public static SolverType getFromOldGeckoIndex(final int oldIndex) {
-        for(SolverType type : values()) {
-            if(type._oldGeckoIndex == oldIndex) {
+        for (SolverType type : values()) {
+            if (type._oldGeckoIndex == oldIndex) {
                 return type;
             }
         }

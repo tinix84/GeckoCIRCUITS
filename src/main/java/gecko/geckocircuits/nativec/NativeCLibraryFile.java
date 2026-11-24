@@ -27,23 +27,23 @@ public final class NativeCLibraryFile {
     private String _libPathName;
     private File _libFile;
 
-    public NativeCLibraryFile () {
+    public NativeCLibraryFile() {
         // no-op
     }
 
-    public NativeCLibraryFile (final String fileName) throws FileNotFoundException {
+    public NativeCLibraryFile(final String fileName) throws FileNotFoundException {
         setFile(fileName);
     }
 
-    public NativeCLibraryFile (final File file) throws FileNotFoundException {
+    public NativeCLibraryFile(final File file) throws FileNotFoundException {
         setFile(file);
     }
 
-    public String getFileName () {
+    public String getFileName() {
         return _libPathName;
     }
 
-    public void setFile (final File file) throws FileNotFoundException {
+    public void setFile(final File file) throws FileNotFoundException {
         if (file != null) {
             if (!file.exists()) {
                 throw new FileNotFoundException("Could not find Library File " + file.getAbsolutePath());
@@ -55,7 +55,7 @@ public final class NativeCLibraryFile {
         }
     }
 
-    public void setFile (final String fileName) throws FileNotFoundException {
+    public void setFile(final String fileName) throws FileNotFoundException {
         _libFile = new File(fileName);
         if (!_libFile.exists()) {
             throw new FileNotFoundException("Could not find Library File " + fileName);
@@ -65,7 +65,7 @@ public final class NativeCLibraryFile {
         }
     }
 
-    public void setFile () {
+    public void setFile() {
         _libFile = null;
         _libPathName = null;
         _timeStamp = 0;
@@ -75,7 +75,7 @@ public final class NativeCLibraryFile {
         return _libFile;
     }
 
-    public File savegetFile () throws FileNotFoundException {
+    public File savegetFile() throws FileNotFoundException {
         if (_libFile == null || _libPathName == null) {
             throw new FileNotFoundException("No Library File was selected!");
         } else {
@@ -83,7 +83,7 @@ public final class NativeCLibraryFile {
         }
     }
 
-    public String savegetFileName () throws FileNotFoundException {
+    public String savegetFileName() throws FileNotFoundException {
         if (_libFile == null || _libPathName == null) {
             throw new FileNotFoundException("No Library File was selected!");
         } else {
@@ -96,11 +96,11 @@ public final class NativeCLibraryFile {
      * revision control.
      * @return
      */
-    public long getTimeStamp () {
+    public long getTimeStamp() {
         return _timeStamp;
     }
 
-    public boolean updateTimeStamp () throws FileNotFoundException {
+    public boolean updateTimeStamp() throws FileNotFoundException {
         long newTimeStamp;
         if (_libFile == null) {
             throw new FileNotFoundException("No Library File was selected!");

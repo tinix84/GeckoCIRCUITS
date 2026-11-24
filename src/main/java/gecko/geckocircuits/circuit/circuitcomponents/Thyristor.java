@@ -38,14 +38,13 @@ public final class Thyristor extends AbstractVoltageDropSwitch {
     private static final int GATE_SIGNAL_INDEX = 8;
     private static final int LAST_SWITCH_TIME_INDEX = 11;
 
-    final UserParameter<Double> _reverseRecoveryDelay = UserParameter.Builder.
-	<Double>start("reverserecoverydelay", 0.0).
-	longName(I18nKeys.REVERSE_RECOVERY_DELAY).
-	shortName("t_rr").
-	unit("sec").
-	arrayIndex(this,REVERSE_RECOV_INDEX).
-	build();
-
+    final UserParameter<Double> _reverseRecoveryDelay =
+            UserParameter.Builder.<Double>start("reverserecoverydelay", 0.0)
+                    .longName(I18nKeys.REVERSE_RECOVERY_DELAY)
+                    .shortName("t_rr")
+                    .unit("sec")
+                    .arrayIndex(this, REVERSE_RECOV_INDEX)
+                    .build();
 
     public Thyristor() {
         super();

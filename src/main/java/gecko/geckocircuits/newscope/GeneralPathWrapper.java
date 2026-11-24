@@ -25,12 +25,12 @@ import java.awt.geom.Point2D;
  * point is just moved to the newly inserted point.
  * @author andy
  */
-final class GeneralPathWrapper{
+final class GeneralPathWrapper {
   private final GeneralPath _generalPath = new GeneralPath();
   private Point2D _lastInsertPoint;
   private Point2D _lastPathpoint;
 
-  void moveTo(final float xPixel, final float yPixel){
+    void moveTo(final float xPixel, final float yPixel) {
     _generalPath.moveTo(xPixel, yPixel);
     _lastInsertPoint = new Point2D.Float(xPixel, yPixel);
   }
@@ -39,36 +39,36 @@ final class GeneralPathWrapper{
     // TODO: implement symbol painting
   }
 
-  void lineTo(final float xPixel, final float yPixel){
-    if(detectSimplification(xPixel, yPixel)){
+    void lineTo(final float xPixel, final float yPixel) {
+        if (detectSimplification(xPixel, yPixel)) {
       _lastInsertPoint = new Point2D.Float(xPixel, yPixel);
-      //_generalPath.moveTo(xPixel, yPixel);
-    }else{
+            // _generalPath.moveTo(xPixel, yPixel);
+        } else {
       _lastPathpoint = _lastInsertPoint;
       _lastInsertPoint = new Point2D.Float(xPixel, yPixel);
 
-      if(_lastPathpoint != null){
+            if (_lastPathpoint != null) {
         _generalPath.lineTo(_lastPathpoint.getX(), _lastPathpoint.getY());
       }
     }
 
   }
 
-  void draw(final Graphics2D g2d){
+    void draw(final Graphics2D g2d) {
     g2d.draw(_generalPath);
-    if(_lastInsertPoint != null && _lastPathpoint != null){
+        if (_lastInsertPoint != null && _lastPathpoint != null) {
       final Line2D.Float lastLine = new Line2D.Float(_lastInsertPoint, _lastPathpoint);
       g2d.draw(lastLine);
     }
 
   }
 
-  /*
-   * if points are nearly on a line, and pixel distance < 10
-   */
-  private boolean detectSimplification(final float xPixel, final float yPixel){
+    /*
+     * if points are nearly on a line, and pixel distance < 10
+     */
+    private boolean detectSimplification(final float xPixel, final float yPixel) {
 
-    if(_lastPathpoint == null || _lastInsertPoint == null){
+        if (_lastPathpoint == null || _lastInsertPoint == null) {
       return false;
     }
 
@@ -76,15 +76,15 @@ final class GeneralPathWrapper{
             / (_lastPathpoint.getX() - _lastInsertPoint.getX()));
     final double slope = Math.tan((_lastInsertPoint.getY() - yPixel) / (_lastInsertPoint.getX() - xPixel));
 
-    // if slope direction is changed,(maximum/minimum), do a detailed plot
-    if(Math.signum(slope) != Math.signum(lastSlope)){
+        // if slope direction is changed,(maximum/minimum), do a detailed plot
+        if (Math.signum(slope) != Math.signum(lastSlope)) {
       return false;
     }
 
-    if(xPixel - _lastPathpoint.getX() > 2){
+        if (xPixel - _lastPathpoint.getX() > 2) {
       final Point2D toInsert = new Point2D.Float(xPixel, yPixel);
       final double kruemmung = calculateInvCircleRadius(_lastInsertPoint, _lastPathpoint, toInsert);
-      if(kruemmung > 0.1){
+            if (kruemmung > 0.1) {
         return false;
       }
     }
@@ -92,10 +92,11 @@ final class GeneralPathWrapper{
     return true;
   }
 
-  /*
-   * Given three points, calculate the curvature of the circle through the three points
-   */
-  private double calculateInvCircleRadius(final Point2D point1, final Point2D point2, final Point2D point3){
+    /*
+     * Given three points, calculate the curvature of the circle through the three points
+     */
+    private double calculateInvCircleRadius(
+            final Point2D point1, final Point2D point2, final Point2D point3) {
 
     final double sideA = point1.distance(point2);
     final double sideB = point2.distance(point3);

@@ -73,7 +73,7 @@ public final class GroupableUndoManager extends UndoManager{
     super.redo();
   }
 
-  public static final class GroupUndoStart implements UndoableEdit{
+    public static final class GroupUndoStart implements UndoableEdit {
     private final List<UndoableEdit> _mergedEdits = new ArrayList<UndoableEdit>();
     private boolean otherEditsAccepted = true;
 
@@ -82,8 +82,8 @@ public final class GroupableUndoManager extends UndoManager{
       // nothing todo here - the stop event contains all operations!
     }
 
-    @Override
-    public boolean canUndo(){
+        @Override
+        public boolean canUndo() {
       return true;
     }
 
@@ -92,21 +92,21 @@ public final class GroupableUndoManager extends UndoManager{
       // nothing todo - operations done by stop event.
     }
 
-    @Override
-    public boolean canRedo(){
+        @Override
+        public boolean canRedo() {
       return true;
     }
 
-    @Override
-    public void die(){
+        @Override
+        public void die() {
       _mergedEdits.clear();
     }
 
-    @Override
-    public boolean addEdit(final UndoableEdit anEdit){
-      if(anEdit instanceof GroupUndoStop){
+        @Override
+        public boolean addEdit(final UndoableEdit anEdit) {
+            if (anEdit instanceof GroupUndoStop) {
         final GroupUndoStop stop = (GroupUndoStop)anEdit;
-        if(stop._matchingStart.equals(this)){
+                if (stop._matchingStart.equals(this)) {
           stop.addGroupOfOperations(_mergedEdits);
           otherEditsAccepted = false; // "close" the merging functionality!
           return false;
@@ -116,117 +116,117 @@ public final class GroupableUndoManager extends UndoManager{
       return otherEditsAccepted;
     }
 
-    @Override
-    public boolean replaceEdit(final UndoableEdit anEdit){
+        @Override
+        public boolean replaceEdit(final UndoableEdit anEdit) {
       return false;
     }
 
-    @Override
-    public boolean isSignificant(){
+        @Override
+        public boolean isSignificant() {
       return false;
     }
 
-    @Override
-    public String getPresentationName(){
+        @Override
+        public String getPresentationName() {
       return "not available";
     }
 
-    @Override
-    public String getUndoPresentationName(){
+        @Override
+        public String getUndoPresentationName() {
       return "not available";
     }
 
-    @Override
-    public String getRedoPresentationName(){
+        @Override
+        public String getRedoPresentationName() {
       return "not available";
     }
   }
 
-  public final static class GroupUndoStop implements UndoableEdit{
+    public final static class GroupUndoStop implements UndoableEdit {
     private final GroupUndoStart _matchingStart;
     private List<UndoableEdit> _editList;
     private UndoableEdit _parentEdit;
 
-    public GroupUndoStop(final GroupUndoStart matchingStart){
+        public GroupUndoStop(final GroupUndoStart matchingStart) {
       _matchingStart = matchingStart;
     }
 
-    public void setParentEditForInfo(final UndoableEdit edit){
+        public void setParentEditForInfo(final UndoableEdit edit) {
       _parentEdit = edit;
     }
 
-    @Override
-    public void undo() throws CannotUndoException{
+        @Override
+        public void undo() throws CannotUndoException {
 
-      for(UndoableEdit edit : _editList){
+            for (UndoableEdit edit : _editList) {
         edit.undo();
       }
     }
 
-    @Override
-    public boolean canUndo(){
+        @Override
+        public boolean canUndo() {
       return true;
     }
 
-    void addGroupOfOperations(final List<UndoableEdit> editList){
+        void addGroupOfOperations(final List<UndoableEdit> editList) {
       _editList = editList;
     }
 
-    @Override
-    public void redo() throws CannotRedoException{
-      for(int i = _editList.size() - 1; i >= 0; i--){
+        @Override
+        public void redo() throws CannotRedoException {
+            for (int i = _editList.size() - 1; i >= 0; i--) {
         _editList.get(i).redo();
       }
     }
 
-    @Override
-    public boolean canRedo(){
+        @Override
+        public boolean canRedo() {
       return true;
     }
 
-    @Override
-    public void die(){
+        @Override
+        public void die() {
       _editList.clear();
     }
 
-    @Override
-    public boolean addEdit(final UndoableEdit anEdit){
+        @Override
+        public boolean addEdit(final UndoableEdit anEdit) {
       return false;
     }
 
-    @Override
-    public boolean replaceEdit(final UndoableEdit anEdit){
+        @Override
+        public boolean replaceEdit(final UndoableEdit anEdit) {
       return false;
     }
 
-    @Override
-    public boolean isSignificant(){
+        @Override
+        public boolean isSignificant() {
       return true;
     }
 
-    @Override
-    public String getPresentationName(){
-      if(_parentEdit != null){
+        @Override
+        public String getPresentationName() {
+            if (_parentEdit != null) {
         return _parentEdit.getPresentationName();
-      }else{
+            } else {
         return "Multi operation";
       }
     }
 
-    @Override
-    public String getUndoPresentationName(){
-      if(_parentEdit != null){
+        @Override
+        public String getUndoPresentationName() {
+            if (_parentEdit != null) {
         return _parentEdit.getUndoPresentationName();
-      }else{
+            } else {
         return "Operation on multiple components";
       }
     }
 
-    @Override
-    public String getRedoPresentationName(){
-      if(_parentEdit != null){
+        @Override
+        public String getRedoPresentationName() {
+            if (_parentEdit != null) {
         return _parentEdit.getRedoPresentationName();
-      }else{
+            } else {
         return "Operation on multiple components";
       }
     }

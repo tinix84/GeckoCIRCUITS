@@ -192,7 +192,7 @@ public final class ReglerSaveData extends RegelBlock implements Operationable {
             while (testCounter < 100) {
                 String filePath = parentDirectory + "/data" + testCounter + ".txt";
                 File file = new File(filePath);
-                if(!file.exists()) {
+                if (!file.exists()) {
                     return filePath;
                 }
                 testCounter++;
@@ -254,7 +254,9 @@ public final class ReglerSaveData extends RegelBlock implements Operationable {
 
     /** Cancels the export owned by this execution without reporting successful completion. */
     public void cancelSimulationExport() {
-        if (_dataSaver != null) _dataSaver.cancelSimulationExport();
+        if (_dataSaver != null) {
+            _dataSaver.cancelSimulationExport();
+        }
         _statusTxt = "Cancelled";
     }
 

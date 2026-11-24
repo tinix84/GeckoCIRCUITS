@@ -76,7 +76,7 @@ public final class GeckoRemoteRegistry {
         } else {
             GeckoSim.applicationProps.setProperty(PROPERTIES_KEY, String.valueOf(newPortNumber));
         }
-        if(oldPortNumber != newPortNumber) {
+        if (oldPortNumber != newPortNumber) {
             GeckoSim.saveProperties();
         }
     }
@@ -136,7 +136,7 @@ public final class GeckoRemoteRegistry {
             try {
                 _rmiRegistry = LocateRegistry.getRegistry(getRemoteAccessPort());
                 _rmiRegistry.rebind(INTERFACE_NAME, stub);
-            } catch(Throwable throwable) {
+            } catch (Throwable throwable) {
                 _rmiRegistry = LocateRegistry.createRegistry(getRemoteAccessPort());
                 _rmiRegistry.bind(INTERFACE_NAME, stub);
             }
@@ -168,14 +168,14 @@ public final class GeckoRemoteRegistry {
             }
 
             Enumeration<InetAddress> addresses = interFace.getInetAddresses();
-            while(addresses.hasMoreElements()) {
+            while (addresses.hasMoreElements()) {
                 InetAddress address = addresses.nextElement();
                 //System.out.println(interFace.getName() + ": " + address.getHostAddress());
                 machineIPs.add(address.getHostAddress());
             }
         }
-        final String[] localIPs = machineIPs.toArray(new String[0]);
-        return localIPs;
+
+        return machineIPs.toArray(new String[0]);
     }
 
     /**
@@ -190,8 +190,8 @@ public final class GeckoRemoteRegistry {
         //ask a site to get the IP seen on the internet
         URL getMyIP = new URL(_ipQuerySite);
         try (BufferedReader in = new BufferedReader(new InputStreamReader(getMyIP.openStream(), StandardCharsets.UTF_8))) {
-            final String ip = in.readLine(); //the IP is the first line of the page
-            return ip;
+ //the IP is the first line of the page
+            return in.readLine();
         }
     }
 

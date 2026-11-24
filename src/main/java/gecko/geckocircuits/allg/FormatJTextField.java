@@ -89,7 +89,7 @@ public class FormatJTextField extends JTextField {
 
     public double getNumberFromField() {
         String zValue = this.getText();
-        if(zValue.isEmpty()) {
+        if (zValue.isEmpty()) {
             return 0;
         }
         if (zValue.charAt(0) == '$') {
@@ -140,7 +140,7 @@ public class FormatJTextField extends JTextField {
         super.paint(g2d);
 
         if (_lineSettable != null && !getText().equals("-")) {
-            if(_lineSettable.getTransparency() != 0) {
+            if (_lineSettable.getTransparency() != 0) {
                 final AlphaComposite alphaComposite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER,
                         _lineSettable.getTransparency());
                 g2d.setComposite(alphaComposite);

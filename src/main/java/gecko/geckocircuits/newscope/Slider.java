@@ -44,7 +44,7 @@ class Slider {
         graphics.setColor(_sliderColor);
         final int xSPix = (int) xAxis.getPixelFromValue(_xSliderValue);
         graphics.drawLine(xSPix, yMin, xSPix, yMax);
-        if(_lastPaintedX != xSPix) {
+        if (_lastPaintedX != xSPix) {
             _lastPaintedX = xSPix;
         }
     }
@@ -73,11 +73,12 @@ class Slider {
         _xSliderPix = checkedPixelValue;
         setXSliderValue(xAxis.getValueFromPixel(_xSliderPix));
 
-        // this is a graphics optimization, since drawing the whole plot during sliding is too time consuming!
-        final int startXPaint = Math.min(_xSliderPix, _lastPaintedX)-1;
+        // this is a graphics optimization, since drawing the whole plot during sliding is too time
+        // consuming!
+        final int startXPaint = Math.min(_xSliderPix, _lastPaintedX) - 1;
         final int xWidth = Math.max(_xSliderPix, _lastPaintedX) - startXPaint + 2;
-        for(Component comp : repaintComponent.getComponents()) {
-            if(comp instanceof AbstractDiagram) {
+        for (Component comp : repaintComponent.getComponents()) {
+            if (comp instanceof AbstractDiagram) {
                 repaintComponent.repaint(startXPaint, 0, xWidth, MAX_HEIGHT);
             } else {
                 comp.repaint();

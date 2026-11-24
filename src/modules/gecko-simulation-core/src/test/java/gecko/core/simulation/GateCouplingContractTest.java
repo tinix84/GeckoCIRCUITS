@@ -14,6 +14,25 @@ import org.junit.jupiter.params.provider.EnumSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GateCouplingContractTest {
+    @ParameterizedTest
+    @EnumSource(value = CircuitTypCore.class, names = {"LK_S", "LK_MOSFET", "LK_THYR", "LK_IGBT"})
+    void consumedCommandIsIndependentOfPendingParametersAndLaterControlOutputs(CircuitTypCore type) {
+        var netlist = device(type, parameters(type));
+        netlist.getParameter(0)[8] = 1;
+        var gate = new GateCalculator();
+        gate._inputSignal[0] = new double[]{0};
+        var coupler = coupler(gate);
+        assertTrue(Double.isNaN(netlist.getConsumedGateCommand(0)));
+        coupler.applyGateSignals(netlist);
+        assertEquals(0, netlist.getConsumedGateCommand(0));
+        var snapshot = netlist.detachedSnapshot();
+        gate._inputSignal[0][0] = 1;
+        coupler.transferGateSignalsToLk(netlist);
+        assertEquals(0, netlist.getConsumedGateCommand(0));
+        coupler.applyGateSignals(netlist);
+        assertEquals(1, netlist.getConsumedGateCommand(0));
+        assertEquals(0, snapshot.getConsumedGateCommand(0));
+    }
     static CircuitNetlist device(CircuitTypCore type, double[] parameters) {
         var netlist = new CircuitNetlist();
         netlist.initNetlist(new CircuitTypCore[]{type}, new int[]{1}, new int[]{0},

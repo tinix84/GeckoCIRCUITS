@@ -93,114 +93,149 @@ public class NativeCDialog extends GeckoDialog {
         _regNCObj = regObj;
         _con = this.getContentPane();
         _con.setLayout(new BorderLayout());
-        jButtonOpenFile.addActionListener( new ActionListener() {
-            @Override
-            public void actionPerformed(final ActionEvent event) {
-                if (jFileChooser == null) {
-                    initFileChooser();
-                }
-                int returnVal = jFileChooser.showOpenDialog(_thisObj);
-                if (returnVal == JFileChooser.APPROVE_OPTION) {
-                    try {
-                        File currentFile = jFileChooser.getSelectedFile();
-                        if (!isFileNameAlreadyInList(currentFile.getAbsolutePath())) {
-                            _selectedLibFile.setFile(currentFile);
-                            String selectedDLLName = _selectedLibFile.getFileName();
-                            _fileList.addElement(selectedDLLName);
-                            jListLibFiles.setSelectedIndex(_fileList.indexOf(selectedDLLName));
+        jButtonOpenFile.addActionListener(
+                new ActionListener() {
+                    @Override
+                    public void actionPerformed(final ActionEvent event) {
+                        if (jFileChooser == null) {
+                            initFileChooser();
                         }
-                    } catch (FileNotFoundException exc) {
-                        JOptionPane.showMessageDialog(null, exc.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-                    }
-                }
-            }
-        } );
-
-        jButtonRemoveSelection.addActionListener( new ActionListener() {
-            @Override
-            public void actionPerformed(final ActionEvent event) {
-                final int index = jListLibFiles.getSelectedIndex();
-                if(index < 0) {
-                    return;
-                }
-                _fileList.remove(index);
-            }
-        } );
-
-        jButtonOK.addActionListener( new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent event) {
-                // trigger update function to save user data in Paramter Object
-                _regNCObj.triggerUpdate();
-                if (_selectedLibFile.getFile() != null) {
-                    // set name of block to selected Native Library filename
-                    try {
-                        _regNCObj.setNewNameChecked(_selectedLibFile.getFile().getName());
-                    }
-                    catch (NameAlreadyExistsException exc) {
-                        Logger.getLogger(CodeWindowModern.class.getName()).log(Level.SEVERE, null, exc);
-                        JOptionPane.showMessageDialog(null, "Seems like the selected Native Library is already used by another block!", "Error", JOptionPane.ERROR_MESSAGE);
-                    }
-                }
-                _thisObj.dispose();
-            }
-        });
-        jListLibFiles.addListSelectionListener( new ListSelectionListener() {
-            @Override
-            public void valueChanged(ListSelectionEvent event) {
-                if (!event.getValueIsAdjusting()) {
-                    JList source = (JList) event.getSource();
-                    int currentLibNameInd = source.getSelectedIndex();
-                    if (currentLibNameInd >= 0 && currentLibNameInd < _fileList.getSize()) {
-                        try {
-                            _selectedLibFile.setFile((String) _fileList.get(currentLibNameInd));
-                        } catch (FileNotFoundException exc) {
-                            JOptionPane.showMessageDialog(null, exc.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-                        }
-                    }
-                }
-            }
-        } );
-        /** add remove option */
-        jListLibFiles.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mousePressed(final MouseEvent mouseEvent) {
-                //final MouseEvent mouseEvent = e;
-                if (SwingUtilities.isRightMouseButton(mouseEvent)) {
-                    JPopupMenu rightClickMenu = new JPopupMenu();
-                    JMenuItem removeOpt = new JMenuItem("remove");
-                    removeOpt.addActionListener(new ActionListener() {
-                        @Override
-                        public void actionPerformed(ActionEvent event) {
-                            Point point = mouseEvent.getPoint();
-                            int currentInd = jListLibFiles.locationToIndex(point);
-                            if (currentInd >= 0 && currentInd < _fileList.size()) {
-                                String deletedFileName = (String) _fileList.get(currentInd);
-                                // check if selected dll file was removed from list
-                                if ( _selectedLibFile.getFileName() != null && deletedFileName.equals(_selectedLibFile.getFileName())) {
-                                    _selectedLibFile.setFile(); // remove all references to removed file
+                        int returnVal = jFileChooser.showOpenDialog(_thisObj);
+                        if (returnVal == JFileChooser.APPROVE_OPTION) {
+                            try {
+                                File currentFile = jFileChooser.getSelectedFile();
+                                if (!isFileNameAlreadyInList(currentFile.getAbsolutePath())) {
+                                    _selectedLibFile.setFile(currentFile);
+                                    String selectedDLLName = _selectedLibFile.getFileName();
+                                    _fileList.addElement(selectedDLLName);
+                                    jListLibFiles.setSelectedIndex(
+                                            _fileList.indexOf(selectedDLLName));
                                 }
-                                _fileList.remove(currentInd);
-                                // now check if we need to set a selection again
-                                if (jListLibFiles.isSelectionEmpty() && _fileList.size() > 0) {
-                                    try {
-                                        _selectedLibFile.setFile((String) _fileList.get(0));
-                                        jListLibFiles.setSelectedIndex(0);
-                                    } catch (Exception exc) {
-                                        exc.printStackTrace();
-                                        JOptionPane.showMessageDialog(null, exc.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-                                    }
+                            } catch (FileNotFoundException exc) {
+                                JOptionPane.showMessageDialog(
+                                        null, exc.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                            }
+                        }
+                    }
+                });
+
+        jButtonRemoveSelection.addActionListener(
+                new ActionListener() {
+                    @Override
+                    public void actionPerformed(final ActionEvent event) {
+                        final int index = jListLibFiles.getSelectedIndex();
+                        if (index < 0) {
+                            return;
+                        }
+                        _fileList.remove(index);
+                    }
+                });
+
+        jButtonOK.addActionListener(
+                new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent event) {
+                        // trigger update function to save user data in Paramter Object
+                        _regNCObj.triggerUpdate();
+                        if (_selectedLibFile.getFile() != null) {
+                            // set name of block to selected Native Library filename
+                            try {
+                                _regNCObj.setNewNameChecked(_selectedLibFile.getFile().getName());
+                            } catch (NameAlreadyExistsException exc) {
+                                Logger.getLogger(CodeWindowModern.class.getName())
+                                        .log(Level.SEVERE, null, exc);
+                                JOptionPane.showMessageDialog(
+                                        null,
+                                        "Seems like the selected Native Library is already used by another block!",
+                                        "Error",
+                                        JOptionPane.ERROR_MESSAGE);
+                            }
+                        }
+                        _thisObj.dispose();
+                    }
+                });
+        jListLibFiles.addListSelectionListener(
+                new ListSelectionListener() {
+                    @Override
+                    public void valueChanged(ListSelectionEvent event) {
+                        if (!event.getValueIsAdjusting()) {
+                            JList source = (JList) event.getSource();
+                            int currentLibNameInd = source.getSelectedIndex();
+                            if (currentLibNameInd >= 0 && currentLibNameInd < _fileList.getSize()) {
+                                try {
+                                    _selectedLibFile.setFile(
+                                            (String) _fileList.get(currentLibNameInd));
+                                } catch (FileNotFoundException exc) {
+                                    JOptionPane.showMessageDialog(
+                                            null,
+                                            exc.getMessage(),
+                                            "Error",
+                                            JOptionPane.ERROR_MESSAGE);
                                 }
                             }
                         }
-                    });
-                    rightClickMenu.add(removeOpt);
-                    rightClickMenu.show(mouseEvent.getComponent(), mouseEvent.getX(), mouseEvent.getY());
-                }
-            }
-        });
-        // set window size of Dialog GUI to 30 % of Main Window ... seemed to be a good choice on my screen
-        Dimension winSize = new Dimension( (int) (GeckoSim._win.getWidth() * 0.3), (int) (GeckoSim._win.getHeight() * 0.3));
+                    }
+                });
+        /** add remove option */
+        jListLibFiles.addMouseListener(
+                new MouseAdapter() {
+                    @Override
+                    public void mousePressed(final MouseEvent mouseEvent) {
+                        // final MouseEvent mouseEvent = e;
+                        if (SwingUtilities.isRightMouseButton(mouseEvent)) {
+                            JPopupMenu rightClickMenu = new JPopupMenu();
+                            JMenuItem removeOpt = new JMenuItem("remove");
+                            removeOpt.addActionListener(
+                                    new ActionListener() {
+                                        @Override
+                                        public void actionPerformed(ActionEvent event) {
+                                            Point point = mouseEvent.getPoint();
+                                            int currentInd = jListLibFiles.locationToIndex(point);
+                                            if (currentInd >= 0 && currentInd < _fileList.size()) {
+                                                String deletedFileName =
+                                                        (String) _fileList.get(currentInd);
+                                                // check if selected dll file was removed from list
+                                                if (_selectedLibFile.getFileName() != null
+                                                        && deletedFileName.equals(
+                                                                _selectedLibFile.getFileName())) {
+                                                    _selectedLibFile
+                                                            .setFile(); // remove all references to
+                                                                        // removed file
+                                                }
+                                                _fileList.remove(currentInd);
+                                                // now check if we need to set a selection again
+                                                if (jListLibFiles.isSelectionEmpty()
+                                                        && _fileList.size() > 0) {
+                                                    try {
+                                                        _selectedLibFile.setFile(
+                                                                (String) _fileList.get(0));
+                                                        jListLibFiles.setSelectedIndex(0);
+                                                    } catch (Exception exc) {
+                                                        exc.printStackTrace();
+                                                        JOptionPane.showMessageDialog(
+                                                                null,
+                                                                exc.getMessage(),
+                                                                "Error",
+                                                                JOptionPane.ERROR_MESSAGE);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    });
+                            rightClickMenu.add(removeOpt);
+                            rightClickMenu.show(
+                                    mouseEvent.getComponent(),
+                                    mouseEvent.getX(),
+                                    mouseEvent.getY());
+                        }
+                    }
+                });
+        // set window size of Dialog GUI to 30 % of Main Window ... seemed to be a good choice on my
+        // screen
+        Dimension winSize =
+                new Dimension(
+                        (int) (GeckoSim._win.getWidth() * 0.3),
+                        (int) (GeckoSim._win.getHeight() * 0.3));
         jListLibFiles.setPreferredSize(winSize);
         jPanelButtonOk = new JPanel();
         jPanelOpenFile = new JPanel();
@@ -220,7 +255,7 @@ public class NativeCDialog extends GeckoDialog {
         this.pack();
     }
 
-    private void initFileChooser () {
+    private void initFileChooser() {
         FileFilter filterLibrary = new FileNameExtensionFilter("Shared Library (*.dll, *.so, *.jnilib)",
                 "dll", "so", "jnilib"); // Windows: *.dll, Linux: *.so, Mac OS: *.jnilib
         jFileChooser = new JFileChooser();
@@ -234,11 +269,11 @@ public class NativeCDialog extends GeckoDialog {
         }
     }
 
-    private boolean isFileNameAlreadyInList (final String name) {
+    private boolean isFileNameAlreadyInList(final String name) {
         if (name == null) {
             return true;
         }
-        for (int i=0; i<_fileList.size(); i++) {
+        for (int i = 0; i < _fileList.size(); i++) {
             if (name.equals(_fileList.get(i))) {
                 return true;
             }

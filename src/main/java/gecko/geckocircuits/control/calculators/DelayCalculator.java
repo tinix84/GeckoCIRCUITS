@@ -27,10 +27,14 @@ public final class DelayCalculator extends AbstractSingleInputSingleOutputCalcul
      * @param delayTime the finite, nonnegative delay in seconds.
      * @throws IllegalArgumentException if the delay is invalid.
      */
-    public DelayCalculator(final double delayTime) { history = new DelayHistory(delayTime); }
+    public DelayCalculator(final double delayTime) {
+        history = new DelayHistory(delayTime);
+    }
 
     @Override
-    public void initWithNewDt(final double deltaT) { history.changeTimeStep(deltaT); }
+    public void initWithNewDt(final double deltaT) {
+        history.changeTimeStep(deltaT);
+    }
 
     @Override
     public void initializeAtSimulationStart(final double deltaT) {
@@ -49,5 +53,7 @@ public final class DelayCalculator extends AbstractSingleInputSingleOutputCalcul
      * @param delayTime the finite, nonnegative delay in seconds.
      * @throws IllegalArgumentException if the delay is invalid.
      */
-    public void setDelayTime(final double delayTime) { history.setDelayTime(delayTime); }
+    public void setDelayTime(final double delayTime) {
+        history.setDelayTime(delayTime);
+    }
 }

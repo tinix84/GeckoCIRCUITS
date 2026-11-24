@@ -43,9 +43,12 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
-@SuppressFBWarnings(value = {"EI_EXPOSE_REP2", "PA_PUBLIC_PRIMITIVE_ATTRIBUTE"},
-        justification = "Loss calculation must share references to parent block for circuit integration; public fields for file access and curve data")
-public final class VerlustBerechnungDetailed implements GeckoFileable, AbstractLossCalculatorFabric {
+@SuppressFBWarnings(
+        value = {"EI_EXPOSE_REP2", "PA_PUBLIC_PRIMITIVE_ATTRIBUTE"},
+        justification =
+                "Loss calculation must share references to parent block for circuit integration; public fields for file access and curve data")
+public final class VerlustBerechnungDetailed
+        implements GeckoFileable, AbstractLossCalculatorFabric {
 
     final AbstractCircuitBlockInterface _parent;
     private final LossProperties _lossParent;
@@ -245,7 +248,7 @@ public final class VerlustBerechnungDetailed implements GeckoFileable, AbstractL
         for (TokenMap lossBlock = tokenMap.getBlockTokenMap("<SchaltverlusteMesskurve>"); lossBlock != null;
                 lossBlock = tokenMap.getBlockTokenMap("<SchaltverlusteMesskurve>")) {
             SwitchingLossCurve newCurve = new SwitchingLossCurve(-1, -1);
-            if(needClearSwitchCurves) {
+            if (needClearSwitchCurves) {
                 _messkurvePvSWITCH.clear();
                 needClearSwitchCurves = false;
             }
@@ -303,7 +306,7 @@ public final class VerlustBerechnungDetailed implements GeckoFileable, AbstractL
             _lossParent._lossType.setValueWithoutUndo(LossCalculationDetail.DETAILED);
         } catch (FileNotFoundException e) { //if not, see if it is a relative path to the .ipes file location
             String modelFilePath = _fileAccessor.getOpenFileName();
-            if(!modelFilePath.equals("Untitled")) {
+            if (!modelFilePath.equals("Untitled")) {
                 modelFilePath = modelFilePath.substring(0, modelFilePath.lastIndexOf(File.separator));
             String newPath = modelFilePath + File.separator + fyomu;
             try {

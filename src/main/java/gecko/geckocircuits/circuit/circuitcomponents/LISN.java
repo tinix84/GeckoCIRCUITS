@@ -33,7 +33,12 @@ import gecko.i18n.resources.I18nKeys;
 // Leistungskreis-Induktivitaet koppelbar ueber M (im Gegensatz dazu kann L nicht gekoppelt werden)
 // dieses Element ist in Wirklichkeit ein Subcircuit, der ein L in Serie zu einer Spannungsquelle enthaelt
 public class LISN extends AbstractCircuitBlockInterface implements HiddenSubCircuitable {
-    public static final AbstractTypeInfo TYPE_INFO = new CircuitTypeInfo(LISN.class, "LISN", I18nKeys.LISN, I18nKeys.LINE_IMPEDANCE_STABILIZATION_NETWORK);
+    public static final AbstractTypeInfo TYPE_INFO =
+            new CircuitTypeInfo(
+                    LISN.class,
+                    "LISN",
+                    I18nKeys.LISN,
+                    I18nKeys.LINE_IMPEDANCE_STABILIZATION_NETWORK);
 
     private AbstractBlockInterface[] qLK;
     private final AbstractTerminal intern1, intern2, intern3, intern7, intern8, intern9;
@@ -229,7 +234,7 @@ public class LISN extends AbstractCircuitBlockInterface implements HiddenSubCirc
         qLK[13] = _CGnd2;
         qLK[14] = _CGnd3;
 
-        for(AbstractBlockInterface elem : qLK) {
+        for (AbstractBlockInterface elem : qLK) {
             elem.getIDStringDialog().setRandomStringID();
         }
 

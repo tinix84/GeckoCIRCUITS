@@ -36,7 +36,7 @@ public final class CompileObjectSavedFile extends AbstractCompileObject {
             final Map<String, CompiledClassContainer> classNameFileMap, final CompileStatus compileStatus) {
         super();
 
-        if(classNameFileMap != null && classNameFileMap.containsKey(sourceFileName)) {
+        if (classNameFileMap != null && classNameFileMap.containsKey(sourceFileName)) {
             _sourceString = classNameFileMap.get(sourceFileName).getSourceString();
         } else {
             _sourceString = "";
@@ -44,7 +44,7 @@ public final class CompileObjectSavedFile extends AbstractCompileObject {
 
         _sourceFileName = sourceFileName;
 
-        if(classNameFileMap != null) {
+        if (classNameFileMap != null) {
             _classMap.putAll(classNameFileMap);
         }
 

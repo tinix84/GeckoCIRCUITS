@@ -59,10 +59,9 @@ public class CurrentSourceCalculator extends CircuitComponent<AbstractCurrentSou
     }
 
     @Override
-    public void stepBack()
-    {
-        if ((!stepped_back && (steps_reversed == 0)) || (stepped_back && (steps_reversed < steps_saved)))
-        {
+    public void stepBack() {
+        if ((!stepped_back && (steps_reversed == 0))
+                || (stepped_back && (steps_reversed < steps_saved))) {
             if (stepped_back) {
                 historyBackward();
             }

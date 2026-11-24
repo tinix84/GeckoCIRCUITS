@@ -22,7 +22,7 @@ package gecko.i18n;
 
 public final class InitParameters {
 
-    private InitParameters(){} // prevents instantiation
+    private InitParameters() {} // prevents instantiation
 
     // **********   To Be Adjusted:    **********
 

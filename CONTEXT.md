@@ -95,8 +95,8 @@ The headless engine that runs Prepared circuits for both the desktop and the RES
 _Avoid_: New engine, REST engine
 
 **Legacy backend**:
-The original desktop simulation engine, kept as the numerical reference and as the fallback when the Core backend cannot run a circuit.
-_Avoid_: Old solver, GUI engine
+The desktop simulation engine derived from the original implementation and developed after v2.02, kept as the fallback when the Core backend cannot run a circuit.
+_Avoid_: Old solver, GUI engine, v2.02 release
 
 **Golden reference**:
 Results recorded from GeckoCIRCUITS v2.02 for a Circuit file, which current results must match within the agreed tolerance.
@@ -128,3 +128,23 @@ _Avoid_: Pv chip, heat source
 **CONTROL subsystem**:
 The CONTROL blocks of one sheet path and of its nested sheets that have no sample period of their own. Blocks outside every configured subsystem use the global sample period.
 _Avoid_: Task, rate group, sheet
+
+**v2.02 reference trace**:
+An ordered record of committed steps from an identified GeckoCIRCUITS v2.02 release, with recorded capture provenance.
+_Avoid_: Current legacy baseline, unversioned golden trace
+
+**Current legacy baseline**:
+An ordered record of committed steps from an identified development revision of the Legacy backend.
+_Avoid_: v2.02 reference trace, release reference
+
+**Gate command**:
+The binary switching instruction that a controlled device consumes for an electrical time step.
+_Avoid_: Conduction state, later CONTROL output
+
+**Conduction state**:
+The conducting or blocking state of a switching device or diode after the electrical time step converges.
+_Avoid_: Gate command, resistance value
+
+**Signal identity**:
+The circuit quantity identified by its component or connected terminals, physical unit, reference, and polarity or current direction.
+_Avoid_: Matrix index, array position, unscoped wire label

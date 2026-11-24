@@ -60,11 +60,11 @@ public class TerminalVerbindung implements TerminalInterface {
 
     @Override
     public Point getPosition() {
-        switch(_loc) {
+        switch (_loc) {
             case START:
                 return _connectorPoints.get(0);
             case END:
-                return _connectorPoints.get(_connectorPoints.size()-1);
+                return _connectorPoints.get(_connectorPoints.size() - 1);
             default:
                 assert false;
                 return null;

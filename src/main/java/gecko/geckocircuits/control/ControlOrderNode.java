@@ -91,7 +91,7 @@ final class ControlOrderNode {
             nodeIndexOut.add(((ControlTerminable) term).getNodeNumber());
         }
 
-        for(ControlOrderNode element2 : allBlocks) {
+        for (ControlOrderNode element2 : allBlocks) {
             if (element2.equals(this)) {
                 continue;
             }

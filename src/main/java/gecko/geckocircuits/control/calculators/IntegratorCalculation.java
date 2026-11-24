@@ -52,7 +52,7 @@ public final class IntegratorCalculation extends AbstractControlCalculatable imp
             _outputSignal[0][0] = _y11;
             _xold = _inputSignal[0][0];
             _y1old = _y11;
-        } else {// reset: alles auf Null bzw. Init
+        } else { // reset: alles auf Null bzw. Init
             _xold = 0;
             _y1old = _y0Val;
             _outputSignal[0][0] = _y0Val;

@@ -38,7 +38,7 @@ public class DialogLizenz extends JDialog implements WindowListener, ActionListe
     private JButton knOK;
     private StringBuffer sbInfoTxt;
 
-    public DialogLizenz (StringBuffer sbInfoTxt) {
+    public DialogLizenz(StringBuffer sbInfoTxt) {
         super.setModal(true);
         try {
             @SuppressWarnings("deprecation")
@@ -47,7 +47,7 @@ public class DialogLizenz extends JDialog implements WindowListener, ActionListe
         } catch (Exception e) {
             // ignored: icon loading is optional
         }
-        this.sbInfoTxt= sbInfoTxt;
+        this.sbInfoTxt = sbInfoTxt;
         this.addWindowListener(this);
         this.setTitle(" Licence Information");
         this.baueGUI();
@@ -56,21 +56,21 @@ public class DialogLizenz extends JDialog implements WindowListener, ActionListe
         //------------------------
     }
 
-    private void baueGUI () {
-        Container con= this.getContentPane();
+    private void baueGUI() {
+        Container con = this.getContentPane();
         con.setLayout(new BorderLayout());
-        //------------------
-        knOK= GuiFabric.getJButton(I18nKeys.OK);
+        // ------------------
+        knOK = GuiFabric.getJButton(I18nKeys.OK);
         knOK.setActionCommand("OK");
         knOK.addActionListener(this);
-        JPanel px= new JPanel();
+        JPanel px = new JPanel();
         px.add(knOK);
-        //------------------
-        JPanel jpM= new JPanel();
+        // ------------------
+        JPanel jpM = new JPanel();
         jpM.setLayout(new BorderLayout());
         jpM.setBorder(new EtchedBorder());
         //
-        JTextArea jtx= new JTextArea();
+        JTextArea jtx = new JTextArea();
         jtx.setForeground(GlobalColors.LAB_COLOR_DIALOG_1);
         //
         jtx.setText(sbInfoTxt.toString());
@@ -86,33 +86,47 @@ public class DialogLizenz extends JDialog implements WindowListener, ActionListe
         con.add(px, BorderLayout.SOUTH);
     }
 
-
-
-
-
     @Override
-    public void actionPerformed (ActionEvent ae) {
+    public void actionPerformed(ActionEvent ae) {
         // 'OK'-Knopf gedrueckt --> Dialog kann verlassen werden
         this.dispose();
     }
 
+    // ------------------------------------------------
+    @Override
+    public void windowDeactivated(WindowEvent we) {
+        this.requestFocus();
+    }
 
+    @Override
+    public void windowActivated(WindowEvent we) {
+        /* no-op */
+    }
 
-    //------------------------------------------------
     @Override
-    public void windowDeactivated (WindowEvent we) { this.requestFocus(); }
+    public void windowDeiconified(WindowEvent we) {
+        /* no-op */
+    }
+
     @Override
-    public void windowActivated (WindowEvent we) { /* no-op */ }
+    public void windowIconified(WindowEvent we) {
+        /* no-op */
+    }
+
     @Override
-    public void windowDeiconified (WindowEvent we) { /* no-op */ }
+    public void windowClosed(WindowEvent we) {
+        /* no-op */
+    }
+
     @Override
-    public void windowIconified (WindowEvent we) { /* no-op */ }
+    public void windowClosing(WindowEvent we) {
+        /* no-op */
+    }
+
     @Override
-    public void windowClosed (WindowEvent we) { /* no-op */ }
-    @Override
-    public void windowClosing (WindowEvent we) { /* no-op */ }
-    @Override
-    public void windowOpened (WindowEvent we) { /* no-op */ }
+    public void windowOpened(WindowEvent we) {
+        /* no-op */
+    }
     //------------------------------------------------
 
 }

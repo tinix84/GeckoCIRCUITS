@@ -32,8 +32,8 @@ final class StartFromBlocksWithoutPredecessorOrderer extends AbstractSourceContr
 
     private Set<ControlOrderNode> findBlocksWithoutPredecessors() {
         final Set<ControlOrderNode> returnValue = new LinkedHashSet<ControlOrderNode>();
-        for(ControlOrderNode node : _transferList) {
-            if(node.getAllDirectInputs().isEmpty()) {
+        for (ControlOrderNode node : _transferList) {
+            if (node.getAllDirectInputs().isEmpty()) {
                 returnValue.add(node);
             }
         }

@@ -23,129 +23,132 @@ import java.util.List;
  *
  * @author andreas
  */
-@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "Null data container shares references with scope components")
-public final class DataContainerNullData extends AbstractDataContainer implements DataContainerValuesSettable,
-                                                                                  DataContainerIntegralCalculatable{
+@SuppressFBWarnings(
+        value = "EI_EXPOSE_REP",
+        justification = "Null data container shares references with scope components")
+public final class DataContainerNullData extends AbstractDataContainer
+        implements DataContainerValuesSettable, DataContainerIntegralCalculatable {
   private List<AbstractScopeSignal> _signalNames;
   private DefinedMeanSignals _definedMeanSignals;
 
-  public DataContainerNullData(){
-      // no-op
-  }
+    public DataContainerNullData() {
+        // no-op
+    }
 
-  public DataContainerNullData(final List<AbstractScopeSignal> signalNames){
+    public DataContainerNullData(final List<AbstractScopeSignal> signalNames) {
     super();
     _signalNames = signalNames;
   }
 
-  public void setNoDataName(){
+    public void setNoDataName() {
     _signalNames = new ArrayList<AbstractScopeSignal>();
 
-    _signalNames.add(new AbstractScopeSignal(){
-      @Override
-      public String getSignalName(){
-        return "no data available";
-      }
-    });
+        _signalNames.add(
+                new AbstractScopeSignal() {
+                    @Override
+                    public String getSignalName() {
+                        return "no data available";
+                    }
+                });
   }
 
-  @Override
-  public HiLoData getHiLoValue(final int row, final int columnMin, final int columnMax){
+    @Override
+    public HiLoData getHiLoValue(final int row, final int columnMin, final int columnMax) {
     return HiLoData.hiLoDataFabric(0, 0);
   }
 
-  @Override
-  public float getValue(final int row, final int column){
+    @Override
+    public float getValue(final int row, final int column) {
     return 0;
   }
 
-  @Override
-  public int getRowLength(){
-    if(_signalNames == null){
+    @Override
+    public int getRowLength() {
+        if (_signalNames == null) {
       return 0;
-    }else{
+        } else {
       return _signalNames.size();
     }
   }
 
-  @Override
-  public double getTimeValue(final int index, final int row){
+    @Override
+    public double getTimeValue(final int index, final int row) {
     return 0;
   }
 
-  @Override
-  public int getMaximumTimeIndex(final int row){
+    @Override
+    public int getMaximumTimeIndex(final int row) {
     return 0;
   }
 
-  @Override
-  public Object getDataValueInInterval(final double intervalStart, final double intervalStop, final int columnIndex){
+    @Override
+    public Object getDataValueInInterval(
+            final double intervalStart, final double intervalStop, final int columnIndex) {
     return null;
   }
 
-  @Override
-  public void insertValuesAtEnd(final float[] values, final double timeValue){
+    @Override
+    public void insertValuesAtEnd(final float[] values, final double timeValue) {
     throw new UnsupportedOperationException("Not supported yet.");
   }
 
-  @Override
-  public HiLoData getAbsoluteMinMaxValue(final int row){
+    @Override
+    public HiLoData getAbsoluteMinMaxValue(final int row) {
     return HiLoData.hiLoDataFabric(0, 1);
   }
 
-
-  @Override
-  public int findTimeIndex(final double time, final int row){
+    @Override
+    public int findTimeIndex(final double time, final int row) {
     return 0;
   }
 
-  @Override
-  public int getUsedRAMSizeInMB(){
+    @Override
+    public int getUsedRAMSizeInMB() {
     return 0;
   }
 
-  @Override
-  public long getCachedRAMSizeInMB(){
+    @Override
+    public long getCachedRAMSizeInMB() {
     return 0;
   }
 
-  @Override
-  public String getSignalName(final int row){
-    if(_signalNames.size() <= row || _signalNames.get(row).getSignalName().isEmpty()){
+    @Override
+    public String getSignalName(final int row) {
+        if (_signalNames.size() <= row || _signalNames.get(row).getSignalName().isEmpty()) {
       return "sg." + row;
-    }else{
+        } else {
       return _signalNames.get(row).getSignalName();
     }
 
   }
 
-  @Override
-  public String getXDataName(){
+    @Override
+    public String getXDataName() {
     return "t";
   }
 
-  @Override
-  public ContainerStatus getContainerStatus(){
+    @Override
+    public ContainerStatus getContainerStatus() {
     return ContainerStatus.NOT_INITIALIZED;
   }
 
-  @Override
-  public void setContainerStatus(ContainerStatus containerStatus){
+    @Override
+    public void setContainerStatus(ContainerStatus containerStatus) {
     assert containerStatus == ContainerStatus.DELETED : "Null data container should not set status ! " + containerStatus;
   }
 
-  @Override
-  public boolean isInvalidNumbers(int row){
+    @Override
+    public boolean isInvalidNumbers(int row) {
     return false;// the container has not data - therefore NaN or Inf is not possible!
   }
 
-  @Override
-  public AbstractTimeSerie getTimeSeries(final int row){
+    @Override
+    public AbstractTimeSerie getTimeSeries(final int row) {
     throw new UnsupportedOperationException("Not supported yet.");
   }
 
-  @Override
-  public float getAVGValueInInterval(double intervalStart, double intervalStop, int columnIndex){
+    @Override
+    public float getAVGValueInInterval(double intervalStart, double intervalStop, int columnIndex) {
     throw new UnsupportedOperationException("Not supported yet.");
   }
 
@@ -154,12 +157,12 @@ public final class DataContainerNullData extends AbstractDataContainer implement
       // no-op
   }
 
-  public void setDefinedMeanSignals(final DefinedMeanSignals definedMeanSignals){
+    public void setDefinedMeanSignals(final DefinedMeanSignals definedMeanSignals) {
     _definedMeanSignals = definedMeanSignals;
   }
 
-  @Override
-  public DefinedMeanSignals getDefinedMeanSignals(){
+    @Override
+    public DefinedMeanSignals getDefinedMeanSignals() {
     return _definedMeanSignals;
   }
 

@@ -37,8 +37,10 @@ import java.util.function.BooleanSupplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@SuppressFBWarnings(value = {"ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD", "PA_PUBLIC_PRIMITIVE_ATTRIBUTE"},
-        justification = "Static fields staticTSTART/staticTEND are intentionally written for backward compatibility; public simulation status for runtime monitoring")
+@SuppressFBWarnings(
+        value = {"ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD", "PA_PUBLIC_PRIMITIVE_ATTRIBUTE"},
+        justification =
+                "Static fields staticTSTART/staticTEND are intentionally written for backward compatibility; public simulation status for runtime monitoring")
 public class SimulationsKern implements ISimulationEngine {
 
     private static final Logger LOGGER = Logger.getLogger(SimulationsKern.class.getName());
@@ -94,7 +96,10 @@ public class SimulationsKern implements ISimulationEngine {
     private int[][] zuordnung_SchalterLK_SWITCH;  // Welcher Schalter wird durch welchen SWITCH angesteuert?
     private int[][] zuordnung_QuelleLK_signalCONTROL;  // Welcher CONTROL-Knoten steuert welche signalgesteuerte LK-Quelle?
     private int[][] zuordnung_QuelleTHERM_signalCONTROL;  // Welcher CONTROL-Knoten steuert welche signalgesteuerte THERM-Quelle?
-    private int[][] zuordnung_MaschineLK_LoadParameterInCONTROL;  // Welcher CONTROL-Knoten definiert welche mechanischen Signale (zB. externes Moment) des Motors?
+    private int[][]
+            zuordnung_MaschineLK_LoadParameterInCONTROL; // Welcher CONTROL-Knoten definiert welche
+                                                         // mechanischen Signale (zB. externes
+                                                         // Moment) des Motors?
     //
     private RegelBlock[] c;
     private double[][] controlParameters;
@@ -260,7 +265,9 @@ public class SimulationsKern implements ISimulationEngine {
     }
 
     private void doDiodeErrorsRecalculations() {
-        int switchingErrorCounter = 0;   // 'stoergroesse<1.0' verhindert, dass der Algorithmus beim Dioden-Umschalten zwischen Zustaenden haengen bleibt
+        int switchingErrorCounter =
+                0; // 'stoergroesse<1.0' verhindert, dass der Algorithmus beim Dioden-Umschalten
+                   // zwischen Zustaenden haengen bleibt
         double stoergroesse = 1;//0.9999999;
         boolean isNewIteration = false;
 
@@ -347,7 +354,9 @@ public class SimulationsKern implements ISimulationEngine {
             int outputIndex = mapping[2];
             double[] par = e.parameter;
             double[][] blockOutput = unsortedCalculators[reglerIndex]._outputSignal;
-            par[((AbstractMotor) e).getIndexForLoadTorque()] = blockOutput[outputIndex][0];  // bei signalgesteuerten Quellen ist parameter[1] das Signal
+            par[((AbstractMotor) e).getIndexForLoadTorque()] =
+                    blockOutput[outputIndex][
+                            0]; // bei signalgesteuerten Quellen ist parameter[1] das Signal
         }
         //-------------------------------------------------------------------
         // Potentialdifferenzen im LK-Kreis an Regelkreiselement VOLT uebergeben:
@@ -727,12 +736,27 @@ public class SimulationsKern implements ISimulationEngine {
         definiereInteraktion_VOLT_AMP_LK();  // wie messe ich Stroeme und Spannungen im LK mit CONTROL-AMP bzw. CONTROL-VOLT?
         definiereInteraktion_MaschineLK_VIEWMOT();  // zur Messung von Maschinen-internen Parametern
         //
-        zuordnung_SchalterLK_SWITCH = definiereInteraktion_Schalter_Regler();  // welches CONTROL-GATE steuert welchen LK_SWITCH (LK_S,LK_IGBT,LK_THYR) an?
-        zuordnung_QuelleLK_signalCONTROL = definiereInteraktion_SignalgesteuerteQuelle_Regler(nl);  // welches allg. CONTROL-Signal steuert welche LK_QUELLE (LK_U, LK_I) an?
-        zuordnung_QuelleTHERM_signalCONTROL = definiereInteraktion_SignalgesteuerteQuelle_Regler(thermNL);  // welches allg. CONTROL-Signal steuert welche THERM_QUELLE (LK_TEMP, LK_FLOW) an?
+        zuordnung_SchalterLK_SWITCH =
+                definiereInteraktion_Schalter_Regler(); // welches CONTROL-GATE steuert welchen
+                                                        // LK_SWITCH (LK_S,LK_IGBT,LK_THYR) an?
+        zuordnung_QuelleLK_signalCONTROL =
+                definiereInteraktion_SignalgesteuerteQuelle_Regler(
+                        nl); // welches allg. CONTROL-Signal steuert welche LK_QUELLE (LK_U, LK_I)
+                             // an?
+        zuordnung_QuelleTHERM_signalCONTROL =
+                definiereInteraktion_SignalgesteuerteQuelle_Regler(
+                        thermNL); // welches allg. CONTROL-Signal steuert welche THERM_QUELLE
+                                  // (LK_TEMP, LK_FLOW) an?
 
-        zuordnung_MaschineLK_LoadParameterInCONTROL = definiereInteraktion_MaschineLK_LoadParameterInCONTROL();  // Welcher CONTROL-Knoten definiert welche mechanischen Signale (zB. externes Moment) des Motors?
-        definiereInteraktion_TEMP_FLOW_THERM();  // wie messe ich thermischen Fluss und Temperatur-Differenzen im THERM mit CONTROL-FLOW bzw. CONTROL-TEMP?
+        zuordnung_MaschineLK_LoadParameterInCONTROL =
+                definiereInteraktion_MaschineLK_LoadParameterInCONTROL(); // Welcher CONTROL-Knoten
+                                                                          // definiert welche
+                                                                          // mechanischen Signale
+                                                                          // (zB. externes Moment)
+                                                                          // des Motors?
+        definiereInteraktion_TEMP_FLOW_THERM(); // wie messe ich thermischen Fluss und
+                                                // Temperatur-Differenzen im THERM mit CONTROL-FLOW
+                                                // bzw. CONTROL-TEMP?
         setControlledSourcesFromControlValue();
         setThermalControlledSourcesFromControlValues();
 
@@ -798,8 +822,12 @@ public class SimulationsKern implements ISimulationEngine {
         for (int i = 0; i < allElements.length; i++) {
             AbstractCircuitBlockInterface element = allElements[i];
             if (element instanceof AbstractVoltageSource || element instanceof AbstractCurrentSource) {
-                if (element.getParameter()[0] == SourceType.QUELLE_SIGNALGESTEUERT_NEW || element.getParameter()[0] == SourceType.QUELLE_SIGNALGESTEUERT) {
-                    NetzlisteCONTROL.IndexConnection li = controlNL.getIndexConnection(element.getParentCircuitSheet(), element.getParameterString()[0]);
+                if (element.getParameter()[0] == SourceType.QUELLE_SIGNALGESTEUERT_NEW
+                        || element.getParameter()[0] == SourceType.QUELLE_SIGNALGESTEUERT) {
+                    NetzlisteCONTROL.IndexConnection li =
+                            controlNL.getIndexConnection(
+                                    element.getParentCircuitSheet(),
+                                    element.getParameterString()[0]);
                     if (li != null) { // this can happen when no control signal is selected/assigned!
                         zuordnung_QuelleLK_signalCONTROL[counter]
                                 = new int[]{i, li._elementIndex, li._inBlockIndex_outputIndex};
@@ -855,9 +883,14 @@ public class SimulationsKern implements ISimulationEngine {
         for (int iLK = 0; iLK < nl.elements.length; iLK++) {
             AbstractCircuitBlockInterface block = nl.elements[iLK];
             if (block instanceof AbstractMotor) {
-                NetzlisteCONTROL.IndexConnection li = controlNL.getIndexConnection(nl.elements[iLK].getParentCircuitSheet(), nl.elements[iLK].getParameterString()[0]);
+                NetzlisteCONTROL.IndexConnection li =
+                        controlNL.getIndexConnection(
+                                nl.elements[iLK].getParentCircuitSheet(),
+                                nl.elements[iLK].getParameterString()[0]);
                 if (li != null) {
-                    zuordnung_MaschineLK_LoadParameterInCONTROL[zuordnungANZAHL_MaschineLK_LoadParameterInCONTROL] = new int[]{iLK, li._elementIndex, li._inBlockIndex_outputIndex};
+                    zuordnung_MaschineLK_LoadParameterInCONTROL[
+                                    zuordnungANZAHL_MaschineLK_LoadParameterInCONTROL] =
+                            new int[] {iLK, li._elementIndex, li._inBlockIndex_outputIndex};
                     zuordnungANZAHL_MaschineLK_LoadParameterInCONTROL++;
                 }
             }

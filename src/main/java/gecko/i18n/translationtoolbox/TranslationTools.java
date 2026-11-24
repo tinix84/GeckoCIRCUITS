@@ -16,6 +16,8 @@
  */
 package gecko.i18n.translationtoolbox;
 
+import java.util.Map;
+
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import javax.swing.ProgressMonitor;
@@ -40,8 +42,8 @@ public class TranslationTools extends javax.swing.JFrame implements PropertyChan
     private Integer counterMultiple;
     private int maxCounterSingle;
     private int maxCounterMultiple;
-    private HashMap<Integer,I18nKeys> keysSingle;
-    private HashMap<Integer,I18nKeys> keysMultiple;
+    private Map<Integer,I18nKeys> keysSingle;
+    private Map<Integer,I18nKeys> keysMultiple;
     private String newTranslationSingle;
     private String newTranslationMultiple;
     private String commentSingle;

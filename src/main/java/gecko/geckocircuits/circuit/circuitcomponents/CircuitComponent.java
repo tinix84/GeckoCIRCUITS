@@ -29,9 +29,12 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
  * @author andy
  * @since 2.0 (refactored to extend CircuitComponentCore)
  */
-@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "Circuit component must share references to parent and terminal objects for proper circuit connectivity")
+@SuppressFBWarnings(
+        value = "EI_EXPOSE_REP",
+        justification =
+                "Circuit component must share references to parent and terminal objects for proper circuit connectivity")
 public abstract class CircuitComponent<T extends AbstractTwoPortLKreisBlock>
-    extends CircuitComponentCore {
+        extends CircuitComponentCore {
 
     /** First terminal (GUI connection) */
     protected final AbstractTerminal _term1;

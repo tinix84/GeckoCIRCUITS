@@ -177,7 +177,7 @@ public abstract class AbstractCircuitBlockInterface extends AbstractBlockInterfa
     static List<? extends CircuitComponent> getCalculatorsFromSubComponents(final HiddenSubCircuitable subCircuitable) {
         Collection<? extends AbstractBlockInterface> hiddenSubs = subCircuitable.getHiddenSubCircuitElements();
         List<CircuitComponent> returnValue = new ArrayList<CircuitComponent>();
-        for(AbstractBlockInterface block : hiddenSubs) {
+        for (AbstractBlockInterface block : hiddenSubs) {
             assert block instanceof AbstractCircuitBlockInterface;
             returnValue.addAll(((AbstractCircuitBlockInterface)block).getCircuitCalculatorsForSimulationStart());
         }

@@ -122,7 +122,11 @@ abstract class AbstractMotorDC extends AbstractMotor {
 
     @Override
     protected void drawConnectorLines(final Graphics2D graphics) {
-        graphics.fillRect((int) (-dpix * BLOCK_SYMB_X), (int) (-dpix * BLOCK_SYMB_Y), (int) (dpix * 2 * BLOCK_SYMB_X), (int) (dpix * 2 * BLOCK_SYMB_Y));
+        graphics.fillRect(
+                (int) (-dpix * BLOCK_SYMB_X),
+                (int) (-dpix * BLOCK_SYMB_Y),
+                (int) (dpix * 2 * BLOCK_SYMB_X),
+                (int) (dpix * 2 * BLOCK_SYMB_Y));
         // connector between Anchor clamps
         graphics.drawLine(XPOS_LEFT_TERM * dpix, 0, XPOS_RIGHT_TERM * dpix, 0);
         if (SchematicEditor2._lkDisplayMode.showFlowSymbol) {

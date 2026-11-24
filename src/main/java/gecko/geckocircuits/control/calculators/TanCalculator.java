@@ -17,10 +17,10 @@ public final class TanCalculator extends AbstractSingleInputSingleOutputCalculat
     private static final double SMALL_NUMBER = 1e-14;
     @Override
     public void berechneYOUT(final double deltaT) {
-        assert Math.abs(_inputSignal[0][0] - Math.PI/2) > SMALL_NUMBER:
-                "Tangens argument of" + _inputSignal[0][0] + " too close to PI/2!";
-        assert Math.abs(_inputSignal[0][0] + Math.PI/2) > SMALL_NUMBER :
-                "Tangens argument of" + _inputSignal[0][0] + " too close to PI/2!";
+        assert Math.abs(_inputSignal[0][0] - Math.PI / 2) > SMALL_NUMBER
+                : "Tangens argument of" + _inputSignal[0][0] + " too close to PI/2!";
+        assert Math.abs(_inputSignal[0][0] + Math.PI / 2) > SMALL_NUMBER
+                : "Tangens argument of" + _inputSignal[0][0] + " too close to PI/2!";
         _outputSignal[0][0] = Math.tan(_inputSignal[0][0]);
     }
 }

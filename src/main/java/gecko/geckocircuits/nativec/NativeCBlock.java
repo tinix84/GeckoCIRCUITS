@@ -30,7 +30,7 @@ public class NativeCBlock {
     private double[] _xINVector;
     private double[] _xOUTVector;
 
-    public NativeCBlock () {
+    public NativeCBlock() {
         _customCClassLoader = new NativeCClassLoader();
     }
 
@@ -38,8 +38,7 @@ public class NativeCBlock {
     void calculateYOUT(final double time, final double deltaT, final double[][] inputSignals,
             final double[][] outputSignals) throws Exception {
 
-
-        if ( _xINVector == null ) {
+        if (_xINVector == null) {
             _xINVector = new double[inputSignals.length];
         }
 
@@ -65,7 +64,7 @@ public class NativeCBlock {
         checkOutputsForNANorINFValues(outputSignals);
     }
 
-    public boolean loadLibraries (final String name) {
+    public boolean loadLibraries(final String name) {
         try {
             _customCClassLoader = new NativeCClassLoader();
             _nativeCWrapperClass = _customCClassLoader.findClass("gecko.geckocircuits.nativec.NativeCWrapper");
@@ -81,7 +80,7 @@ public class NativeCBlock {
         }
     }
 
-    public void unloadLibraries () {
+    public void unloadLibraries() {
         try {
             /*ClassLoader clLoader = this.getClass().getClassLoader();
             Field field = ClassLoader.class.getDeclaredField("nativeLibraries");

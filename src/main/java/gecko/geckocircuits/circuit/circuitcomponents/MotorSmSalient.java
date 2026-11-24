@@ -33,8 +33,12 @@ public final class MotorSmSalient extends AbstractMotorSM {
     private static final int INIT_STATOR_FLUX_D_INDEX = 34;
     private static final int INIT_STATOR_FLUX_Q_INDEX = 35;
     private static final int SAT_IND_INDEX = 36;
-    public static final AbstractTypeInfo TYPE_INFO = new CircuitTypeInfo(MotorSmSalient.class, "SM-SAL", I18nKeys.SM_SAL, I18nKeys.SALIENT_POLE_SYNCHRONOUS_MACHINE);
-
+    public static final AbstractTypeInfo TYPE_INFO =
+            new CircuitTypeInfo(
+                    MotorSmSalient.class,
+                    "SM-SAL",
+                    I18nKeys.SM_SAL,
+                    I18nKeys.SALIENT_POLE_SYNCHRONOUS_MACHINE);
 
     private double _Lmq0;
     final UserParameter<Double> _unsatMagnetizingInductQPar = UserParameter.Builder.
@@ -81,7 +85,13 @@ public final class MotorSmSalient extends AbstractMotorSM {
         double ddt_psimd = (isd * (Rkd / Llkd - _statorResistance / Lls) + isq * _omegaElectric
                 + ifd * (Rkd / Llkd - Rf / Llf) - Rkd * inv_Lmd / Llkd * psimd + _omegaElectric / Lls * psimq
                 + ud / Lls + uf / Llf) / (inv_Lmd + 1 / Lls + 1 / Llf + 1 / Llkd);
-        double ddt_psimq = (-_omegaElectric * isd + isq * (Rkq / Llkq1 - _statorResistance / Lls) - _omegaElectric / Lls * psimd - Rkq * inv_Lmq / Llkq1 * psimq + uq / Lls) / (inv_Lmq + 1 / Lls + 1 / Llkq1);
+        double ddt_psimq =
+                (-_omegaElectric * isd
+                                + isq * (Rkq / Llkq1 - _statorResistance / Lls)
+                                - _omegaElectric / Lls * psimd
+                                - Rkq * inv_Lmq / Llkq1 * psimq
+                                + uq / Lls)
+                        / (inv_Lmq + 1 / Lls + 1 / Llkq1);
         psimd = psimd0 + ddt_psimd * deltaT;
         psimq = psimq0 + ddt_psimq * deltaT;
 

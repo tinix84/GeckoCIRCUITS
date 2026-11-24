@@ -59,7 +59,7 @@ final class CurveSettings {
         _crvTransparency = curveMap.readDataLine("crvTransparency", _crvTransparency);
         _crvFillingDigColor = GeckoColor.getFromCode(curveMap.readDataLine("fillDigitalColor", _crvFillingDigColor.code()));
         _crvFillDigitalCurves = curveMap.readDataLine("isFillDigitalCurves", _crvFillDigitalCurves);
-        if(curveMap.containsToken("lineType")) {
+        if (curveMap.containsToken("lineType")) {
             _lineType = GeckoLineType.getFromCode(curveMap.readDataLine("lineType", _lineType.code()));
         }
 

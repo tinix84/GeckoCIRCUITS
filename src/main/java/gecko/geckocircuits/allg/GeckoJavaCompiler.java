@@ -13,6 +13,8 @@
  */
 package gecko.geckocircuits.allg;
 
+import java.util.List;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Date;
@@ -270,7 +272,7 @@ public class GeckoJavaCompiler {
                 _workingDirectory = System.getProperty("user.dir");
             }
 
-            Vector<String> opt = new Vector<String>();
+            List<String> opt = new Vector<String>();
 
             opt.add("-classpath");
             String cp0 = System.getProperty("user.dir");

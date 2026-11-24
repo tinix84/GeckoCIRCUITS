@@ -51,21 +51,23 @@ class ReglerSignalSourceDialog extends AbstractDialogWithExternalOption<ReglerSi
 
         parameterPanel = createParameterPanel(element._amplitudeAC, element._frequency, element._offsetDC, element._phase, element._dutyRatio);
 
-        jComboShape.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                boolean visible = jComboShape.getSelectedItem() != ControlSourceType.QUELLE_SIN;
-                tf.get(tf.size()-1).setVisible(visible);
-                for(Component comp : parameterPanel.getComponents()) {
-                    if(comp instanceof JLabel) {
-                        JLabel lab = (JLabel) comp;
-                        if(lab.getText().startsWith("d =")) {
-                        lab.setVisible(visible);
+        jComboShape.addActionListener(
+                new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        boolean visible =
+                                jComboShape.getSelectedItem() != ControlSourceType.QUELLE_SIN;
+                        tf.get(tf.size() - 1).setVisible(visible);
+                        for (Component comp : parameterPanel.getComponents()) {
+                            if (comp instanceof JLabel) {
+                                JLabel lab = (JLabel) comp;
+                                if (lab.getText().startsWith("d =")) {
+                                    lab.setVisible(visible);
+                                }
+                            }
+                        }
                     }
-                }
-                }
-            }
-        });
+                });
 
         jComboShape.setSelectedItem(element._typQuelle.getValue());
 

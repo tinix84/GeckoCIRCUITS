@@ -74,10 +74,18 @@ import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import gecko.modelviewcontrol.AbstractUndoGenericModel;
 
-@SuppressFBWarnings(value = {"ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD", "MS_CANNOT_BE_FINAL", "PA_PUBLIC_PRIMITIVE_ATTRIBUTE", "SE_BAD_FIELD", "SF_SWITCH_FALLTHROUGH"},
-        justification = "MainWindow is effectively a singleton - static fields hold application-wide state; public fields for menu item access across UI components; JFrame is not serialized in this application; switch fallthrough in schliesseProgramm is intentional for save-then-exit flow")
-public final class MainWindow extends JFrame implements WindowListener, ActionListener, ComponentListener {
-
+@SuppressFBWarnings(
+        value = {
+            "ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD",
+            "MS_CANNOT_BE_FINAL",
+            "PA_PUBLIC_PRIMITIVE_ATTRIBUTE",
+            "SE_BAD_FIELD",
+            "SF_SWITCH_FALLTHROUGH"
+        },
+        justification =
+                "MainWindow is effectively a singleton - static fields hold application-wide state; public fields for menu item access across UI components; JFrame is not serialized in this application; switch fallthrough in schliesseProgramm is intentional for save-then-exit flow")
+public final class MainWindow extends JFrame
+        implements WindowListener, ActionListener, ComponentListener {
 
     int _simMenuIndex = 2; // simulation menu is third in bar.
     JMenuBar _menuBar; // to provide dynamic changing of the menu bar, need to make this a member.
@@ -771,7 +779,10 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
      * menu accelerators --> (Java bug??)
      */
     private void processKeyEvents(KeyEvent ke) {
-        if ((ke.getKeyChar() == KeyEvent.VK_DELETE) || (ke.getKeyCode() == KeyEvent.VK_DELETE) || (ke.getKeyChar() == KeyEvent.VK_BACK_SPACE) || (ke.getKeyChar() == 4)) // '4' corresponds to CONTROL_D
+        if ((ke.getKeyChar() == KeyEvent.VK_DELETE)
+                || (ke.getKeyCode() == KeyEvent.VK_DELETE)
+                || (ke.getKeyChar() == KeyEvent.VK_BACK_SPACE)
+                || (ke.getKeyChar() == 4)) // '4' corresponds to CONTROL_D
         {
             _se.deleteSelectedComponentsWithUndo();
             return;
@@ -1023,15 +1034,15 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
         documentGeneration.incrementAndGet();
         _simRunner.cancelAcAnalysis();
         _se.resetCircuitSheetsForNewFile();
-        Vector<String> datVec = new Vector<>();
+        List<String> datVec = new Vector<>();
         String z = null;
         while ((z = in.readLine()) != null) {
-            datVec.addElement(z);
+            datVec.add(z);
         }
         in.close();
         String[] zeile = new String[datVec.size()];
         for (int i1 = 0; i1 < datVec.size(); i1++) {
-            zeile[i1] = datVec.elementAt(i1);
+            zeile[i1] = datVec.get(i1);
             //System.out.println("zeile[i1]= "+zeile[i1]);
         }
 
@@ -1215,20 +1226,25 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
                         currentDirectory = null;
                     }
                 }
-                GeckoFileChooser fileChooser = GeckoFileChooser.createOpenFileChooser(".ipes", "Circuit Simulation Files (*.ipes)", this, currentDirectory);
+                GeckoFileChooser fileChooser =
+                        GeckoFileChooser.createOpenFileChooser(
+                                ".ipes",
+                                "Circuit Simulation Files (*.ipes)",
+                                this,
+                                currentDirectory);
                 if (fileChooser.getUserResult() == GeckoFileChooser.FileChooserResult.CANCEL) {
                     return;
                 }
                     final String fileName = fileChooser.getFileWithCheckedEnding().getAbsolutePath();
                     try {
-                        if(new File(fileName).exists()) {
+                    if (new File(fileName).exists()) {
                             String[] fileLines = getLinesArrayFromIpesFile(fileName);
                             _se.readSelectedElementsFromASCIIString(fileLines);
                         } else {
                             throw new FileNotFoundException("File not found " + fileName);
                         }
-                    } catch(Throwable error) {
-                        JOptionPane.showMessageDialog(MainWindow.this,
+                } catch (Throwable error) {
+                        JOptionPane.showMessageDialog(this,
                             "Error during file import : " + fileName + "\n" + error.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
                     }
             } else if (befehl.equals("Export")) {
@@ -1453,7 +1469,7 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
      */
     public void setMenuDuringSimulation(boolean simulationRunning, boolean endReached,
             java.util.function.BooleanSupplier stillCurrent) {
-        java.util.List<Runnable> changes = new java.util.ArrayList<>();
+        List<Runnable> changes = new ArrayList<>();
         if (simulationRunning) {
             changes.add(() -> mItemNew.setEnabled(false));
             changes.add(() -> mItemOpen.setEnabled(false));
@@ -1478,7 +1494,7 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
 
     /** Restores editing and start actions without enabling continuation of a failed core calculation. */
     public void setMenusAfterSimulationFailure() {
-        java.util.List<Runnable> changes = new java.util.ArrayList<>();
+        List<Runnable> changes = new ArrayList<>();
         addStoppedMenuChanges(changes, false);
         changes.add(() -> jtfStatus.setText("Simulation aborted."));
         _simulationMenuUpdates.update(() -> true, changes.toArray(Runnable[]::new));
@@ -1493,7 +1509,7 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
         }
     }
 
-    private void addStoppedMenuChanges(java.util.List<Runnable> changes, boolean canContinue) {
+    private void addStoppedMenuChanges(List<Runnable> changes, boolean canContinue) {
         if (!IS_BRANDED) {
             changes.add(() -> mItemNew.setEnabled(true));
             changes.add(() -> mItemOpen.setEnabled(true));
@@ -1674,7 +1690,7 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
     }
     void copyFile(final File zipFile, final File newFile) {
 
-        final ProgressMonitor progressMonitor = new ProgressMonitor(MainWindow.this, "Saving applet...", "Please wait.", 0, 100);
+        final ProgressMonitor progressMonitor = new ProgressMonitor(this, "Saving applet...", "Please wait.", 0, 100);
 
         class Task extends SwingWorker<Void, Void> {
 
@@ -1825,7 +1841,9 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
         _se.updateAllComponentReferences();
     }
 
-    public static ProjectData loadProjectDataFromFile(String dateiName, boolean isAutoBackupFile, OptimizerParameterData optimizer) throws FileNotFoundException {
+    public static ProjectData loadProjectDataFromFile(
+            String dateiName, boolean isAutoBackupFile, OptimizerParameterData optimizer)
+            throws FileNotFoundException {
         if (!new File(dateiName).exists()) {
             throw new FileNotFoundException("File: " + GlobalFilePathes.DATNAM + " not found!");
         }
@@ -1899,16 +1917,16 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
              GZIPInputStream in1 = new GZIPInputStream(fileIn);
              InputStreamReader streamReader = new InputStreamReader(in1, java.nio.charset.StandardCharsets.UTF_8);
              BufferedReader in = new BufferedReader(streamReader)) {
-            Vector<String> datVec = new Vector<>();
+            List<String> datVec = new Vector<>();
             String z = null;
 
             while ((z = in.readLine()) != null) {
-                datVec.addElement(z);
+                datVec.add(z);
             }
 
             lines = new String[datVec.size()];
             for (int i1 = 0; i1 < datVec.size(); i1++) {
-                lines[i1] = datVec.elementAt(i1);
+                lines[i1] = datVec.get(i1);
             }
 
 
@@ -1920,14 +1938,14 @@ public final class MainWindow extends JFrame implements WindowListener, ActionLi
                  InflaterInputStream in1 = new InflaterInputStream(fileIn);
                  InputStreamReader streamReader = new InputStreamReader(in1, java.nio.charset.StandardCharsets.UTF_8);
                  BufferedReader in = new BufferedReader(streamReader)) {
-                Vector<String> datVec = new Vector<>();
+                List<String> datVec = new Vector<>();
                 String z = null;
                 while ((z = in.readLine()) != null) {
-                    datVec.addElement(z);
+                    datVec.add(z);
                 }
                 lines = new String[datVec.size()];
                 for (int i1 = 0; i1 < datVec.size(); i1++) {
-                    lines[i1] = datVec.elementAt(i1);
+                    lines[i1] = datVec.get(i1);
                     //System.out.println("zeile[i1]= "+zeile[i1]);
                 }
             } catch (Exception eGZIP) {

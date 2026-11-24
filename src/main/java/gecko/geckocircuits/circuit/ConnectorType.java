@@ -44,7 +44,7 @@ public enum ConnectorType {
     }
 
     public ElementDisplayProperties getDisplayMode() {
-        switch(this) {
+        switch (this) {
             case LK:
             case RELUCTANCE:
             case LK_AND_RELUCTANCE:

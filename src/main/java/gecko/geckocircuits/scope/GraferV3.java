@@ -69,7 +69,22 @@ public class GraferV3 extends JPanel {
     //
     static final String[] FARBEN = /*  // MS_PKGPROTECT: only used within package
              * TxtI.ti_farbe_GraferV3;
-             */ new String[]{"black", "red", "green", "blue", "darkgray", "gray", "ligthgray", "white", "magenta", "cyan", "orange", "yellow", "darkgreen"};
+             */
+            new String[] {
+                "black",
+                "red",
+                "green",
+                "blue",
+                "darkgray",
+                "gray",
+                "ligthgray",
+                "white",
+                "magenta",
+                "cyan",
+                "orange",
+                "yellow",
+                "darkgreen"
+            };
     public static final int BLACK = -3444440;
     public static final int RED = -3444441;
     public static final int GREEN = -3444442;
@@ -112,7 +127,10 @@ public class GraferV3 extends JPanel {
     protected int[] linStilGridNormalX, linStilGridNormalY, linStilGridNormalXminor, linStilGridNormalYminor;
     protected int[] gridNormalX_zugeordneteXAchse, gridNormalX_zugeordneteYAchse;
     protected int[] gridNormalY_zugeordneteXAchse, gridNormalY_zugeordneteYAchse;
-    protected int[][] showGridNormalXmajor, showGridNormalXminor, showGridNormalYmajor, showGridNormalYminor;  // welche Grid-Linien sollen dargestellt werden?
+    protected int[][] showGridNormalXmajor,
+            showGridNormalXminor,
+            showGridNormalYmajor,
+            showGridNormalYminor; // welche Grid-Linien sollen dargestellt werden?
     // --> zB. showGridNormalXmajor[i1]= {index_xAchse, index_yAchse}
     //-------------
     protected boolean[] xTickAutoSpacing, yTickAutoSpacing;  // sollen die Tick-Abstaende automatisch bestimmt werden?
@@ -121,7 +139,11 @@ public class GraferV3 extends JPanel {
     protected int[] xTickLaenge, yTickLaenge, xTickLaengeMinor, yTickLaengeMinor;
     protected boolean[] zeigeXticksUnten, zeigeYticksLinks;  // Ticks auf der x-Achse koennen nach unten oder nach oben zeigen, analog die der y-Achse
     //
-    protected boolean[] zeigeLabelsXmaj, zeigeLabelsXmin, zeigeLabelsYmaj, zeigeLabelsYmin;  // sollen die entsprechenden Labels bei den jeweiligen Ticks angezeigt werden?
+    protected boolean[] zeigeLabelsXmaj,
+            zeigeLabelsXmin,
+            zeigeLabelsYmaj,
+            zeigeLabelsYmin; // sollen die entsprechenden Labels bei den jeweiligen Ticks angezeigt
+                             // werden?
     protected int[] posXtickLabels, posYtickLabels;  // wie weit sind die Tick-Beschriftungen von der jeweiligen Achse entfernt?
     protected Font[] foTickLabelX, foTickLabelY;
     //-------------
@@ -236,14 +258,22 @@ public class GraferV3 extends JPanel {
         this.farbeGridNormalYminor = Arrays.copyOf(farbeGridNormalYminor, farbeGridNormalYminor.length);
     }
 
-    public void setzeGridLinienStil(int[] linStilGridNormalX, int[] linStilGridNormalY, int[] linStilGridNormalXminor, int[] linStilGridNormalYminor) {
+    public void setzeGridLinienStil(
+            int[] linStilGridNormalX,
+            int[] linStilGridNormalY,
+            int[] linStilGridNormalXminor,
+            int[] linStilGridNormalYminor) {
         this.linStilGridNormalX = Arrays.copyOf(linStilGridNormalX, linStilGridNormalX.length);
         this.linStilGridNormalY = Arrays.copyOf(linStilGridNormalY, linStilGridNormalY.length);
         this.linStilGridNormalXminor = Arrays.copyOf(linStilGridNormalXminor, linStilGridNormalXminor.length);
         this.linStilGridNormalYminor = Arrays.copyOf(linStilGridNormalYminor, linStilGridNormalYminor.length);
     }
 
-    public void showGridLines(int[][] showGridNormalXmajor, int[][] showGridNormalXminor, int[][] showGridNormalYmajor, int[][] showGridNormalYminor) {
+    public void showGridLines(
+            int[][] showGridNormalXmajor,
+            int[][] showGridNormalXminor,
+            int[][] showGridNormalYmajor,
+            int[][] showGridNormalYminor) {
         this.showGridNormalXmajor = deepCopy2D(showGridNormalXmajor);
         this.showGridNormalXminor = deepCopy2D(showGridNormalXminor);
         this.showGridNormalYmajor = deepCopy2D(showGridNormalYmajor);
@@ -335,7 +365,15 @@ public class GraferV3 extends JPanel {
         this.crvSymbFarbe = Arrays.copyOf(crvSymbFarbe, crvSymbFarbe.length);
     }
 
-    public void setzeKurveClipping(double[] xmin, double[] xmax, double[] ymin, double[] ymax, int[] clipXmin, int[] clipXmax, int[] clipYmin, int[] clipYmax) {
+    public void setzeKurveClipping(
+            double[] xmin,
+            double[] xmax,
+            double[] ymin,
+            double[] ymax,
+            int[] clipXmin,
+            int[] clipXmax,
+            int[] clipYmin,
+            int[] clipYmax) {
         this.kurveClippling_xmin = Arrays.copyOf(xmin, xmin.length);
         this.kurveClippling_xmax = Arrays.copyOf(xmax, xmax.length);
         this.kurveClippling_ymin = Arrays.copyOf(ymin, ymin.length);
@@ -579,9 +617,11 @@ public class GraferV3 extends JPanel {
             }
         }
 
-
-
-        g2.setClip(x0Kurve + 1, y0Kurve - hoehePix[indexZurKurveGehoerigeYachse[i1]] - 1, breitePix[indexZurKurveGehoerigeYachse[i1]] + 2, hoehePix[indexZurKurveGehoerigeYachse[i1]] + 3);
+        g2.setClip(
+                x0Kurve + 1,
+                y0Kurve - hoehePix[indexZurKurveGehoerigeYachse[i1]] - 1,
+                breitePix[indexZurKurveGehoerigeYachse[i1]] + 2,
+                hoehePix[indexZurKurveGehoerigeYachse[i1]] + 3);
         //--------------------------------
         g2.setColor(kurveFarbe[i1]);
         //
@@ -605,7 +645,7 @@ public class GraferV3 extends JPanel {
         if (kurveLinienstil[i1] != INVISIBLE) {
             grL.moveTo(xPix[0], yPix[0]);
             for (int i5 = 1; i5 < anzKurvenpunkteImWorksheet; i5++) {
-                if(xPix[i5] < 2000 && yPix[i5] < 2000) { // old uwe-bug!
+                if (xPix[i5] < 2000 && yPix[i5] < 2000) { // old uwe-bug!
                     grL.lineTo(xPix[i5], yPix[i5]);
                 }
             }
@@ -642,12 +682,32 @@ public class GraferV3 extends JPanel {
                             g2.fillRect(Math.round(xPix[i2]) - aRECT / 2, Math.round(yPix[i2]) - aRECT / 2, aRECT, aRECT);
                             break;
                         case SYBM_TRIANG:
-                            g2.drawPolygon(new int[]{Math.round(xPix[i2]) - aTRIANG / 2, Math.round(xPix[i2]) + aTRIANG / 2, Math.round(xPix[i2])},
-                                    new int[]{Math.round(yPix[i2]) + (int) (0.29 * aTRIANG), Math.round(yPix[i2]) + (int) (0.29 * aTRIANG), Math.round(yPix[i2]) - (int) (0.58 * aTRIANG)}, 3);
+                            g2.drawPolygon(
+                                    new int[] {
+                                        Math.round(xPix[i2]) - aTRIANG / 2,
+                                        Math.round(xPix[i2]) + aTRIANG / 2,
+                                        Math.round(xPix[i2])
+                                    },
+                                    new int[] {
+                                        Math.round(yPix[i2]) + (int) (0.29 * aTRIANG),
+                                        Math.round(yPix[i2]) + (int) (0.29 * aTRIANG),
+                                        Math.round(yPix[i2]) - (int) (0.58 * aTRIANG)
+                                    },
+                                    3);
                             break;
                         case SYBM_TRIANG_FILLED:
-                            g2.fillPolygon(new int[]{Math.round(xPix[i2]) - aTRIANG / 2, Math.round(xPix[i2]) + aTRIANG / 2, Math.round(xPix[i2])},
-                                    new int[]{Math.round(yPix[i2]) + (int) (0.29 * aTRIANG), Math.round(yPix[i2]) + (int) (0.29 * aTRIANG), Math.round(yPix[i2]) - (int) (0.58 * aTRIANG)}, 3);
+                            g2.fillPolygon(
+                                    new int[] {
+                                        Math.round(xPix[i2]) - aTRIANG / 2,
+                                        Math.round(xPix[i2]) + aTRIANG / 2,
+                                        Math.round(xPix[i2])
+                                    },
+                                    new int[] {
+                                        Math.round(yPix[i2]) + (int) (0.29 * aTRIANG),
+                                        Math.round(yPix[i2]) + (int) (0.29 * aTRIANG),
+                                        Math.round(yPix[i2]) - (int) (0.58 * aTRIANG)
+                                    },
+                                    3);
                             break;
                         default:
                             System.out.println("Fehler: q09gj023");
@@ -893,8 +953,18 @@ public class GraferV3 extends JPanel {
                 if (zeigeLabelsYmaj[i1]) {
                     g2.setFont(foTickLabelY[i1]);
                     String label = tcf.formatENG(wertTickY[i1][i2], digitsY);  // nf.format(wertTickY[i1][i2]);
-                    //if ((label.equals("0"))&&(wertTickY[i1][i2]!=0)) label= ""+wertTickY[i1][i2];
-                    g2.drawString(label, _xAchseY[i1] - posYtickLabels[i1] - (int) g2.getFontMetrics().getStringBounds(label, g2).getWidth(), tickY[i1][i2] + foTickLabelY[i1].getSize() / 2 - 1);  // Labels auf der y-Achse
+                    // if ((label.equals("0"))&&(wertTickY[i1][i2]!=0)) label= ""+wertTickY[i1][i2];
+                    g2.drawString(
+                            label,
+                            _xAchseY[i1]
+                                    - posYtickLabels[i1]
+                                    - (int)
+                                            g2.getFontMetrics()
+                                                    .getStringBounds(label, g2)
+                                                    .getWidth(),
+                            tickY[i1][i2]
+                                    + foTickLabelY[i1].getSize() / 2
+                                    - 1); // Labels auf der y-Achse
                 }
             }
             //
@@ -940,7 +1010,17 @@ public class GraferV3 extends JPanel {
                 if (zeigeLabelsYmin[i1]) {
                     g2.setFont(foTickLabelY[i1]);
                     String label = tcf.formatENG(wertTickYminor[i1][i2], digitsY);  // nf.format(wertTickYminor[i1][i2]);
-                    g2.drawString(label, _xAchseY[i1] - posYtickLabels[i1] - (int) g2.getFontMetrics().getStringBounds(label, g2).getWidth(), tickYminor[i1][i2] + foTickLabelY[i1].getSize() / 2);  // Minor-Labels auf der y-Achse
+                    g2.drawString(
+                            label,
+                            _xAchseY[i1]
+                                    - posYtickLabels[i1]
+                                    - (int)
+                                            g2.getFontMetrics()
+                                                    .getStringBounds(label, g2)
+                                                    .getWidth(),
+                            tickYminor[i1][i2]
+                                    + foTickLabelY[i1].getSize()
+                                            / 2); // Minor-Labels auf der y-Achse
                 }
             }
             //==================================
@@ -982,7 +1062,16 @@ public class GraferV3 extends JPanel {
                     if (zeigeLabelsYmaj[i1]) {
                         g2.setFont(foTickLabelY[i1]);
                         String label = tcf.formatT(wertTickY[i1][i2], "#.E0");  // tcf.formatENG(wertTickY[i1][i2],digitsY);
-                        g2.drawString(label, _xAchseY[i1] - posYtickLabels[i1] - (int) g2.getFontMetrics().getStringBounds(label, g2).getWidth(), tickY[i1][i2] + foTickLabelY[i1].getSize() / 2);  // Labels auf der y-Achse
+                        g2.drawString(
+                                label,
+                                _xAchseY[i1]
+                                        - posYtickLabels[i1]
+                                        - (int)
+                                                g2.getFontMetrics()
+                                                        .getStringBounds(label, g2)
+                                                        .getWidth(),
+                                tickY[i1][i2]
+                                        + foTickLabelY[i1].getSize() / 2); // Labels auf der y-Achse
                     }
                 }
                 //
@@ -1028,7 +1117,17 @@ public class GraferV3 extends JPanel {
                     if (zeigeLabelsYmin[i1]) {
                         g2.setFont(foTickLabelY[i1]);
                         String label = tcf.formatT(wertTickYminor[i1][i2], "#.E0");  // tcf.formatENG(wertTickYminor[i1][i2],digitsY);
-                        g2.drawString(label, _xAchseY[i1] - posYtickLabels[i1] - (int) g2.getFontMetrics().getStringBounds(label, g2).getWidth(), tickYminor[i1][i2] + foTickLabelY[i1].getSize() / 2);  // Minor-Labels auf der y-Achse
+                        g2.drawString(
+                                label,
+                                _xAchseY[i1]
+                                        - posYtickLabels[i1]
+                                        - (int)
+                                                g2.getFontMetrics()
+                                                        .getStringBounds(label, g2)
+                                                        .getWidth(),
+                                tickYminor[i1][i2]
+                                        + foTickLabelY[i1].getSize()
+                                                / 2); // Minor-Labels auf der y-Achse
                     }
                 }
                 //-----------------------------------------------------------------------------------------------------------------------

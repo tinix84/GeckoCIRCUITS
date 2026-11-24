@@ -17,23 +17,24 @@ package gecko.geckocircuits.datacontainer;
  *
  * @author andreas
  */
-public class SignalDataContainerRegular extends AbstractDataContainerSignal{
+public class SignalDataContainerRegular extends AbstractDataContainerSignal {
   private String _signalName;
 
-  public SignalDataContainerRegular(final AbstractDataContainer dataContainer, final int dataContainerIndex){
+    public SignalDataContainerRegular(
+            final AbstractDataContainer dataContainer, final int dataContainerIndex) {
     super(dataContainer, dataContainerIndex);
   }
 
-  @Override
-  public final String getSignalName(){
-    if(_signalName != null){
+    @Override
+    public final String getSignalName() {
+        if (_signalName != null) {
       return _signalName;
-    }else{
+        } else {
       return _dataContainer.getSignalName(_dataContainerIndex);
     }
   }
 
-  final void setSignalName(final String newName){
+    final void setSignalName(final String newName) {
     _signalName = newName;
   }
 }

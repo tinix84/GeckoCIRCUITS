@@ -96,6 +96,15 @@ public class CircuitNetlist implements INetList {
     // Result storage (Task 3.6)
     private double[] lastNodeVoltages = new double[0];
     private double[] lastComponentCurrents = new double[0];
+    private double[] consumedGateCommands = new double[0];
+
+    /** Records the command consumed before this step's electrical execution. */
+    public void recordConsumedGateCommand(int component, boolean on) {
+        consumedGateCommands[component] = on ? 1 : 0;
+    }
+
+    /** Returns the consumed command, or NaN when no command has been observed. */
+    public double getConsumedGateCommand(int component) { return consumedGateCommands[component]; }
 
     /**
      * Creates a new empty CircuitNetlist.
@@ -126,6 +135,7 @@ public class CircuitNetlist implements INetList {
         copy.simulationTime = simulationTime;
         copy.lastNodeVoltages = lastNodeVoltages.clone();
         copy.lastComponentCurrents = lastComponentCurrents.clone();
+        copy.consumedGateCommands = consumedGateCommands.clone();
         for (MutualCouplingRegistry.Coupling coupling : couplingRegistry.getAllCouplings()) {
             copy.couplingRegistry.registerCoupling(coupling.getInductor1Index(), coupling.getInductor2Index(),
                     coupling.getCouplingCoefficient(), coupling.getInductance1(), coupling.getInductance2());
@@ -214,6 +224,8 @@ public class CircuitNetlist implements INetList {
         componentNameToIndex = Collections.emptyMap();
         lastNodeVoltages = new double[0];
         lastComponentCurrents = new double[0];
+        consumedGateCommands = new double[elementCount];
+        Arrays.fill(consumedGateCommands, Double.NaN);
     }
 
     /** Assigns a controlling element in this run's netlist. */

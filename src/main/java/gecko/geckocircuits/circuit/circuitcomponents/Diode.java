@@ -70,7 +70,7 @@ public final class Diode extends AbstractSemiconductor implements ForwardVoltage
         parameter[4] = 0;
         parameter[5] = 0;
 
-        if(_losses._lossType.getValue() == LossCalculationDetail.DETAILED
+        if (_losses._lossType.getValue() == LossCalculationDetail.DETAILED
                 && useNonlinearChar.getValue()) {
             initializeDiodeCharacteristic();
         } else {

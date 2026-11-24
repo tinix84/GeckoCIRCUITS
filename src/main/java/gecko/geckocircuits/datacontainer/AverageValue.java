@@ -40,7 +40,7 @@ public final class AverageValue {
     }
 
     public void appendAverage(final AverageValue append) {
-        if(append == null) {
+        if (append == null) {
             return;
         }
         // do this in double precision

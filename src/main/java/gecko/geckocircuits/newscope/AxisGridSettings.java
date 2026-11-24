@@ -20,7 +20,7 @@ import gecko.core.circuit.TokenMap;
  *
  * @author andy
  */
-public final class AxisGridSettings{
+public final class AxisGridSettings {
   private boolean _autoGrids = true;
   private boolean _userShowGridMin = false;
   private boolean _userShowGridMaj = true;
@@ -35,14 +35,14 @@ public final class AxisGridSettings{
   private boolean _showGridMaj, _showGridMin;
   private static final double PX1 = 230, PX2 = 100, PXR = 2.5;
 
-  private final class MajorSettable implements LineSettable{
-    @Override
-    public void setStroke(final GeckoLineStyle stroke){
+    private final class MajorSettable implements LineSettable {
+        @Override
+        public void setStroke(final GeckoLineStyle stroke) {
       setLinStyleMaj(stroke);
     }
 
-    @Override
-    public GeckoLineStyle getStroke(){
+        @Override
+        public GeckoLineStyle getStroke() {
       return getLinStyleMaj();
     }
 
@@ -51,30 +51,30 @@ public final class AxisGridSettings{
       // grid transparency cannot be set
     }
 
-    @Override
-    public float getTransparency(){
+        @Override
+        public float getTransparency() {
       return 1f;
     }
 
-    @Override
-    public GeckoColor getColor(){
+        @Override
+        public GeckoColor getColor() {
       return getColorGridMaj();
     }
 
-    @Override
-    public void setColor(final GeckoColor color){
+        @Override
+        public void setColor(final GeckoColor color) {
       setColorGridMaj(color);
     }
   }
 
-  private final class MinorSettable implements LineSettable{
-    @Override
-    public void setStroke(final GeckoLineStyle stroke){
+    private final class MinorSettable implements LineSettable {
+        @Override
+        public void setStroke(final GeckoLineStyle stroke) {
       setLinStyleMin(stroke);
     }
 
-    @Override
-    public GeckoLineStyle getStroke(){
+        @Override
+        public GeckoLineStyle getStroke() {
       return getLinStyleMin();
     }
 
@@ -83,119 +83,119 @@ public final class AxisGridSettings{
       // grid transparency cannot be set
     }
 
-    @Override
-    public float getTransparency(){
+        @Override
+        public float getTransparency() {
       return 1f;
     }
 
-    @Override
-    public GeckoColor getColor(){
+        @Override
+        public GeckoColor getColor() {
       return getColorGridMin();
     }
 
-    @Override
-    public void setColor(final GeckoColor color){
+        @Override
+        public void setColor(final GeckoColor color) {
       setColorGridMin(color);
     }
   }
 
-  public LineSettable getSettableMaj(){
+    public LineSettable getSettableMaj() {
     return new MajorSettable();
   }
 
-  public LineSettable getSettableMin(){
+    public LineSettable getSettableMin() {
     return new MinorSettable();
   }
 
-  public GeckoLineStyle getLinStyleMaj(){
+    public GeckoLineStyle getLinStyleMaj() {
     return _linStilGridNormal;
   }
 
-  public GeckoLineStyle getLinStyleMin(){
+    public GeckoLineStyle getLinStyleMin() {
     return _linStilGridMinor;
   }
 
-  public void setLinStyleMaj(final GeckoLineStyle lineStyle){
+    public void setLinStyleMaj(final GeckoLineStyle lineStyle) {
     _linStilGridNormal = lineStyle;
   }
 
-  public void setLinStyleMin(final GeckoLineStyle lineStyle){
+    public void setLinStyleMin(final GeckoLineStyle lineStyle) {
     _linStilGridMinor = lineStyle;
   }
 
-  public GeckoColor getColorGridMaj(){
+    public GeckoColor getColorGridMaj() {
     return _farbeGridNormal;
   }
 
-  public GeckoColor getColorGridMin(){
+    public GeckoColor getColorGridMin() {
     return _farbeGridNormalMinor;
   }
 
-  public void setColorGridMaj(final GeckoColor newColor){
+    public void setColorGridMaj(final GeckoColor newColor) {
     _farbeGridNormal = newColor;
   }
 
-  public void setColorGridMin(final GeckoColor newColor){
+    public void setColorGridMin(final GeckoColor newColor) {
     _farbeGridNormalMinor = newColor;
   }
 
-  public boolean isAutoGrids(){
+    public boolean isAutoGrids() {
     return _autoGrids;
   }
 
-  public void setAutoGrids(final boolean value){
+    public void setAutoGrids(final boolean value) {
     _autoGrids = value;
   }
 
-  public boolean isShowGridNormalMajor(){
+    public boolean isShowGridNormalMajor() {
     return _showGridMaj;
   }
 
-  public boolean isShowGridNormalMinor(){
+    public boolean isShowGridNormalMinor() {
     return _showGridMin;
   }
 
-  public void setUserShowGridMin(final boolean value){
+    public void setUserShowGridMin(final boolean value) {
     _userShowGridMin = value;
   }
 
-  public boolean isUserShowGridMin(){
+    public boolean isUserShowGridMin() {
     return _userShowGridMin;
   }
 
-  public void setUserShowGridMaj(final boolean value){
+    public void setUserShowGridMaj(final boolean value) {
     _userShowGridMaj = value;
   }
 
-  public boolean isUserShowGridMaj(){
+    public boolean isUserShowGridMaj() {
     return _userShowGridMaj;
   }
 
-  /**
-   * wenn die Diagramme in einem sehr kleinen Fenster gezeichnet werden, dann
-   * muessen eventuell die Grid-Linien ausgeblendet werden, um eine gewisse
-   * Uebersichtlichkeit zu wahren -->
-   */
-  public void blendeEventuellGridLinienAus(final int axisLengthPix){
-    if(_autoGrids){
-      if(isUserShowGridMaj() && axisLengthPix > PX2 * PXR){
+    /**
+     * wenn die Diagramme in einem sehr kleinen Fenster gezeichnet werden, dann
+     * muessen eventuell die Grid-Linien ausgeblendet werden, um eine gewisse
+     * Uebersichtlichkeit zu wahren -->
+     */
+    public void blendeEventuellGridLinienAus(final int axisLengthPix) {
+        if (_autoGrids) {
+            if (isUserShowGridMaj() && axisLengthPix > PX2 * PXR) {
         _showGridMaj = true;
-      }else{
+            } else {
         _showGridMaj = false;
       }
 
-      if(isUserShowGridMin() && axisLengthPix > PX1 * PXR){
+            if (isUserShowGridMin() && axisLengthPix > PX1 * PXR) {
         _showGridMin = true;
-      }else{
+            } else {
         _showGridMin = false;
       }
-    }else{
+        } else {
       _showGridMaj = _userShowGridMaj;
       _showGridMin = _userShowGridMin;
     }
   }
 
-  void exportIndividualCONTROL(final StringBuffer ascii){
+    void exportIndividualCONTROL(final StringBuffer ascii) {
     ProjectData.appendAsString(ascii.append("\nuserShowGridMaj"), _userShowGridMaj);
     ProjectData.appendAsString(ascii.append("\nuserShowGridMin"), _userShowGridMin);
     ProjectData.appendAsString(ascii.append("\nlinStilGridNormal"), _linStilGridNormal.code());
@@ -204,7 +204,7 @@ public final class AxisGridSettings{
     ProjectData.appendAsString(ascii.append("\ncolorGridMinor"), _farbeGridNormalMinor.code());
   }
 
-  void importASCII(final TokenMap axisMap){
+    void importASCII(final TokenMap axisMap) {
     _userShowGridMaj = axisMap.readDataLine("userShowGridMaj", _userShowGridMaj);
     _userShowGridMin = axisMap.readDataLine("userShowGridMin", _userShowGridMin);
     _linStilGridNormal = GeckoLineStyle.getFromCode(axisMap.readDataLine("linStilGridNormal", _linStilGridNormal.code()));

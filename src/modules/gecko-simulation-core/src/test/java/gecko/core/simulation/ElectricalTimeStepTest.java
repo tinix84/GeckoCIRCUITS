@@ -16,6 +16,20 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ElectricalTimeStepTest {
 
+    @ParameterizedTest
+    @EnumSource(value = CircuitTypCore.class, names = {"LK_THYR", "LK_IGBT"})
+    void releaseTurnOffPatchRetainsTheOffResistanceVoltageTermForThatStep(CircuitTypCore type) {
+        var netlist = SemiconductorStepContractTest.circuit(type, true, -6);
+        var step = new ElectricalTimeStep(netlist, SolverType.SOLVER_BE);
+        step.advance(.001, 0, null);
+        // v2.02 LKMatrices patches Uf/Roff into B when a conducting device turns off.
+        double transitionCurrent = (-6 - 1.5) / (1e6 + 1.75);
+        assertEquals(transitionCurrent, netlist.getLastComponentCurrents()[1], 1e-10);
+        step.advance(.001, .001, null);
+        // The next ordinary B build omits this term for a blocking device.
+        assertEquals(-6 / (1e6 + 1.75), netlist.getLastComponentCurrents()[1], 1e-10);
+    }
+
     @Test
     void voltageSourceCurrentBalancesItsLoadWithoutChangingSourceVoltage() {
         CircuitNetlist netlist = SyntheticCircuitBuilder.rcCircuit(10.0, 1000.0, 1e-6);

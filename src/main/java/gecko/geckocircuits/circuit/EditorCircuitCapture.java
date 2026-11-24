@@ -75,7 +75,9 @@ public final class EditorCircuitCapture {
             if (element instanceof AbstractBlockInterface block) {
                 block.exportForCapture(ascii, acSettings);
                 blocks.add(block);
-            } else element.exportASCII(ascii);
+            } else {
+                element.exportASCII(ascii);
+            }
         }
         ProjectData.appendAsString(ascii.append("\noptimizerName"), optimizer.getNameOpt());
         ProjectData.appendAsString(ascii.append("\noptimizerValue"), optimizer.getValueOpt());

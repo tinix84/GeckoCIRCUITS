@@ -61,24 +61,25 @@ public final class DialogVerlusteDetail extends GeckoDialog {
         super(parent, true);
         getContentPane().setLayout(new BorderLayout());
 
-        _tabbedPane.addChangeListener(new ChangeListener() {
+        _tabbedPane.addChangeListener(
+                new ChangeListener() {
 
-            @Override
-            public void stateChanged(ChangeEvent e) {
-                int tabIndex = _tabbedPane.getSelectedIndex();
-                switch(tabIndex) {
-                    case 0:
-                        // disable voltage selection test curve field!
-                        _jpTest.setVoltageSelectionVisible(false);
-                        break;
-                    case 1:
-                        _jpTest.setVoltageSelectionVisible(true);
-                        break;
-                    default:
-                        assert false;
-                }
-            }
-        });
+                    @Override
+                    public void stateChanged(ChangeEvent e) {
+                        int tabIndex = _tabbedPane.getSelectedIndex();
+                        switch (tabIndex) {
+                            case 0:
+                                // disable voltage selection test curve field!
+                                _jpTest.setVoltageSelectionVisible(false);
+                                break;
+                            case 1:
+                                _jpTest.setVoltageSelectionVisible(true);
+                                break;
+                            default:
+                                assert false;
+                        }
+                    }
+                });
         // vorhandene Verlust-Details werden zum Editieren geladen
         _lossCalculation = lossCalculation;
         // Kurvendaten der Messkurven einlesen:
@@ -96,7 +97,7 @@ public final class DialogVerlusteDetail extends GeckoDialog {
         _switchingLossPanel.baueGUI();
         _tabbedPane.addTab("Switching Losses", _switchingLossPanel);
 
-        if(_lossCalculation._parent instanceof Diode) {
+        if (_lossCalculation._parent instanceof Diode) {
             _conductionLossPanel.useNonlinearInElectric((Diode) _lossCalculation._parent);
         }
 

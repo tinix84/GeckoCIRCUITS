@@ -226,7 +226,8 @@ public final class BJT extends AbstractTwoPortLKreisBlock implements HiddenSubCi
         } else {
             setPNPTerminals();
         }
-        return Arrays.asList( new AbstractBlockInterface[]{_diode1, _diode2, controlledSource1, _resistor1});
+        return Arrays.asList(
+                new AbstractBlockInterface[] {_diode1, _diode2, controlledSource1, _resistor1});
     }
 
 
@@ -255,8 +256,8 @@ public final class BJT extends AbstractTwoPortLKreisBlock implements HiddenSubCi
     protected void drawConnectorLines(Graphics2D graphics) {
         graphics.drawLine(0, -dpix * 2, 0, -dpix);
         graphics.drawLine(0, dpix * 2, 0, dpix);
-        graphics.drawLine(-(int) (dpix * 0.8), (int) (dpix * 0.3), 0, dpix );
-        graphics.drawLine(-(int) (dpix * 0.8), (int) (-dpix * 0.3), 0, -dpix );
+        graphics.drawLine(-(int) (dpix * 0.8), (int) (dpix * 0.3), 0, dpix);
+        graphics.drawLine(-(int) (dpix * 0.8), (int) (-dpix * 0.3), 0, -dpix);
         graphics.drawLine(-2 * dpix, 0, -(int) (dpix * 0.8), 0);
     }
 

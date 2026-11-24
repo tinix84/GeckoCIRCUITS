@@ -52,7 +52,7 @@ public class ReglerControlDebug extends RegelBlock {
 
     @Override
     protected Window openDialogWindow() {
-        if(_debugWindow == null) {
+        if (_debugWindow == null) {
             _debugWindow = new ControlDebugWindow();
         }
         _debugWindow.setVisible(true);

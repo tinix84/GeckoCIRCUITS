@@ -60,131 +60,143 @@ public interface GeckoRemoteIntWithoutExc {
 
     double getParameter(String elementName, String parameterName);
 
-    double getOutput(String elementName, String outputName) ;
+    double getOutput(String elementName, String outputName);
 
-    double getOutput(String elementName) ;
+    double getOutput(String elementName);
 
-    void initSimulation() ;
+    void initSimulation();
 
-    void initSimulation(final double deltaT, final double endTime) ;
+    void initSimulation(final double deltaT, final double endTime);
 
-    void continueSimulation() ;
+    void continueSimulation();
 
-    void simulateTime(double time) ;
+    void simulateTime(double time);
 
-    void endSimulation() ;
+    void endSimulation();
 
-    void saveFileAs(String fileName) ;
+    void saveFileAs(String fileName);
 
     void openFile(String fileName);
 
     void importFromFile(String fileName, String importIntoSubcircuit);
 
-    double get_dt() ;
-    double get_Tend() ;
+    double get_dt();
 
-    double get_dt_pre() ;
-    double get_Tend_pre() ;
+    double get_Tend();
 
-    void set_dt(double value) ;
-    void set_dt_pre(double value) ;
-    void set_Tend(double value) ;
-    void set_Tend_pre(double value) ;
+    double get_dt_pre();
 
-    @Deprecated
-    double[] getSignalCharacteristics(String scopeName, int scopePort, double startTime, double endTime) ;
+    double get_Tend_pre();
 
-    @Deprecated
-    double getAvg(String scopeName, int scopePort, double startTime, double endTime) ;
+    void set_dt(double value);
 
-    @Deprecated
-    double getRMS(String scopeName, int scopePort, double startTime, double endTime) ;
+    void set_dt_pre(double value);
+
+    void set_Tend(double value);
+
+    void set_Tend_pre(double value);
 
     @Deprecated
-    double getTHD(String scopeName, int scopePort, double startTime, double endTime) ;
+    double[] getSignalCharacteristics(
+            String scopeName, int scopePort, double startTime, double endTime);
 
     @Deprecated
-    double getMin(String scopeName, int scopePort, double startTime, double endTime) ;
+    double getAvg(String scopeName, int scopePort, double startTime, double endTime);
 
     @Deprecated
-    double getMax(String scopeName, int scopePort, double startTime, double endTime) ;
+    double getRMS(String scopeName, int scopePort, double startTime, double endTime);
 
     @Deprecated
-    double getRipple(String scopeName, int scopePort, double startTime, double endTime) ;
+    double getTHD(String scopeName, int scopePort, double startTime, double endTime);
 
     @Deprecated
-    double getKlirr(String scopeName, int scopePort, double startTime, double endTime) ;
+    double getMin(String scopeName, int scopePort, double startTime, double endTime);
 
     @Deprecated
-    double getShape(String scopeName, int scopePort, double startTime, double endTime) ;
+    double getMax(String scopeName, int scopePort, double startTime, double endTime);
 
     @Deprecated
-    double[] getSignalCharacteristics(String scopeName, double startTime, double endTime) ;
+    double getRipple(String scopeName, int scopePort, double startTime, double endTime);
 
     @Deprecated
-    double getAvg(String scopeName, double startTime, double endTime) ;
+    double getKlirr(String scopeName, int scopePort, double startTime, double endTime);
 
     @Deprecated
-    double getRMS(String scopeName, double startTime, double endTime) ;
+    double getShape(String scopeName, int scopePort, double startTime, double endTime);
 
     @Deprecated
-    double getMin(String scopeName, double startTime, double endTime) ;
+    double[] getSignalCharacteristics(String scopeName, double startTime, double endTime);
 
     @Deprecated
-    double getMax(String scopeName, double startTime, double endTime) ;
+    double getAvg(String scopeName, double startTime, double endTime);
 
     @Deprecated
-    double getTHD(String scopeName, double startTime, double endTime) ;
+    double getRMS(String scopeName, double startTime, double endTime);
 
     @Deprecated
-    double getShape(String scopeName, double startTime, double endTime) ;
+    double getMin(String scopeName, double startTime, double endTime);
 
     @Deprecated
-    double getKlirr(String scopeName, double startTime, double endTime) ;
+    double getMax(String scopeName, double startTime, double endTime);
 
     @Deprecated
-    double getRipple(String scopeName, double startTime, double endTime) ;
+    double getTHD(String scopeName, double startTime, double endTime);
 
-    double[][] getFourier(String scopeName, int scopePort, double startTime, double endTime, int harmonics) ;
+    @Deprecated
+    double getShape(String scopeName, double startTime, double endTime);
 
-    double[][] getFourier(String scopeName, double startTime, double endTime, int harmonics) ;
+    @Deprecated
+    double getKlirr(String scopeName, double startTime, double endTime);
 
-    double getSignalAvg(String signalName, double startTime, double endTime) ;
+    @Deprecated
+    double getRipple(String scopeName, double startTime, double endTime);
 
-    double getSignalRMS(String signalName, double startTime, double endTime) ;
+    double[][] getFourier(
+            String scopeName, int scopePort, double startTime, double endTime, int harmonics);
 
-    double getSignalMin(String signalName, double startTime, double endTime) ;
+    double[][] getFourier(String scopeName, double startTime, double endTime, int harmonics);
 
-    double getSignalMax(String signalName, double startTime, double endTime) ;
+    double getSignalAvg(String signalName, double startTime, double endTime);
 
-    double getSignalTHD(String signalName, double startTime, double endTime) ;
+    double getSignalRMS(String signalName, double startTime, double endTime);
 
-    double getSignalShape(String signalName, double startTime, double endTime) ;
+    double getSignalMin(String signalName, double startTime, double endTime);
 
-    double getSignalKlirr(String signalName, double startTime, double endTime) ;
+    double getSignalMax(String signalName, double startTime, double endTime);
 
-    double getSignalRipple(String signalName, double startTime, double endTime) ;
+    double getSignalTHD(String signalName, double startTime, double endTime);
 
-    double[][] getSignalFourier(String signalName, double startTime, double endTime, int harmonics) ;
+    double getSignalShape(String signalName, double startTime, double endTime);
 
+    double getSignalKlirr(String signalName, double startTime, double endTime);
+
+    double getSignalRipple(String signalName, double startTime, double endTime);
+
+    double[][] getSignalFourier(String signalName, double startTime, double endTime, int harmonics);
 
     void setWorksheetSize(int sizeX, int sizeY);
     int[] getWorksheetSize();
 
-
-    void initSteadyStateDetection(final String[] stateVariables, final double frequency, final double deltaT,
-            final double simulationTime) ;
-
-    @Deprecated
-    void initSteadyStateDetection(final String[] stateVariables, final double[] frequencies, final double deltaT,
-            final double simulationTime) ;
-
-    double[] simulateToSteadyState(boolean supressMessages) ;
-
-    double[] simulateToSteadyState(boolean supressMessages, double targetCorrelation, double targetMeanPctDiff) ;
+    void initSteadyStateDetection(
+            final String[] stateVariables,
+            final double frequency,
+            final double deltaT,
+            final double simulationTime);
 
     @Deprecated
-    double[] simulateUntilSteadyState(boolean supressMessages) ;
+    void initSteadyStateDetection(
+            final String[] stateVariables,
+            final double[] frequencies,
+            final double deltaT,
+            final double simulationTime);
+
+    double[] simulateToSteadyState(boolean supressMessages);
+
+    double[] simulateToSteadyState(
+            boolean supressMessages, double targetCorrelation, double targetMeanPctDiff);
+
+    @Deprecated
+    double[] simulateUntilSteadyState(boolean supressMessages);
 
     @Deprecated
     void setLossFile(String elementName, String lossFileName);
@@ -192,53 +204,67 @@ public interface GeckoRemoteIntWithoutExc {
     @Deprecated
     void setNonLinear(String elementName, String characteristicFileName);
 
-    void setPosition(String elementName, int xPosition, int yPosition) ;
-    int[] getPosition(String elementName) ;
+    void setPosition(String elementName, int xPosition, int yPosition);
+
+    int[] getPosition(String elementName);
 
     @Deprecated
-    void delete(String elementName) ;
-    void deleteComponent(String elementName) ;
-    void deleteAllComponents(String subcircuitName) ;
+    void delete(String elementName);
+
+    void deleteComponent(String elementName);
+
+    void deleteAllComponents(String subcircuitName);
 
     void createConnector(String elementName, int xStart, int yStart, int xEnd, int yEnd, boolean startHorizontal);
 
-    void createComponent(String elementType, String elementName, int xPosition, int yPosition) ;
+    void createComponent(String elementType, String elementName, int xPosition, int yPosition);
+
     @Deprecated
-    void create(String elementType, String elementName, int xPosition, int yPosition) ;
+    void create(String elementType, String elementName, int xPosition, int yPosition);
 
-    void setOutputNodeName(String elementName, int nodeIndex, String nodeName) ;
-    void setInputNodeName(String elementName, int nodeIndex, String nodeName) ;
+    void setOutputNodeName(String elementName, int nodeIndex, String nodeName);
 
-    String getOutputNodeName(String elementName, int nodeIndex) ;
-    String getInputNodeName(String elementName, int nodeIndex) ;
+    void setInputNodeName(String elementName, int nodeIndex, String nodeName);
 
-    void rotate(String elementName) ;
+    String getOutputNodeName(String elementName, int nodeIndex);
 
-    void setOrientation(String elementName, String direction) ;
+    String getInputNodeName(String elementName, int nodeIndex);
 
-    void shutdown() ;
+    void rotate(String elementName);
 
-    float[] getSignalData(String signalName, double tStart, double tEnd, int skipPoints) ;
+    void setOrientation(String elementName, String direction);
 
-    double[] getTimeArray(String signalName, double tStart, double tEnd, int skipPoints) ;
+    void shutdown();
 
-    void setComponentName(final String oldName, final String newName) ;
+    float[] getSignalData(String signalName, double tStart, double tEnd, int skipPoints);
 
-     double getSimulationTime() ;
+    double[] getTimeArray(String signalName, double tStart, double tEnd, int skipPoints);
 
-     float[][] getGlobalFloatMatrix() ;
-     double[][] getGlobalDoubleMatrix() ;
-     void setGlobalFloatMatrix(final float[][] matrix) ;
-     void setGlobalDoubleMatrix(final double[][] matrix) ;
-    float[] floatFFT(final float[] timeValues) ;
+    void setComponentName(final String oldName, final String newName);
+
+    double getSimulationTime();
+
+    float[][] getGlobalFloatMatrix();
+
+    double[][] getGlobalDoubleMatrix();
+
+    void setGlobalFloatMatrix(final float[][] matrix);
+
+    void setGlobalDoubleMatrix(final double[][] matrix);
+
+    float[] floatFFT(final float[] timeValues);
+
     @Deprecated
-    float[] realFFT(final float[] timeValues) ;
-    @Deprecated
-    String[] getParametersNames(String componentName) ;
-    String[] getAccessibleParameters(String componentName) ;
+    float[] realFFT(final float[] timeValues);
 
-    void setGlobalParameterValue(String parameterName, double value) ;
-    double getGlobalParameterValue(String parameterName) ;
+    @Deprecated
+    String[] getParametersNames(String componentName);
+
+    String[] getAccessibleParameters(String componentName);
+
+    void setGlobalParameterValue(String parameterName, double value);
+
+    double getGlobalParameterValue(String parameterName);
 
     void acceptExtraConnections(int numberOfExtraConnections);
 

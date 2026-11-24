@@ -95,7 +95,7 @@ public abstract class AbstractCurrentMeasurement extends ReglerWithSingleReferen
     public AbstractControlCalculatable getInternalControlCalculatableForSimulationStart() {
         final AbstractBlockInterface coupled = (AbstractCircuitBlockInterface) _coupling._coupledElements[0];
         if (coupled != null) {
-            if(coupled instanceof MOSFET) {
+            if (coupled instanceof MOSFET) {
                 return new MOSFETCurrentCalculation((MOSFET) _coupling._coupledElements[0]);
             } else if (coupled instanceof ThermPvChip && this instanceof ReglerFlowMeter) {
                 return new ThermPvChipFlowCalculation((ThermPvChip) _coupling._coupledElements[0], (ReglerFlowMeter) this);

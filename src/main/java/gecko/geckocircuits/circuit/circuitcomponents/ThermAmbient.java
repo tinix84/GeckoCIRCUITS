@@ -42,14 +42,15 @@ public final class ThermAmbient extends AbstractCircuitBlockInterface {
     // Null und kann (vorerst) nicht veraendert werden
     public static final double T_ZERO = 0;
 
-    final UserParameter<Double> _ambientTemp = UserParameter.Builder.
-            <Double>start("tRef", 0.0).
-            longName(I18nKeys.REFERENCE_TEMPERATURE).
-            shortName("t_ref").
-            unit("°C").
-            showInTextInfo(TextInfoType.SHOW_NEVER). // nonlinearity: custom display!
-            arrayIndex(this, 0).
-            build();
+    final UserParameter<Double> _ambientTemp =
+            UserParameter.Builder.<Double>start("tRef", 0.0)
+                    .longName(I18nKeys.REFERENCE_TEMPERATURE)
+                    .shortName("t_ref")
+                    .unit("°C")
+                    .showInTextInfo(TextInfoType.SHOW_NEVER)
+                    . // nonlinearity: custom display!
+                    arrayIndex(this, 0)
+                    .build();
 
     ThermAmbient() {
         super();

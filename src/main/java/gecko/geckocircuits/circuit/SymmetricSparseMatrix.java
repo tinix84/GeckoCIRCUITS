@@ -13,6 +13,8 @@
  */
 package gecko.geckocircuits.circuit;
 
+import java.util.List;
+
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -80,7 +82,7 @@ public final class SymmetricSparseMatrix {
         for (int i = 0; i < _N; i++) {
             if (matrix.rowEntries.containsKey(i)) {
                 int counter = -1;
-                ArrayList<Integer> rowEntries = new ArrayList<Integer>();
+                List<Integer> rowEntries = new ArrayList<Integer>();
                 rowEntries.addAll(matrix.rowEntries.get(i));
                 Collections.sort(rowEntries);
 

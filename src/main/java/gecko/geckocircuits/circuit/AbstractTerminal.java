@@ -129,8 +129,7 @@ public abstract class AbstractTerminal implements TerminalInterface {
             yFl[2] = yFl[0] + _pFb;
           }
 
-
-        if(_parentElement.getSheetPosition().x > x) {
+        if (_parentElement.getSheetPosition().x > x) {
             xFl[0] = (int) (dpix * x);
             xFl[1] = xFl[0] + _pFa;
             xFl[2] = xFl[1];

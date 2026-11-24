@@ -126,12 +126,12 @@ public class ParameterRegistry<P> {
 
         String shortName = adapter.getShortName(param);
         if (shortName != null && !shortName.isEmpty()) {
-            byShortName.put(shortName.toLowerCase(), param);
+            byShortName.put(shortName.toLowerCase(Locale.getDefault()), param);
         }
 
         String altName = adapter.getAlternativeShortName(param);
         if (altName != null && !altName.isEmpty()) {
-            byAlternativeName.put(altName.toLowerCase(), param);
+            byAlternativeName.put(altName.toLowerCase(Locale.getDefault()), param);
         }
     }
 
@@ -146,11 +146,11 @@ public class ParameterRegistry<P> {
         if (removed) {
             String shortName = adapter.getShortName(param);
             if (shortName != null) {
-                byShortName.remove(shortName.toLowerCase());
+                byShortName.remove(shortName.toLowerCase(Locale.getDefault()));
             }
             String altName = adapter.getAlternativeShortName(param);
             if (altName != null) {
-                byAlternativeName.remove(altName.toLowerCase());
+                byAlternativeName.remove(altName.toLowerCase(Locale.getDefault()));
             }
         }
         return removed;
@@ -163,8 +163,10 @@ public class ParameterRegistry<P> {
      * @return the parameter, or null if not found
      */
     public P findByShortName(String name) {
-        if (name == null) { return null; }
-        return byShortName.get(name.toLowerCase());
+        if (name == null) {
+            return null;
+        }
+        return byShortName.get(name.toLowerCase(Locale.getDefault()));
     }
 
     /**
@@ -174,8 +176,10 @@ public class ParameterRegistry<P> {
      * @return the parameter, or null if not found
      */
     public P findByAlternativeName(String name) {
-        if (name == null) { return null; }
-        return byAlternativeName.get(name.toLowerCase());
+        if (name == null) {
+            return null;
+        }
+        return byAlternativeName.get(name.toLowerCase(Locale.getDefault()));
     }
 
     /**
@@ -397,17 +401,34 @@ public class ParameterRegistry<P> {
      */
     public static class SimpleParameterAdapter implements ParameterAdapter<SimpleParameter> {
         @Override
-        public String getShortName(SimpleParameter param) { return param.shortName; }
+        public String getShortName(SimpleParameter param) {
+            return param.shortName;
+        }
+
         @Override
-        public String getAlternativeShortName(SimpleParameter param) { return param.alternativeName; }
+        public String getAlternativeShortName(SimpleParameter param) {
+            return param.alternativeName;
+        }
+
         @Override
-        public String getLongName(SimpleParameter param) { return param.longName; }
+        public String getLongName(SimpleParameter param) {
+            return param.longName;
+        }
+
         @Override
-        public String getUnit(SimpleParameter param) { return param.unit; }
+        public String getUnit(SimpleParameter param) {
+            return param.unit;
+        }
+
         @Override
-        public double getDoubleValue(SimpleParameter param) { return param.value; }
+        public double getDoubleValue(SimpleParameter param) {
+            return param.value;
+        }
+
         @Override
-        public void setFromDoubleValue(SimpleParameter param, double value) { param.value = value; }
+        public void setFromDoubleValue(SimpleParameter param, double value) {
+            param.value = value;
+        }
     }
 
     /**

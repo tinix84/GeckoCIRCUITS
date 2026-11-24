@@ -138,7 +138,7 @@ public final class PotentialArea {
             final CircuitSheet circuitSheet) {
         final List<Point> returnValue = new ArrayList<Point>();
         for (AbstractBlockInterface elem : elements) {
-            if (java.util.Objects.equals(elem.getParentCircuitSheet(), circuitSheet)) {
+            if (Objects.equals(elem.getParentCircuitSheet(), circuitSheet)) {
                 for (TerminalInterface term : elem.getAllTerminals()) {
                     if (isTerminalOnPotential(term)) {
                         returnValue.add(term.getPosition());
@@ -167,7 +167,7 @@ public final class PotentialArea {
 
 
 
-        if (!java.util.Objects.equals(pot2._potentialCircuitSheet, _potentialCircuitSheet)) {
+        if (!Objects.equals(pot2._potentialCircuitSheet, _potentialCircuitSheet)) {
             return false;
         }
 
@@ -246,7 +246,7 @@ public final class PotentialArea {
             _potentialLabel = label1;
         }
 
-        if (!java.util.Objects.equals(pot1._potentialCircuitSheet, pot2._potentialCircuitSheet)) {
+        if (!Objects.equals(pot1._potentialCircuitSheet, pot2._potentialCircuitSheet)) {
             _potentialCircuitSheet = null;
         }
         // Note: If sheets are equal, _potentialCircuitSheet is already set to pot1._potentialCircuitSheet
@@ -499,11 +499,11 @@ public final class PotentialArea {
     }
 
     private boolean validateMemoryOptimization() {
-        if(_memoryOptimization.length != _potentialTerminals.size()) {
+        if (_memoryOptimization.length != _potentialTerminals.size()) {
             return false;
         }
         for (SubCircuitTerminable terminal : _memoryOptimization) {
-            if(!_potentialTerminals.contains(terminal)) {
+            if (!_potentialTerminals.contains(terminal)) {
                 assert false : _potentialTerminals.contains(terminal);
                 return false;
             }
@@ -592,6 +592,6 @@ public final class PotentialArea {
         if (pot1._potentialCircuitSheet == null || pot2._potentialCircuitSheet == null) {
             return false;
         }
-        return label1.equals(label2) && java.util.Objects.equals(pot1._potentialCircuitSheet, pot2._potentialCircuitSheet);
+        return label1.equals(label2) && Objects.equals(pot1._potentialCircuitSheet, pot2._potentialCircuitSheet);
     }
 }

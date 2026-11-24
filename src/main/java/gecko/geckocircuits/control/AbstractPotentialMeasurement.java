@@ -27,8 +27,12 @@ import java.awt.Window;
 import java.util.ArrayList;
 import java.util.List;
 
-@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "Measurement block must share coupling references for circuit connectivity")
-public abstract class AbstractPotentialMeasurement extends RegelBlock implements gecko.geckocircuits.circuit.PotentialCoupable, gecko.geckocircuits.circuit.ComponentCoupable {
+@SuppressFBWarnings(
+        value = "EI_EXPOSE_REP",
+        justification = "Measurement block must share coupling references for circuit connectivity")
+public abstract class AbstractPotentialMeasurement extends RegelBlock
+        implements gecko.geckocircuits.circuit.PotentialCoupable,
+                gecko.geckocircuits.circuit.ComponentCoupable {
 
     final PotentialCoupling _potentialLabelCoupling;
     final ComponentCoupling _componentCoupling = new ComponentCoupling(1, this, new int[]{2});
@@ -85,9 +89,10 @@ public abstract class AbstractPotentialMeasurement extends RegelBlock implements
 
     @Override
     public final void checkComponentCompatibility(Object testObject, List<AbstractBlockInterface> insertList) {
-        if(testObject instanceof DirectVoltageMeasurable) {
+        if (testObject instanceof DirectVoltageMeasurable) {
             DirectVoltageMeasurable voltMeas = (DirectVoltageMeasurable) testObject;
-            for(AbstractBlockInterface comp : voltMeas.getDirectVoltageMeasurementComponents(_measureConnectorType)) {
+            for (AbstractBlockInterface comp :
+                    voltMeas.getDirectVoltageMeasurementComponents(_measureConnectorType)) {
                 insertList.add(comp);
             }
         }

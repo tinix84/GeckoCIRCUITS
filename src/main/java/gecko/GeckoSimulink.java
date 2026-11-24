@@ -30,7 +30,7 @@ public class GeckoSimulink {
     private boolean isRunning = false;
 
     public GeckoSimulink() {
-        if(!setSimulinkOperatingMode()) {
+        if (!setSimulinkOperatingMode()) {
             GeckoSim.main(new String[]{});
         }
 
@@ -52,7 +52,7 @@ public class GeckoSimulink {
     public GeckoSimulink(String filePath) {
         ReglerFromEXTERNAL.clearFromExternals();
         ReglerToEXTERNAL.clearToExternals();
-        if(!setSimulinkOperatingMode()) {
+        if (!setSimulinkOperatingMode()) {
             GeckoSim.main(new String[]{filePath});
         }
     }
@@ -64,7 +64,7 @@ public class GeckoSimulink {
     //========================================================================
     //
     public double external_init(double tend) {
-        if(isRunning) {
+        if (isRunning) {
             external_end();
         }
         isRunning = true;
@@ -100,7 +100,7 @@ public class GeckoSimulink {
     }
 
     public int external_getTerminalNumber_TO_EXTERNAL(int portNo) {
-        if(portNo < ReglerToEXTERNAL.toExternals.size()) {
+        if (portNo < ReglerToEXTERNAL.toExternals.size()) {
             return ((ReglerToEXTERNAL) ReglerToEXTERNAL.toExternals.get(portNo)).XIN.size();
         } else {
             return 0;
@@ -109,21 +109,21 @@ public class GeckoSimulink {
     }
 
     public static void external_setInputPortName(int index, String name) {
-        if(index < ReglerFromEXTERNAL.fromExternals.size()) {
+        if (index < ReglerFromEXTERNAL.fromExternals.size()) {
             ReglerFromEXTERNAL fromExt = (ReglerFromEXTERNAL) ReglerFromEXTERNAL.fromExternals.get(index);
             fromExt.setExternalName(name);
         }
     }
 
     public static void external_setOutputPortName(int index, String name) {
-        if(index < ReglerToEXTERNAL.toExternals.size()) {
+        if (index < ReglerToEXTERNAL.toExternals.size()) {
             ReglerToEXTERNAL fromExt = (ReglerToEXTERNAL) ReglerToEXTERNAL.toExternals.get(index);
             fromExt.setExternalName(name);
         }
     }
 
     public int external_getTerminalNumber_FROM_EXTERNAL(int portNo) {
-        if(portNo < ReglerFromEXTERNAL.fromExternals.size()) {
+        if (portNo < ReglerFromEXTERNAL.fromExternals.size()) {
             return ((ReglerFromEXTERNAL) ReglerFromEXTERNAL.fromExternals.get(portNo)).getTerminalNumber();
         } else {
             return 0;

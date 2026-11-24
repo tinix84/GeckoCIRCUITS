@@ -206,7 +206,7 @@ public class PotentialCoupling {
                 }
 
                 setNewCouplingLabel(_index, (String) parameterValue);
-                if(_parent instanceof AbstractPotentialMeasurement) {
+            if (_parent instanceof AbstractPotentialMeasurement) {
                     ((AbstractPotentialMeasurement) _parent).getComponentCoupling().setNewCouplingElement(0, null);
                 }
                 return null;
@@ -220,7 +220,7 @@ public class PotentialCoupling {
         Operationable.OperationInterface op0 = new SetOperation(0);
         returnValue.add(op0);
 
-        if(_stringIDIndices.length == 2) {
+        if (_stringIDIndices.length == 2) {
             Operationable.OperationInterface op1 = new SetOperation(1);
             returnValue.add(op1);
         }
