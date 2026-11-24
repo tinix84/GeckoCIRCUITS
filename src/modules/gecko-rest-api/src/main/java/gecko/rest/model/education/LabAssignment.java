@@ -29,5 +29,10 @@ public record LabAssignment(UUID id, Definition definition, Instant createdAt) {
     public record Submission(UUID id, UUID assignmentId, String student, Instant submittedAt,
                              double score, List<CheckResult> checks) {}
 
-    public record CheckResult(Check check, Double value, boolean passed, String error) {}
+    public record CheckResult(Check check, Double value, boolean passed, String error) {
+        @JsonProperty(value = "score", access = JsonProperty.Access.READ_ONLY)
+        public int score() {
+            return passed ? 1 : 0;
+        }
+    }
 }

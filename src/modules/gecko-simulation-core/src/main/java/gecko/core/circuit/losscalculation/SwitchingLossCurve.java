@@ -16,6 +16,7 @@ package gecko.core.circuit.losscalculation;
 import gecko.core.allg.UserParameterCore;
 import gecko.core.allg.UserParameterCoreImpl;
 import gecko.core.circuit.TokenMap;
+import gecko.core.io.SerializationUtils;
 
 import java.io.Serializable;
 
@@ -61,7 +62,8 @@ public class SwitchingLossCurve extends LossCurve implements Serializable {
 
     @Override
     protected void exportIndividual(final StringBuffer ascii) {
-        _uBlock.writeXMLToFile(ascii);
+        ascii.append('\n').append(_uBlock.getSaveIdentifier());
+        SerializationUtils.appendAsString(ascii, _uBlock.getDoubleValue());
     }
 
     @Override
