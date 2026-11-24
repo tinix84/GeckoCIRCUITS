@@ -151,4 +151,18 @@ class AdaptiveStepGridChangeTest {
         }
         assertEquals(whole, parts, "same-grid continuation is deterministic and unchanged");
     }
+
+    @Test
+    void aPreparedEngineRunReportsEventMetadataForAnAdaptiveOnlyCircuit() {
+        var result = new HeadlessSimulationEngine().runSimulation(prepared(rc(), 0.1, 0.5), ExecutionOptions.defaults(),
+                () -> false);
+        assertTrue(result.isSuccess(), result.getErrorMessage());
+        var metadata = result.getMetadata();
+        for (String key : List.of("zeroCrossingLocated", "zeroCrossingUnlocated", "zeroCrossingFirstUnlocatedTime",
+                "zeroCrossingRetained", "zeroCrossingDropped")) {
+            assertTrue(metadata.containsKey(key), key);
+        }
+        assertEquals(0L, metadata.get("zeroCrossingLocated"), "an RC circuit has no switching event");
+        assertTrue(metadata.get("adaptiveStep") instanceof AdaptiveStepReport);
+    }
 }

@@ -4,7 +4,8 @@ package gecko.core.simulation;
  * Constant-memory statistics of the adaptive electrical step.
  *
  * @param accepted committed sub-steps
- * @param rejected trials that the local-error estimate rejected and retried with a shorter step. Discarded event and refinement trials are not counted
+ * @param rejected trials that the local-error estimate rejected and retried with a shorter step.
+ *     Discarded event and refinement trials are not counted
  * @param forced committed sub-steps whose error estimate exceeded the tolerance at the smallest step or after the retry bound
  * @param minStep shortest committed sub-step, or NaN when none committed
  * @param maxStep longest committed sub-step, or NaN when none committed

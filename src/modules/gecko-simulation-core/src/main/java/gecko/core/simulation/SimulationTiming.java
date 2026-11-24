@@ -17,6 +17,8 @@ public final class SimulationTiming {
     private static final int MAXIMUM_STEPS = Integer.MAX_VALUE - 2;
     private static final String STEP_MESSAGE = "Step width must be finite and positive.";
     private static final String DURATION_MESSAGE = "Simulation duration must be finite and positive.";
+    /** The reason the adaptive step rejects the Gear-Shichman solver, shared by settings validation and the solver. */
+    static final String GS_ADAPTIVE_MESSAGE = "The adaptive step does not support the Gear-Shichman solver.";
 
     private SimulationTiming() { }
 
@@ -71,8 +73,6 @@ public final class SimulationTiming {
         issues.addAll(adaptiveStepIssues(settings.getAdaptiveStep(), settings.getSolverType(), step, preTime, preStep));
         return List.copyOf(issues);
     }
-
-    public static final String GS_ADAPTIVE_MESSAGE = "The adaptive step does not support the Gear-Shichman solver.";
 
     /**
      * Checks the adaptive-step settings against the grid steps, before any allocation.

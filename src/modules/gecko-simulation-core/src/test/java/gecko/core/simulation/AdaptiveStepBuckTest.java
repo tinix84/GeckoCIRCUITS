@@ -119,7 +119,9 @@ class AdaptiveStepBuckTest {
             }
             if (shorter) edgesWithShort++;
         }
-        System.out.printf("ADAPTIVE-BUCK fixedAvg=%.6f adaptiveAvg=%.6f relDiff=%.3e accepted=%d rejected=%d forced=%d minH=%.3e maxH=%.3e located=%d unlocated=%d gateEdges=%d edgesWithShortStep=%d steadyIntervals=%d steadyOneSubStep=%d adaptiveSeconds=%.3f fixedSeconds=%.3f%n",
+        System.out.printf("ADAPTIVE-BUCK fixedAvg=%.6f adaptiveAvg=%.6f relDiff=%.3e accepted=%d rejected=%d forced=%d "
+                        + "minH=%.3e maxH=%.3e located=%d unlocated=%d gateEdges=%d edgesWithShortStep=%d "
+                        + "steadyIntervals=%d steadyOneSubStep=%d adaptiveSeconds=%.3f fixedSeconds=%.3f%n",
                 fixedAverage, adaptiveAverage, Math.abs(adaptiveAverage - fixedAverage) / Math.abs(fixedAverage),
                 report.accepted(), report.rejected(), report.forced(), report.minStep(), report.maxStep(),
                 report.located(), report.unlocated(), edges, edgesWithShort, steady, steadyOne, run.seconds(), fixedSeconds);

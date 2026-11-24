@@ -290,7 +290,7 @@ public class HeadlessSimulationEngine {
                     .metadata("circuitFile", config.getCircuitFilePath())
                     .metadata("parameterOverrides", config.getParameterOverrides().size());
             if (steady != null) success.metadata("steadyState", steady);
-            if (settings.isZeroCrossing()) {
+            if (session.locatesEvents()) {
                 var report = session.eventLocationReport();
                 success.metadata("zeroCrossingLocated", report.located())
                         .metadata("zeroCrossingUnlocated", report.unlocated())

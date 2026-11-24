@@ -83,7 +83,8 @@ class AdaptiveStepTest {
         int fixedSteps = (int) Math.round(5e-3 / MIN);
         for (int index = 0; index <= fixedSteps; index++) fixed.advance(MIN, index * MIN, null);
         double fixedSeconds = (System.nanoTime() - begin) * 1e-9;
-        System.out.printf("ADAPTIVE-RC-TRZ accepted=%d rejected=%d forced=%d maxError=%.3e adaptiveSeconds=%.4f fixedSteps=%d fixedSeconds=%.4f ratio=%.1f%n",
+        System.out.printf("ADAPTIVE-RC-TRZ accepted=%d rejected=%d forced=%d maxError=%.3e adaptiveSeconds=%.4f "
+                        + "fixedSteps=%d fixedSeconds=%.4f ratio=%.1f%n",
                 run.accepted(), run.rejected(), run.forced(), run.maxError(), run.seconds(), fixedSteps + 1, fixedSeconds,
                 (fixedSteps + 1.0) / run.accepted());
         assertTrue(run.maxError() <= 1e-3, "error " + run.maxError());

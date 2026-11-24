@@ -130,7 +130,8 @@ class AdaptiveStepSessionTest {
         var tolerance = preparation.prepare(snapshot, new PreparationRequest(features(adaptive(new AdaptiveStepSettings(0.5))), Map.of()));
         assertTrue(assertInstanceOf(PreparationResult.Rejected.class, tolerance).report().diagnostics().stream()
                 .anyMatch(item -> "adaptiveStep.tolerance".equals(item.parameterPath())));
-        var clamps = preparation.prepare(snapshot, new PreparationRequest(features(adaptive(new AdaptiveStepSettings(1e-3, 1e-3, Double.NaN))), Map.of()));
+        var clamps = preparation.prepare(snapshot, new PreparationRequest(
+                features(adaptive(new AdaptiveStepSettings(1e-3, 1e-3, Double.NaN))), Map.of()));
         assertInstanceOf(PreparationResult.Rejected.class, clamps);
         assertInstanceOf(PreparationResult.Ready.class, preparation.prepare(snapshot, new PreparationRequest(
                 new SolverOverrides(SolverType.SOLVER_GS, null, null, SolverFeatures.none()), Map.of())));
@@ -237,6 +238,34 @@ class AdaptiveStepSessionTest {
         }
         assertArrayEquals(plainRows[0], adaptiveRows[0], "the clock is the grid time");
         assertArrayEquals(plainRows[1], adaptiveRows[1], "the delay line holds the same grid history");
+    }
+
+    private static final List<String> EVENT_KEYS = List.of("zeroCrossingLocated", "zeroCrossingUnlocated",
+            "zeroCrossingFirstUnlocatedTime", "zeroCrossingRetained", "zeroCrossingDropped");
+
+    private static java.util.Map<String, Object> metadata(SimulationConfig config) {
+        var result = new HeadlessSimulationEngine().runSimulation(config);
+        assertTrue(result.isSuccess(), result.getErrorMessage());
+        return result.getMetadata();
+    }
+
+    @Test
+    void theEngineReportsEventCountsWheneverEventsAreLocatedWhetherOrNotZeroCrossingIsRequested() throws Exception {
+        var adaptiveOnly = metadata(SimulationConfig.builder().circuitFile(buck()).simulationDuration(2e-3)
+                .zeroCrossing(false).adaptiveStep(ON).build());
+        var explicit = metadata(SimulationConfig.builder().circuitFile(buck()).simulationDuration(2e-3)
+                .zeroCrossing(true).adaptiveStep(ON).build());
+        for (String key : EVENT_KEYS) assertTrue(adaptiveOnly.containsKey(key), "adaptive-only reports " + key);
+        for (String key : EVENT_KEYS) assertEquals(explicit.get(key), adaptiveOnly.get(key), key);
+        assertTrue((Long) adaptiveOnly.get("zeroCrossingLocated") > 0, "the buck diode switches inside steps");
+        assertEquals(adaptiveOnly.get("adaptiveStep"), explicit.get("adaptiveStep"));
+        assertEquals(((AdaptiveStepReport) adaptiveOnly.get("adaptiveStep")).located(), adaptiveOnly.get("zeroCrossingLocated"));
+        var off = metadata(SimulationConfig.builder().circuitFile(buck()).simulationDuration(2e-3).build());
+        for (String key : EVENT_KEYS) assertFalse(off.containsKey(key), "off reports no " + key);
+        assertFalse(off.containsKey("adaptiveStep"));
+        var legacy = metadata(SimulationConfig.builder().circuitFile(buck()).simulationDuration(2e-3).zeroCrossing(true).build());
+        for (String key : EVENT_KEYS) assertTrue(legacy.containsKey(key), "zero-crossing alone reports " + key);
+        assertFalse(legacy.containsKey("adaptiveStep"));
     }
 
     @Test

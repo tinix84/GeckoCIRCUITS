@@ -122,7 +122,7 @@ final class ElectricalTimeStep {
     ElectricalTimeStep(CircuitNetlist netlist, SolverType solverType, SolverFeatures features) {
         this.adaptive = features.adaptiveStep();
         if (adaptive != null && solverType == SolverType.SOLVER_GS) {
-            throw new IllegalArgumentException(gecko.core.simulation.SimulationTiming.GS_ADAPTIVE_MESSAGE);
+            throw new IllegalArgumentException(SimulationTiming.GS_ADAPTIVE_MESSAGE);
         }
         this.zeroCrossing = features.zeroCrossing() || adaptive != null;
         this.netlist = netlist;
@@ -168,7 +168,10 @@ final class ElectricalTimeStep {
             companionSolver.initializeMatrices(netlist.getNodeMax(), netlist.getVoltageSourceMax(), netlist.getElementCount());
             int[] watched = new int[netlist.getElementCount()];
             int watchedCount = 0;
-            for (int element = 0; element < watched.length; element++) if (discontinuityValue(element) == discontinuityValue(element)) watched[watchedCount++] = element;
+            for (int element = 0; element < watched.length; element++) {
+                double value = discontinuityValue(element);
+                if (!Double.isNaN(value)) watched[watchedCount++] = element;
+            }
             discontinuityElements = Arrays.copyOf(watched, watchedCount);
             discontinuityValues = new double[watchedCount];
             committedMargin = new double[diodeCount];
@@ -491,9 +494,11 @@ final class ElectricalTimeStep {
     }
 
     /**
-     * Exports every electrical value that the next step reads, after a committed grid step. It only reads.
+     * Exports the physical electrical state that the next step reads, after a committed grid step. It only reads.
      * Solver histories come first, then capacitor currents, then the discrete states, which compare exactly.
      * The derived matrix cache, the clock and the event counters are not state and are not exported.
+     * The adaptive controller step, restart flag, margin trend and statistics are numerical controller state,
+     * not physical state, so they are not exported (ADR-0018).
      */
     void exportPeriodicState(PeriodicStateMonitor.Sink sink) {
         double[] potentials = matrixSolver.getPALT();

@@ -571,6 +571,9 @@ public final class SimulationSession implements AutoCloseable {
         finally { leaveOperation(); }
     }
 
+    /** @return true when events are located, whether requested directly or implied by the adaptive step */
+    boolean locatesEvents() { return zeroCrossing; }
+
     /**
      * Reports the adaptive electrical step: committed, rejected and forced sub-steps, the shortest and longest
      * sub-step, and the located and unlocated diode events.
