@@ -34,10 +34,10 @@ public final class CircuitFileWriter {
         var identifiers = identifiers(model);
         var text = new StringBuilder();
         int ordinal = 0;
-        for (var data : model.getCircuitComponents()) component(text, data, "LK", "e", ++ordinal, identifiers.get(data));
-        for (var data : model.getControlComponents()) component(text, data, "CONTROL", "c", ++ordinal, identifiers.get(data));
-        for (var data : model.getThermalComponents()) component(text, data, "THERM", "eTH", ++ordinal, identifiers.get(data));
-        for (var data : model.getSpecialComponents()) component(text, data, "SPECIAL", "sp", ++ordinal, identifiers.get(data));
+        for (var data : model.getCircuitComponents()) component(text, model, data, "LK", "e", ++ordinal, identifiers.get(data));
+        for (var data : model.getControlComponents()) component(text, model, data, "CONTROL", "c", ++ordinal, identifiers.get(data));
+        for (var data : model.getThermalComponents()) component(text, model, data, "THERM", "eTH", ++ordinal, identifiers.get(data));
+        for (var data : model.getSpecialComponents()) component(text, model, data, "SPECIAL", "sp", ++ordinal, identifiers.get(data));
         for (var wire : model.getConnections()) {
             String domain = wire.getType().equals("THERMAL") ? "THERM" : wire.getType();
             text.append("\nverbindung").append(domain).append(" (").append(++ordinal).append(")\n<Verbindung>\n");
@@ -53,6 +53,14 @@ public final class CircuitFileWriter {
             text.append("<\\Verbindung>\n");
         }
         var settings = new TreeMap<>(model.getSavedSettings());
+        settings.remove(AcMetadataCodec.SETTINGS);
+        settings.remove(AcMetadataCodec.PROVENANCE);
+        if (model.getAcSettings() != null) {
+            settings.put(AcMetadataCodec.SETTINGS, AcMetadataCodec.encode(model.getAcSettings()));
+        }
+        if (model.getAcProvenance() != null) {
+            settings.put(AcMetadataCodec.PROVENANCE, AcMetadataCodec.encode(model.getAcProvenance()));
+        }
         settings.keySet().removeIf(key -> key.startsWith("<") || key.startsWith("=")
                 || Set.of("e", "c", "eTH", "sp", "verbindungLK", "verbindungCONTROL",
                         "verbindungTHERM", "GeckoFileManager").contains(key));
@@ -82,7 +90,7 @@ public final class CircuitFileWriter {
         }
         appendTokens(text, settings);
         for (var section : model.getSavedSections()) {
-            if (!section.tag().equals("ImportIssues")) section(text, section.tag(), section.text());
+            if (!section.tag().equals(ImportIssueCodec.TAG)) section(text, section.tag(), section.text());
         }
         if (!model.getResources().isEmpty()) {
             text.append("GeckoFileManager\n<GeckoFileManager>\n");
@@ -97,25 +105,13 @@ public final class CircuitFileWriter {
             }
             text.append("<\\GeckoFileManager>\n");
         }
-        var conversionIssues = model.getConversionIssues();
-        if (!conversionIssues.isEmpty()) {
-            var issues = new StringBuilder();
-            for (var issue : conversionIssues) {
-                String[] fields = {issue.code(), issue.domain(), issue.component(), issue.message(),
-                    issue.sourceLocation(), Boolean.toString(issue.unsupported()), issue.parameterPath()};
-                issues.append("issue");
-                for (String field : fields) issues.append(' ').append(field == null ? "-" : java.util.Base64.getEncoder()
-                        .encodeToString(field.getBytes(StandardCharsets.UTF_8)));
-                issues.append('\n');
-            }
-            section(text, "ImportIssues", issues.toString());
-        }
+        text.append(ImportIssueCodec.encodeSection(model.getConversionIssues()));
         var bytes = new ByteArrayOutputStream();
         try (var gzip = new GZIPOutputStream(bytes)) { gzip.write(text.toString().getBytes(StandardCharsets.UTF_8)); }
         return bytes.toByteArray();
     }
 
-    private static void component(StringBuilder text, CircuitModel.ComponentData data,
+    private static void component(StringBuilder text, CircuitModel model, CircuitModel.ComponentData data,
             String domain, String marker, int ordinal, long identifier) throws IOException {
         if (!data.isParsedInput() && data.getParameters().keySet().stream().anyMatch(key -> !key.equals("uniqueObjectIdentifier"))) {
             throw new IOException("Set the saved parameter slots and tokens for " + data.getName() + ".");
@@ -123,6 +119,10 @@ public final class CircuitFileWriter {
         text.append('\n').append(marker).append(" (").append(ordinal).append(")\n<Element").append(domain).append(">\n");
         var tokens = tokens(data.getSavedBlock());
         tokens.putAll(data.getImportTokens());
+        tokens.remove(AcMetadataCodec.COMPONENT);
+        if (data.getAcComponent() != null) {
+            tokens.put(AcMetadataCodec.COMPONENT, AcMetadataCodec.encode(data.getAcComponent()));
+        }
         tokens.put("typ", Integer.toString(data.getType()));
         tokens.put("idStringDialog", scalar(data.getName()));
         tokens.put("x", Integer.toString(data.getPosition()[0]));
@@ -131,7 +131,9 @@ public final class CircuitFileWriter {
         if (!domain.equals("SPECIAL") || data.getSavedBlock() == null) {
             tokens.put("labelAnfangsKnoten[]", strings(data.getTerminalXLabels()));
             tokens.put("labelEndKnoten[]", strings(data.getTerminalYLabels()));
-            tokens.put("parameter[]", Arrays.stream(data.getNumericParameters()).mapToObj(Double::toString)
+            double[] values = data.getAcComponent() == null ? data.getNumericParameters()
+                    : AcMetadataCodec.compatibilityValues(data.getAcComponent(), data.getNumericParameters(), model.getAcSettings());
+            tokens.put("parameter[]", Arrays.stream(values).mapToObj(Double::toString)
                     .collect(Collectors.joining(" ")));
             tokens.put("parameterString[]", strings(data.getParameterStrings()));
         }

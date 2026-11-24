@@ -17,8 +17,8 @@ public final class Main {
 
     /** Returns zero for a complete import, two for a partial import, or one for an input/output error. */
     public static int run(String[] args, PrintStream output, PrintStream errors) {
-        if (args.length != 2) {
-            errors.println("Usage: gecko.core.io.importer.Main <input.cir|input.asc|input.plecs> <output.ipes>");
+        if (args.length != 2 && !(args.length == 4 && args[2].equals("--symbols") && args[0].toLowerCase(Locale.ROOT).endsWith(".asc"))) {
+            errors.println("Usage: gecko.core.io.importer.Main <input.cir|input.asc|input.plecs> <output.ipes> [--symbols <stock-symbol-directory>]");
             return 1;
         }
         try {
@@ -27,7 +27,9 @@ public final class Main {
             String lowerName = inputName.toLowerCase(Locale.ROOT);
             CircuitModel model;
             if (lowerName.endsWith(".asc")) {
-                model = new LtspiceImporter().convert(input);
+                var importer = new LtspiceImporter();
+                model = args.length == 2 ? importer.convert(input)
+                        : importer.convert(input, Path.of(args[3]));
             } else {
                 String source = Files.readString(input, StandardCharsets.UTF_8);
                 model = lowerName.endsWith(".plecs")
@@ -46,7 +48,7 @@ public final class Main {
         }
     }
 
-    private static String json(String value) {
+    public static String json(String value) {
         if (value == null) return "null";
         var result = new StringBuilder("\"");
         for (char c : value.toCharArray()) {

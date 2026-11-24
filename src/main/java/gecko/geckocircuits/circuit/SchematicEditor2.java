@@ -13,6 +13,11 @@
  */
 package gecko.geckocircuits.circuit;
 
+import gecko.core.ac.AcDocumentSettings;
+import gecko.core.io.AcProvenance;
+import gecko.core.io.ImportIssue;
+import gecko.modelviewcontrol.ModelMVC;
+import java.util.Optional;
 import gecko.GeckoSim;
 import gecko.geckocircuits.allg.AbstractComponentTyp;
 import gecko.geckocircuits.allg.ProjectData;
@@ -51,6 +56,27 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 @SuppressFBWarnings(value = {"MS_CANNOT_BE_FINAL", "PA_PUBLIC_PRIMITIVE_ATTRIBUTE", "EI_EXPOSE_REP2", "NM_FIELD_NAMING_CONVENTION"},
         justification = "Static fields (Singleton, fonts) are intentionally mutable for runtime configuration; public fields for UI component access; stores component selection reference; Singleton name is a widely-used pattern in codebase")
 public final class SchematicEditor2 implements MouseListener, MouseMotionListener {
+    private final ModelMVC<Optional<AcDocumentSettings>> acSettings = new ModelMVC<>(Optional.empty(), "AC analysis");
+    private AcProvenance acProvenance;
+    private List<ImportIssue> conversionIssues = List.of();
+
+    public AcDocumentSettings getAcSettings() { return acSettings.getValue().orElse(null); }
+    public AcProvenance getAcProvenance() { return acProvenance; }
+    public List<ImportIssue> getConversionIssues() { return conversionIssues; }
+
+    /** Blocks simulation when an import dropped or approximated behavior. */
+    public void requireCompleteConversion() {
+        if (conversionIssues.isEmpty()) return;
+        String details = conversionIssues.stream().map(issue -> issue.code() + " " + issue.message()
+                + (issue.sourceLocation() == null ? "" : " (" + issue.sourceLocation() + ")"))
+                .collect(java.util.stream.Collectors.joining("\n"));
+        throw new IllegalArgumentException("The source conversion is incomplete.\n" + details);
+    }
+
+    public void setAcSettings(AcDocumentSettings settings) {
+        acSettings.setValue(Optional.ofNullable(settings));
+        setDirtyFlag();
+    }
 
     public final CircuitSheet _circuitSheet = new CircuitSheet(this);
     private SchematicComponentSelection2 _sea;
@@ -730,6 +756,9 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
     }
 
     public void resetCircuitSheetsForNewFile() {
+        acSettings.setValueWithoutUndo(Optional.empty());
+        acProvenance = null;
+        conversionIssues = List.of();
         for (AbstractCircuitSheetComponent comp : _circuitSheet.getAllElements().toArray(new AbstractCircuitSheetComponent[0])) {
             comp.deleteComponent();
         }
@@ -857,6 +886,22 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
 
     public void ladeGespeicherteNetzlisteVonProjectData(final ProjectData daten,
             final String insertIntoSubCircuitName) {
+        attachProjectComponents(daten, insertIntoSubCircuitName);
+        conversionIssues = daten.getConversionIssues();
+        if (insertIntoSubCircuitName == null) {
+            acSettings.setValueWithoutUndo(Optional.ofNullable(daten.getAcSettings()));
+            acProvenance = daten.getAcProvenance();
+        }
+    }
+
+    public void importProjectComponents(ProjectData project, String parent) {
+        attachProjectComponents(project, parent);
+        var combined = new LinkedHashSet<>(conversionIssues);
+        combined.addAll(project.getConversionIssues());
+        conversionIssues = List.copyOf(combined);
+    }
+
+    private void attachProjectComponents(ProjectData daten, String insertIntoSubCircuitName) {
         for (AbstractCircuitSheetComponent elem : daten._allSheetComponents) {
             elem.findAndSetReferenceToParentSheet(daten.allSubCircuitBlocks, insertIntoSubCircuitName);
         }
