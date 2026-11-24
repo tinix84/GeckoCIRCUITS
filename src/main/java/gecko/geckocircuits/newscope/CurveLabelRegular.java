@@ -20,18 +20,18 @@ import java.awt.Graphics2D;
  *
  * @author andy
  */
-class CurveLabelRegular extends CurveLabel{
+class CurveLabelRegular extends CurveLabel {
   private final TechFormat _cf = new TechFormat();
   private static final int DISP_NUM_DIGITS = 4;
 
-  CurveLabelRegular(final AbstractCurve curve){
+    CurveLabelRegular(final AbstractCurve curve) {
     super(curve);
     _cf.setMaximumDigits(DISP_NUM_DIGITS);
   }
 
-  @Override
-  public void drawLabel(final Graphics2D g2d){
-    if(_labelIndex < 0){
+    @Override
+    public void drawLabel(final Graphics2D g2d) {
+        if (_labelIndex < 0) {
       return;
     }
     super.drawLabel(g2d);
@@ -41,7 +41,7 @@ class CurveLabelRegular extends CurveLabel{
     final Axis yAxis = _diagram._yAxis1;
     final int yLinksObenKurve = yAxis._axisOriginPixel.y - yAxis.getAxisLengthPixel();
 
-    if(_slider.isSliderActive()){
+        if (_slider.isSliderActive()) {
       final int yOben = yLinksObenKurve + g2d.getFont().getSize() + 2 * _labelIndex * DIST_SIG_NAMES;
       final int yUnten = yOben + (int)(DIST_SIG_NAMES * SIG_NAMES_RATIO);
       _labelYMin = yOben - g2d.getFont().getSize();
@@ -50,7 +50,7 @@ class CurveLabelRegular extends CurveLabel{
       final String labelString = _slider.getLabelString(_curve) + " " + wert;
       g2d.drawString(labelString, TXT_DX,
                      yOben + Math.round(DIST_SIG_NAMES * SIG_NAMES_RATIO));
-    }else{
+        } else {
       _labelYMin = yLinksObenKurve + _labelIndex * DIST_SIG_NAMES;
       _labelYMax = _labelYMin + g2d.getFont().getSize();
       g2d.drawString(_curve.getCurveName(), TXT_DX,

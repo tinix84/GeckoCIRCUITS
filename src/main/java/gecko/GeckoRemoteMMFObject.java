@@ -58,16 +58,16 @@ public final class GeckoRemoteMMFObject extends GeckoRemoteObject {
         if (!mmfile.exists()) { //file does not exist - can be created by a new GeckoCIRCUITS instance
             GeckoSim.operatingmode = OperatingMode.MMF;
             final List<String> argsList = new ArrayList<String>();
-            if(!_pathToJava.isEmpty()) {
+            if (!_pathToJava.isEmpty()) {
                 argsList.add("-j");
                 argsList.add(_pathToJava);
             }
             argsList.add("-mm"); //-mm is argument to enable memory-mapped access on startup
             argsList.add(file);
-            argsList.add(Long.toString(size*1024*1024)); //convert MB to bytes
+            argsList.add(Long.toString(size * 1024 * 1024)); // convert MB to bytes
             final String[] args = argsList.toArray(new String[0]);
 
-            for(String arg : args) {
+            for (String arg : args) {
                 System.out.println("arg " + arg);
             }
             GeckoSim.main(args);
@@ -80,7 +80,10 @@ public final class GeckoRemoteMMFObject extends GeckoRemoteObject {
                 return connectToExistingInstance(file);
             }
         } else {
-            System.out.println("The given file " + file + " already exists. Will attempt to treat it as a runnning GeckoCIRCUITS instance\nand connect to it. If this fails, please try a different (non-existing!) file name.");
+            System.out.println(
+                    "The given file "
+                            + file
+                            + " already exists. Will attempt to treat it as a runnning GeckoCIRCUITS instance\nand connect to it. If this fails, please try a different (non-existing!) file name.");
             return connectToExistingInstance(file);
 
         }
@@ -145,7 +148,10 @@ public final class GeckoRemoteMMFObject extends GeckoRemoteObject {
                         sessionID = newSessionID;
                         System.out.println("You are now connected to the GeckoCIRCUITS instance via file " + file.getFileName());
                     } else if (newSessionID == 0) {
-                        throw new RuntimeException("Connection to GeckoCIRCUITS via file " + file.getFileName() + " rejected by that instance of GeckoCIRCUITS.");
+                throw new RuntimeException(
+                        "Connection to GeckoCIRCUITS via file "
+                                + file.getFileName()
+                                + " rejected by that instance of GeckoCIRCUITS.");
                     } else if (newSessionID == -1) {
                         throw new RuntimeException("The GeckoCIRCUITS instance using file " + file.getFileName()
                                 + " is busy with another session. You cannot connect to it now.");
@@ -169,9 +175,10 @@ public final class GeckoRemoteMMFObject extends GeckoRemoteObject {
                             + "another process.");
                 }
             }
-        //} catch (Exception ex) {
-            //throw new RuntimeException("Error connecting to existing GeckoCIRCUITS instance through file " + file.getFileName() + ":\n" + ex.getMessage(), ex);
-        //}
+        // } catch (Exception ex) {
+        // throw new RuntimeException("Error connecting to existing GeckoCIRCUITS instance through
+        // file " + file.getFileName() + ":\n" + ex.getMessage(), ex);
+        // }
 
     }
 
@@ -180,7 +187,7 @@ public final class GeckoRemoteMMFObject extends GeckoRemoteObject {
      * @param pathToJavaExe the path to the java executable
      */
     public static void setJavaPath(final String pathToJavaExe) {
-        if(new File(pathToJavaExe).exists()) {
+        if (new File(pathToJavaExe).exists()) {
             _pathToJava = pathToJavaExe;
         } else {
             throw new RuntimeException("Error: Path to Java executable: " + pathToJavaExe + " does not exist!");
@@ -204,8 +211,12 @@ public final class GeckoRemoteMMFObject extends GeckoRemoteObject {
 
         } catch (Exception e) {
             final String fileName = (_mmf != null) ? _mmf.getFileName() : "unknown";
-            throw new RuntimeException("Error disconnecting from GeckoCIRCUITS instance at file " + fileName
-                    + "\nTo force a (potentially one-sided) disconnect, please call forceDisconnectFromGecko().\n"+e.getMessage(), e);
+            throw new RuntimeException(
+                    "Error disconnecting from GeckoCIRCUITS instance at file "
+                            + fileName
+                            + "\nTo force a (potentially one-sided) disconnect, please call forceDisconnectFromGecko().\n"
+                            + e.getMessage(),
+                    e);
         }
     }
 
@@ -261,8 +272,12 @@ public final class GeckoRemoteMMFObject extends GeckoRemoteObject {
 
         } catch (Exception e) {
             final String fileName = (_mmf != null) ? _mmf.getFileName() : "unknown";
-            throw new RuntimeException("Error disconnecting from GeckoCIRCUITS instance at file " + fileName
-                    + "\nTo force a (potentially one-sided) disconnect, please call forceDisconnectFromGecko().\n"+e.getMessage(), e);
+            throw new RuntimeException(
+                    "Error disconnecting from GeckoCIRCUITS instance at file "
+                            + fileName
+                            + "\nTo force a (potentially one-sided) disconnect, please call forceDisconnectFromGecko().\n"
+                            + e.getMessage(),
+                    e);
         }
 
         forceDisconnectFromGecko();
@@ -1089,7 +1104,10 @@ public final class GeckoRemoteMMFObject extends GeckoRemoteObject {
             final double endTime, final int harmonics) {
         try {
             if (checkRemote()) {
-                final GeckoRemotePipeObject method = new GeckoRemotePipeObject("getFourier",new Object[]{scopeName,scopePort,startTime,endTime,harmonics});
+                final GeckoRemotePipeObject method =
+                        new GeckoRemotePipeObject(
+                                "getFourier",
+                                new Object[] {scopeName, scopePort, startTime, endTime, harmonics});
                 final GeckoRemotePipeObject returnValue = _mmf.callMethod(sessionID, method);
                 if (returnValue.isReturnValue()) {
                     return (double[][])returnValue.getMethodReturnValue();
@@ -1674,7 +1692,10 @@ public final class GeckoRemoteMMFObject extends GeckoRemoteObject {
             final double endTime, final int harmonics) {
         try {
             if (checkRemote()) {
-                final GeckoRemotePipeObject method = new GeckoRemotePipeObject("getSignalFourier",new Object[]{signalName,startTime,endTime,harmonics});
+                final GeckoRemotePipeObject method =
+                        new GeckoRemotePipeObject(
+                                "getSignalFourier",
+                                new Object[] {signalName, startTime, endTime, harmonics});
                 final GeckoRemotePipeObject returnValue = _mmf.callMethod(sessionID, method);
                 if (returnValue.isReturnValue()) {
                     return (double[][])returnValue.getMethodReturnValue();
@@ -1719,7 +1740,10 @@ public final class GeckoRemoteMMFObject extends GeckoRemoteObject {
             double simulationTime) {
         try {
             if (checkRemote()) {
-                final GeckoRemotePipeObject method = new GeckoRemotePipeObject("initSteadyStateDetection",new Object[]{stateVariables,frequency,deltaT,simulationTime});
+                final GeckoRemotePipeObject method =
+                        new GeckoRemotePipeObject(
+                                "initSteadyStateDetection",
+                                new Object[] {stateVariables, frequency, deltaT, simulationTime});
                 final GeckoRemotePipeObject returnValue = _mmf.callMethod(sessionID, method);
                 if (returnValue.isErrorMessage()) {
                     throw new RuntimeException(returnValue.getErrorMessage());
@@ -1760,7 +1784,12 @@ public final class GeckoRemoteMMFObject extends GeckoRemoteObject {
     public double[] simulateToSteadyState(final boolean supressMessages, final double targetCorrelation, final double targetMeanPctDiff) {
         try {
             if (checkRemote()) {
-                final GeckoRemotePipeObject method = new GeckoRemotePipeObject("getSignalData",new Object[]{supressMessages,targetCorrelation,targetMeanPctDiff});
+                final GeckoRemotePipeObject method =
+                        new GeckoRemotePipeObject(
+                                "getSignalData",
+                                new Object[] {
+                                    supressMessages, targetCorrelation, targetMeanPctDiff
+                                });
                 final GeckoRemotePipeObject returnValue = _mmf.callMethod(sessionID, method);
                 if (returnValue.isReturnValue()) {
                     return (double[])returnValue.getMethodReturnValue();

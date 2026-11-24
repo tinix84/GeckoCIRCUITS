@@ -37,11 +37,11 @@ public class MemoryContainer {
     private static List<MemoryContainer> _containerSingletons = new ArrayList<MemoryContainer>();
 
     public static MemoryContainer getMemoryContainer(final int numRows) {
-        if(_containerSingletons.size() > CLEAR_SIZE) {
+        if (_containerSingletons.size() > CLEAR_SIZE) {
             _containerSingletons.clear();
         }
-        for(MemoryContainer mem : _containerSingletons) {
-            if(mem._numRows == numRows) {
+        for (MemoryContainer mem : _containerSingletons) {
+            if (mem._numRows == numRows) {
                 return mem;
             }
         }
@@ -76,7 +76,7 @@ public class MemoryContainer {
 //                    + "% valid arrays.");
 //            }
             assert _inUsePointer < _availablePointer;
-            if(returnValue == null) {
+            if (returnValue == null) {
                 return createNewArray();
             }
             return returnValue;
@@ -87,7 +87,7 @@ public class MemoryContainer {
 
     public float[] getArrayInitializedWithNaN() {
         float[] returnValue = getArray();
-        for(int i = 0; i < returnValue.length; i++) {
+        for (int i = 0; i < returnValue.length; i++) {
             returnValue[i] = Float.NaN;
         }
         return returnValue;

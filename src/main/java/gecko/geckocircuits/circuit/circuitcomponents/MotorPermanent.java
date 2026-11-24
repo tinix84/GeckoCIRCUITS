@@ -29,7 +29,12 @@ public final class MotorPermanent extends AbstractMotorDC {
     private static final int EMK_INDEX = 3;
     private static final int ELECTRIC_TORQUE_INDEX = 4;
     private static final int THETA_M_INDEX = 5;
-    public static final AbstractTypeInfo TYPE_INFO = new CircuitTypeInfo(MotorPermanent.class, "PM-DC", I18nKeys.DC_MACHINE_PERM, I18nKeys.PERMANENT_MAGNET_DC_MACHINE);
+    public static final AbstractTypeInfo TYPE_INFO =
+            new CircuitTypeInfo(
+                    MotorPermanent.class,
+                    "PM-DC",
+                    I18nKeys.DC_MACHINE_PERM,
+                    I18nKeys.PERMANENT_MAGNET_DC_MACHINE);
     double _fluxLinkage;
     final UserParameter<Double> _psiParameter = UserParameter.Builder.
             <Double>start("flux_psi", INITIAL_FLUX_VALUE).

@@ -149,9 +149,27 @@ public class TechFormat implements Serializable {
             char[] sc = s2.toCharArray();
             int anzTechZeichen = 0, anzKomma = 0;
             for (int i1 = 0; i1 < sc.length; i1++) {
-                if ((sc[i1] != '0') && (sc[i1] != '1') && (sc[i1] != '2') && (sc[i1] != '3') && (sc[i1] != '4') && (sc[i1] != '5') && (sc[i1] != '6') && (sc[i1] != '7') && (sc[i1] != '8') && (sc[i1] != '9')
-                        && (sc[i1] != 'e') && (sc[i1] != 'E') && (sc[i1] != '+') && (sc[i1] != '-') && (sc[i1] != '.')
-                        && (sc[i1] != 'p') && (sc[i1] != 'n') && (sc[i1] != 'u') && (sc[i1] != 'm') && (sc[i1] != 'k') && (sc[i1] != 'M')) {
+                if ((sc[i1] != '0')
+                        && (sc[i1] != '1')
+                        && (sc[i1] != '2')
+                        && (sc[i1] != '3')
+                        && (sc[i1] != '4')
+                        && (sc[i1] != '5')
+                        && (sc[i1] != '6')
+                        && (sc[i1] != '7')
+                        && (sc[i1] != '8')
+                        && (sc[i1] != '9')
+                        && (sc[i1] != 'e')
+                        && (sc[i1] != 'E')
+                        && (sc[i1] != '+')
+                        && (sc[i1] != '-')
+                        && (sc[i1] != '.')
+                        && (sc[i1] != 'p')
+                        && (sc[i1] != 'n')
+                        && (sc[i1] != 'u')
+                        && (sc[i1] != 'm')
+                        && (sc[i1] != 'k')
+                        && (sc[i1] != 'M')) {
                     NumberFormatException nfe = new NumberFormatException("Invalid number format in 'TechFormat'  --> invalid character");
                     nfe.initCause(e1);
                     throw nfe;
@@ -159,12 +177,21 @@ public class TechFormat implements Serializable {
                 if (((sc[i1] == '+') || (sc[i1] == '-')) && (i1 != 0)) {
                     // '+' and '-' are not at the beginning --> are they before the exponent? (would be OK) -->
                     if ((sc[i1 - 1] != 'e') && (sc[i1 - 1] != 'E')) {
-                        NumberFormatException nfe = new NumberFormatException("Invalid number format in 'TechFormat'  --> '+' or '-' at invalid position");
+                        NumberFormatException nfe =
+                                new NumberFormatException(
+                                        "Invalid number format in 'TechFormat'  --> '+' or '-' at invalid position");
                         nfe.initCause(e1);
                         throw nfe;
                     }
                 }
-                if ((sc[i1] == 'e') || (sc[i1] == 'E') || (sc[i1] == 'p') || (sc[i1] == 'n') || (sc[i1] == 'u') || (sc[i1] == 'm') || (sc[i1] == 'k') || (sc[i1] == 'M')) {
+                if ((sc[i1] == 'e')
+                        || (sc[i1] == 'E')
+                        || (sc[i1] == 'p')
+                        || (sc[i1] == 'n')
+                        || (sc[i1] == 'u')
+                        || (sc[i1] == 'm')
+                        || (sc[i1] == 'k')
+                        || (sc[i1] == 'M')) {
                     anzTechZeichen++;
                 }
                 if (sc[i1] == '.') {
@@ -307,12 +334,33 @@ public class TechFormat implements Serializable {
 
     public void testAusgabe() {
 
-        //----------------------------
+        // ----------------------------
         // Testing 'parseT()' -->
-        String[] s = new String[]{
-            "1234.676", "1,234.676", "1'234.676", "12'3'4.676", "1234.6m76", "12e4", "-98.55e45", "0.67E-67", "123n4.676", "1234n.676", "1234.676e", "1234.676EE",
-            "2e.", "2e+.", "2e+0.67", "e3434", ".e3", "2k34", "2k2", "13m", "300", "7.1"
-        };
+        String[] s =
+                new String[] {
+                    "1234.676",
+                    "1,234.676",
+                    "1'234.676",
+                    "12'3'4.676",
+                    "1234.6m76",
+                    "12e4",
+                    "-98.55e45",
+                    "0.67E-67",
+                    "123n4.676",
+                    "1234n.676",
+                    "1234.676e",
+                    "1234.676EE",
+                    "2e.",
+                    "2e+.",
+                    "2e+0.67",
+                    "e3434",
+                    ".e3",
+                    "2k34",
+                    "2k2",
+                    "13m",
+                    "300",
+                    "7.1"
+                };
         System.out.println("Testing 'parseT()' -->");
         for (int i1 = 0; i1 < s.length; i1++) {
             try {

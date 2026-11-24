@@ -77,54 +77,64 @@ public class SubCircuitSheet extends CircuitSheet {
         _newTerminalButton.setOpaque(false);
         _newTerminalButton.setFont(new Font("Arial", Font.PLAIN, 10));
         this.add(_newTerminalButton);
-        _newTerminalButton.setBounds(BUTTON_WIDTH*2, 0, BUTTON_WIDTH, 20);
+        _newTerminalButton.setBounds(BUTTON_WIDTH * 2, 0, BUTTON_WIDTH, 20);
         _newTerminalButton.setToolTipText("<html>Create a new subcircuit terminal. Depending<br>on the component selection tab a circuit,<br>"
                 + " control, or thermal terminal will be created.</html>");
-        _newTerminalButton.addActionListener(new ActionListener() {
+        _newTerminalButton.addActionListener(
+                new ActionListener() {
 
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                AbstractBlockInterface newElement = null;
-                switch(SchematicEditor2.Singleton.wireModeVersteckt) {
-                    case SchematicEditor2.WIRE_MODE_LK:
-                    case SchematicEditor2.WIRE_MODE_RELUCTANCE:
-                    case SchematicEditor2.WIRE_MODE_THERM:
-                        newElement = AbstractTypeInfo.fabricNew(AbstractTypeInfo.getTypeInfoFromClass(TerminalCircuit.class));
-                        break;
-                    case SchematicEditor2.WIRE_MODE_CONTROL:
-                        newElement = AbstractTypeInfo.fabricNew(AbstractTypeInfo.getTypeInfoFromClass(ReglerTERMINAL.class));
-                        break;
-                    default:
-                        assert false;
-                }
-                SchematicEditor2.Singleton.insertNewElement(newElement);
-            }
-        });
-
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        AbstractBlockInterface newElement = null;
+                        switch (SchematicEditor2.Singleton.wireModeVersteckt) {
+                            case SchematicEditor2.WIRE_MODE_LK:
+                            case SchematicEditor2.WIRE_MODE_RELUCTANCE:
+                            case SchematicEditor2.WIRE_MODE_THERM:
+                                newElement =
+                                        AbstractTypeInfo.fabricNew(
+                                                AbstractTypeInfo.getTypeInfoFromClass(
+                                                        TerminalCircuit.class));
+                                break;
+                            case SchematicEditor2.WIRE_MODE_CONTROL:
+                                newElement =
+                                        AbstractTypeInfo.fabricNew(
+                                                AbstractTypeInfo.getTypeInfoFromClass(
+                                                        ReglerTERMINAL.class));
+                                break;
+                            default:
+                                assert false;
+                        }
+                        SchematicEditor2.Singleton.insertNewElement(newElement);
+                    }
+                });
 
         _infoButton = GuiFabric.getJButton(I18nKeys.SHOW_INFORMATION);
         _infoButton.setBackground(new Color(0, 0, 0, 0));
         _infoButton.setOpaque(false);
         _infoButton.setFont(new Font("Arial", Font.PLAIN, 10));
         this.add(_infoButton);
-        _infoButton.setBounds(BUTTON_WIDTH*3, 0, BUTTON_WIDTH, 20);
-        _infoButton.addActionListener(new ActionListener() {
+        _infoButton.setBounds(BUTTON_WIDTH * 3, 0, BUTTON_WIDTH, 20);
+        _infoButton.addActionListener(
+                new ActionListener() {
 
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                JOptionPane.showMessageDialog(GeckoSim._win, "The subcircuit block can be used to create hierarchical circuit structures.\n"
-                        + "The connection of subcircuit-internal circuits to its environment can done \n"
-                        + "either via \"subcircuit terminals\" or \"global labels\". We recommend to use\n"
-                        + "global labels only rarely - otherwise your simulation model will become \n"
-                        + "confusing. Terminals and global labels can be created for all simulation \n"
-                        + "domains, i.e. circuit, thermal, control and reluctance.\n"
-                        + "By default, the visiblity of labels and components for references are circuit-\n"
-                        + "sheet local. You can move components in the model hierarchy by moving\n"
-                        + "the components and navigating into the parent circuit sheet or into a sub-\n"
-                        + "circuit by clicking on the subcircuit block."
-                        , "Subcircuit documentation", JOptionPane.INFORMATION_MESSAGE);
-            }
-        });
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        JOptionPane.showMessageDialog(
+                                GeckoSim._win,
+                                "The subcircuit block can be used to create hierarchical circuit structures.\n"
+                                        + "The connection of subcircuit-internal circuits to its environment can done \n"
+                                        + "either via \"subcircuit terminals\" or \"global labels\". We recommend to use\n"
+                                        + "global labels only rarely - otherwise your simulation model will become \n"
+                                        + "confusing. Terminals and global labels can be created for all simulation \n"
+                                        + "domains, i.e. circuit, thermal, control and reluctance.\n"
+                                        + "By default, the visiblity of labels and components for references are circuit-\n"
+                                        + "sheet local. You can move components in the model hierarchy by moving\n"
+                                        + "the components and navigating into the parent circuit sheet or into a sub-\n"
+                                        + "circuit by clicking on the subcircuit block.",
+                                "Subcircuit documentation",
+                                JOptionPane.INFORMATION_MESSAGE);
+                    }
+                });
 
         setNewScaling(AbstractCircuitSheetComponent.dpix);
     }
@@ -152,7 +162,7 @@ public class SubCircuitSheet extends CircuitSheet {
     }
 
     public void setNameLabelText() {
-        if(_nameLabel != null) {
+        if (_nameLabel != null) {
             _nameLabel.setText(getCircuitSheetName()  + "   ");
         }
     }

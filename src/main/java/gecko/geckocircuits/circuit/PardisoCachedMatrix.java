@@ -48,7 +48,7 @@ public class PardisoCachedMatrix extends AbstractCachedMatrix {
                 } else {
                     if (_originalMatrix[i][j] != 0) {
                         sysMatrix.setValue(i, j, _originalMatrix[i][j]);
-                        if(_originalMatrix[j][i] != _originalMatrix[i][j]) {
+                        if (_originalMatrix[j][i] != _originalMatrix[i][j]) {
                             System.err.println("nonsymmetric: " + i + " " + j + " " + _originalMatrix[i][j] + " " + _originalMatrix[j][i]);
                             throw new RuntimeException("Error in sparse matrix solver: system matrix is not symmetric!");
                         }

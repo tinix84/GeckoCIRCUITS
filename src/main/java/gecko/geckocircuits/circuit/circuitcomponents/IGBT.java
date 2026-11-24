@@ -37,7 +37,9 @@ public final class IGBT extends AbstractVoltageDropSwitch implements HiddenSubCi
     private static final double WIDTH = 0.7;
     private static final double HEIGHT = 0.4;
     private static final int TRIANGLE_WIDTH = 5;
-    public static final AbstractTypeInfo TYPE_INFO = new CircuitTypeInfo(IGBT.class, "IGBT", I18nKeys.IGBT, I18nKeys.INSULATED_GATE_BIPOLAR_TRANSISTOR);
+    public static final AbstractTypeInfo TYPE_INFO =
+            new CircuitTypeInfo(
+                    IGBT.class, "IGBT", I18nKeys.IGBT, I18nKeys.INSULATED_GATE_BIPOLAR_TRANSISTOR);
 
     final UserParameter<Boolean> _isSatCurEnabled = UserParameter.Builder.
             <Boolean>start("satCurEnabled", false).
@@ -87,10 +89,9 @@ public final class IGBT extends AbstractVoltageDropSwitch implements HiddenSubCi
     @Override
     protected void drawConnectorLines(final Graphics2D graphics) {
         graphics.drawPolyline(
-                new int[]{0, 0, (int) (-dpix * WIDTH), (int) (-dpix * WIDTH), 0, 0},
-                new int[]{- 2 * dpix, -dpix, -dpix,
-            dpix, dpix, 2 * dpix}, 6);
-
+                new int[] {0, 0, (int) (-dpix * WIDTH), (int) (-dpix * WIDTH), 0, 0},
+                new int[] {-2 * dpix, -dpix, -dpix, dpix, dpix, 2 * dpix},
+                6);
     }
 
     @Override

@@ -13,12 +13,9 @@
  */
 package gecko.geckocircuits.allg;
 
-public class StartsWithMatcher
-  implements SuggestMatcher
-{
-  @Override
-  public boolean matches(String dataWord, String searchWord)
-  {
+public class StartsWithMatcher implements SuggestMatcher {
+    @Override
+    public boolean matches(String dataWord, String searchWord) {
     return dataWord.startsWith(searchWord);
   }
 }

@@ -108,7 +108,7 @@ public final class ReglerNativeC extends RegelBlock implements VariableTerminalN
 
     @Override
     public void deleteActionIndividual() {
-        if(_guiWindow != null && _guiWindow.isVisible()) {
+        if (_guiWindow != null && _guiWindow.isVisible()) {
             _guiWindow.setVisible(false);
             _guiWindow.dispose();
         }
@@ -152,7 +152,7 @@ public final class ReglerNativeC extends RegelBlock implements VariableTerminalN
                         //      Therefore, loading them at the latest possible chance! I couldn't find better solutions.
                         //      Inits here are usually unwanted, because of testing them on every Simulation Timestep
                         if (_libFile == null || _libFileList == null) {
-                            loadUserData ();
+                        loadUserData();
                         }
                         if (_nativeCBlock == null) {
                             _nativeCBlock = new NativeCBlock();
@@ -405,7 +405,7 @@ public final class ReglerNativeC extends RegelBlock implements VariableTerminalN
             //      too lazy to check them in the Constructor.
             //      Therefore, loading them at the latest possible chance!
             if (_libFile == null || _libFileList == null) {
-                loadUserData ();
+            loadUserData();
             }
             if (_guiWindow == null) {
                 _guiWindow = new NativeCDialog(this, GeckoSim._win, false,
@@ -424,9 +424,9 @@ public final class ReglerNativeC extends RegelBlock implements VariableTerminalN
             return (Window) _guiWindow;
     }
 
-    public void triggerUpdate () {
+    public void triggerUpdate() {
         _paramLibNames.setUserValue(convertList2String(_libFileList));
-        if (_libFile.getFile() == null ||_libFile.getFileName() == null) {
+        if (_libFile.getFile() == null || _libFile.getFileName() == null) {
             _paramSelectedLibName.setUserValue("null");
         } else {
             _paramSelectedLibName.setUserValue(_libFile.getFileName());
@@ -434,7 +434,7 @@ public final class ReglerNativeC extends RegelBlock implements VariableTerminalN
 
     }
 
-    public DefaultListModel<String> convertString2List (final String list) {
+    public DefaultListModel<String> convertString2List(final String list) {
         DefaultListModel<String> result = new DefaultListModel<>();
         String[] elements = list.split(Pattern.quote(PATH_SPLITTER));
         for (String element : elements) {
@@ -443,15 +443,15 @@ public final class ReglerNativeC extends RegelBlock implements VariableTerminalN
         return result;
     }
 
-    public String convertList2String (final DefaultListModel<String> listVec) {
+    public String convertList2String(final DefaultListModel<String> listVec) {
         StringBuffer result = new StringBuffer();
-        for (int i=0; i<listVec.size(); i++) {
+        for (int i = 0; i < listVec.size(); i++) {
             result.append(listVec.get(i) + PATH_SPLITTER);
         }
         return result.toString();
     }
 
-    public void loadUserData () {
+    public void loadUserData() {
         String selLibName = _paramSelectedLibName.getValue();
         if (selLibName.isEmpty() || selLibName.equals("null")) {
             _libFile = new NativeCLibraryFile();

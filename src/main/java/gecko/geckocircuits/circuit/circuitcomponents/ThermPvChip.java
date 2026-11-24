@@ -156,7 +156,7 @@ public final class ThermPvChip extends AbstractCircuitBlockInterface implements 
     public void doCalculation(final double deltaT, final double time) {
         // Junction-Temperatur --> Temperaturdifferenz an Rth, wobei Bezugspunkt das Null-Niveau ist ('TH_NULLBEZUG_KNOTEN')
         final double temperature = -_parallelRes.parameter[2];
-        if(_lossComponent == null) {
+        if (_lossComponent == null) {
             return;
         }
 
@@ -164,7 +164,7 @@ public final class ThermPvChip extends AbstractCircuitBlockInterface implements 
 
         _currentInAmps = _lossCalculator.getTotalLosses();
 
-        if(_lossCalculator instanceof LossCalculationSplittable) {
+        if (_lossCalculator instanceof LossCalculationSplittable) {
             _conductionLosses = ((LossCalculationSplittable) _lossCalculator).getConductionLoss();
             _switchingLosses = ((LossCalculationSplittable) _lossCalculator).getSwitchingLoss();
         }
@@ -174,18 +174,34 @@ public final class ThermPvChip extends AbstractCircuitBlockInterface implements 
 
     @Override
     protected void drawConnectorLines(final Graphics2D graphics) {
-        graphics.drawLine((int) (dpix * (- WIDTH - DIAMETER_A)), 0, (int) (dpix * (WIDTH + DIAMETER_A)), 0);
-        graphics.drawLine((int) (dpix * (- WIDTH - DIAMETER_A)), 0, (int) (dpix * (- WIDTH - DIAMETER_A)), (int) (dpix * HEIGHT));
+        graphics.drawLine(
+                (int) (dpix * (-WIDTH - DIAMETER_A)), 0, (int) (dpix * (WIDTH + DIAMETER_A)), 0);
+        graphics.drawLine(
+                (int) (dpix * (-WIDTH - DIAMETER_A)),
+                0,
+                (int) (dpix * (-WIDTH - DIAMETER_A)),
+                (int) (dpix * HEIGHT));
     }
 
     @Override
     protected void drawBackground(final Graphics2D graphics) {
         final double dax = 0.5 * DIAMETER_A;
         graphics.fillPolygon(
-                new int[]{(int) (-dpix * WIDTH), (int) (dpix * WIDTH), (int) (dpix * (+ WIDTH + dax)),
-                    (int) (dpix * WIDTH), (int) (-dpix * WIDTH)},
-                new int[]{(int) (dpix * HEIGHT), (int) (dpix * HEIGHT), 0,
-                    (int) (-dpix * HEIGHT), (int) (-dpix * HEIGHT)}, POLYGON_POINTS);
+                new int[] {
+                    (int) (-dpix * WIDTH),
+                    (int) (dpix * WIDTH),
+                    (int) (dpix * (+WIDTH + dax)),
+                    (int) (dpix * WIDTH),
+                    (int) (-dpix * WIDTH)
+                },
+                new int[] {
+                    (int) (dpix * HEIGHT),
+                    (int) (dpix * HEIGHT),
+                    0,
+                    (int) (-dpix * HEIGHT),
+                    (int) (-dpix * HEIGHT)
+                },
+                POLYGON_POINTS);
     }
 
     @Override
@@ -199,8 +215,11 @@ public final class ThermPvChip extends AbstractCircuitBlockInterface implements 
         graphics.drawString("Loss", (int) (-dpix * WIDTH + DIAMETER), (int) (graphics.getFont().getSize() / 2 - 2));
         // 'Erde'  -->
 
-        graphics.fillRect((int) (dpix * (- WIDTH - DIAMETER_A - EARTH_X)),
-                (int) (dpix * HEIGHT), (int) (dpix * 2 * EARTH_X), EARTH_Y);
+        graphics.fillRect(
+                (int) (dpix * (-WIDTH - DIAMETER_A - EARTH_X)),
+                (int) (dpix * HEIGHT),
+                (int) (dpix * 2 * EARTH_X),
+                EARTH_Y);
     }
 
     @Override
@@ -262,7 +281,7 @@ public final class ThermPvChip extends AbstractCircuitBlockInterface implements 
     }
 
     public boolean isSplittableLossCalculation() {
-        return _lossCalculator != null && _lossCalculator instanceof LossCalculationSplittable;
+        return _lossCalculator instanceof LossCalculationSplittable;
     }
 
     public double getTotalLosses() {

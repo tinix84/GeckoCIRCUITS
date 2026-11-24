@@ -199,7 +199,8 @@ public class SchematicComponentSelection2 extends JTabbedPane {
             }
         });
 
-        SchematicComponentSelection2.MouseDraggedOutsideListener listener = new SchematicComponentSelection2.MouseDraggedOutsideListener(_lastComponentButton);
+        SchematicComponentSelection2.MouseDraggedOutsideListener listener =
+                new SchematicComponentSelection2.MouseDraggedOutsideListener(_lastComponentButton);
         _lastComponentButton.addFocusListener(listener);
         _lastComponentButton.addMouseMotionListener(listener);
     }
@@ -226,42 +227,44 @@ public class SchematicComponentSelection2 extends JTabbedPane {
             setContentAreaFilled(false);
             setFocusPainted(false);
 
+            addMouseListener(
+                    new MouseListener() {
+                        private boolean _mouseInComponent;
 
-            addMouseListener(new MouseListener() {
-                private boolean _mouseInComponent;
-                @Override
-                public void mouseClicked(final MouseEvent event) {
-                    // nothing todo
-                }
+                        @Override
+                        public void mouseClicked(final MouseEvent event) {
+                            // nothing todo
+                        }
 
-                @Override
-                public void mousePressed(final MouseEvent event) {
-                    // nothing todo
-                }
+                        @Override
+                        public void mousePressed(final MouseEvent event) {
+                            // nothing todo
+                        }
 
-                @Override
-                public void mouseReleased(final MouseEvent event) {
-                    if(_mouseInComponent) {
-                        se.deselect();
-                        _typElement = _typ;
-                        _lastComponentButton.setSelectedShowComponent(_map.get(_typ), _typ);
-                    }
-                }
+                        @Override
+                        public void mouseReleased(final MouseEvent event) {
+                            if (_mouseInComponent) {
+                                se.deselect();
+                                _typElement = _typ;
+                                _lastComponentButton.setSelectedShowComponent(_map.get(_typ), _typ);
+                            }
+                        }
 
-                @Override
-                public void mouseEntered(final MouseEvent event) {
-                    _mouseInComponent = true;
-                    _lastComponentButton.setTempShowComponent(_map.get(_typ));
-                }
+                        @Override
+                        public void mouseEntered(final MouseEvent event) {
+                            _mouseInComponent = true;
+                            _lastComponentButton.setTempShowComponent(_map.get(_typ));
+                        }
 
-                @Override
-                public void mouseExited(final MouseEvent event) {
-                    _mouseInComponent = false;
-                    _lastComponentButton.removeTempShowComponent(_map.get(_typ));
-                }
-            });
+                        @Override
+                        public void mouseExited(final MouseEvent event) {
+                            _mouseInComponent = false;
+                            _lastComponentButton.removeTempShowComponent(_map.get(_typ));
+                        }
+                    });
 
-            SchematicComponentSelection2.MouseDraggedOutsideListener dragListener = new SchematicComponentSelection2.MouseDraggedOutsideListener(_typ);
+            SchematicComponentSelection2.MouseDraggedOutsideListener dragListener =
+                    new SchematicComponentSelection2.MouseDraggedOutsideListener(_typ);
             addMouseMotionListener(dragListener);
             addFocusListener(dragListener);
         }

@@ -26,11 +26,11 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 @SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "Writer stores text area reference for appending output")
 public final class JTextAreaWriter extends Writer {
 
-	private final JTextArea textArea;
+    private final JTextArea textArea;
 
-	public JTextAreaWriter(final JTextArea textArea) {
-		this.textArea = textArea;
-	}
+    public JTextAreaWriter(final JTextArea textArea) {
+        this.textArea = textArea;
+    }
 
     @Override
     public void flush(){ /* no-op */ }
@@ -38,9 +38,9 @@ public final class JTextAreaWriter extends Writer {
     @Override
     public void close(){ /* no-op */ }
 
-	@Override
-	public void write(char[] cbuf, int off, int len) throws IOException {
-		textArea.append(new String(cbuf, off, len));
-	}
+    @Override
+    public void write(char[] cbuf, int off, int len) throws IOException {
+        textArea.append(new String(cbuf, off, len));
+    }
 }
 

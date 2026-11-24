@@ -82,7 +82,7 @@ public class GeckoDialog extends JDialog {
             }
         };
 
-        if(rootPane == null) {
+        if (rootPane == null) {
             rootPane = new JRootPane();
         }
 

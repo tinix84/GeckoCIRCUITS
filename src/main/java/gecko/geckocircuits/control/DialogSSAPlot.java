@@ -49,7 +49,7 @@ public final class DialogSSAPlot extends GeckoDialog {
     private DataTablePanel table;
     private final SimpleGraferPanel newScope1;
 
-    public DialogSSAPlot(final double[][] data){
+    public DialogSSAPlot(final double[][] data) {
         super(GeckoSim._win, true);
         _data = data;
 
@@ -92,19 +92,19 @@ public final class DialogSSAPlot extends GeckoDialog {
         data = _parent.getMagnitude();
     }
     */
-    private JPanel createGUIInput(){
+    private JPanel createGUIInput() {
         table = new DataTablePanel(new String[]{"omega [rad/s]","|G| [dB]"});
         table.setPreferredSize(new Dimension(150,100));
         table.setValues(_data);
 
-        table.addTableModelListener(new TableModelListener(){
-            @Override
-            public void tableChanged(TableModelEvent e){
-                _data = table.getCheckedData();
-                updatePlot();
-            }
-
-        });
+        table.addTableModelListener(
+                new TableModelListener() {
+                    @Override
+                    public void tableChanged(TableModelEvent e) {
+                        _data = table.getCheckedData();
+                        updatePlot();
+                    }
+                });
 
         JPanel jpCONDdataGes = new JPanel();
         jpCONDdataGes.setLayout(new BorderLayout());

@@ -126,35 +126,46 @@ public abstract class AbstractSemiconductor extends AbstractTwoPortLKreisBlock i
     @Override
     public List<OperationInterface> getOperationEnumInterfaces() {
         List<OperationInterface> returnValue = new ArrayList<OperationInterface>();
-        returnValue.add(new OperationInterface("setLossFile", I18nKeys.SET_LOSS_FILE_DOC) {
-            @Override
-            public Object doOperation(final Object parameterValue) {
-                if(!(parameterValue instanceof String)) {
-                    throw new IllegalArgumentException("Error: argument must be a String containing a file name");
-                }
-                File lossFile = new File((String) parameterValue);
+        returnValue.add(
+                new OperationInterface("setLossFile", I18nKeys.SET_LOSS_FILE_DOC) {
+                    @Override
+                    public Object doOperation(final Object parameterValue) {
+                        if (!(parameterValue instanceof String)) {
+                            throw new IllegalArgumentException(
+                                    "Error: argument must be a String containing a file name");
+                        }
+                        File lossFile = new File((String) parameterValue);
 
-                //if it doesn't exist, try first to see if it is in the same directory as the currently open model file
-                if (!lossFile.exists()) {
-                    final File modelFile = new File(MainWindow.getOpenFileName());
-                    final String currentModelDirectory = modelFile.getParent();
-                    final String correctedFileName = currentModelDirectory + System.getProperty("file.separator") + parameterValue;
-                    lossFile = new File(correctedFileName);
-                }
+                        // if it doesn't exist, try first to see if it is in the same directory as
+                        // the currently open model file
+                        if (!lossFile.exists()) {
+                            final File modelFile = new File(MainWindow.getOpenFileName());
+                            final String currentModelDirectory = modelFile.getParent();
+                            final String correctedFileName =
+                                    currentModelDirectory
+                                            + System.getProperty("file.separator")
+                                            + parameterValue;
+                            lossFile = new File(correctedFileName);
+                        }
 
-                if (lossFile.exists() && !lossFile.isDirectory()) {
-                    final String foundLossFileName = lossFile.getAbsolutePath();
-                    if (foundLossFileName.endsWith(".scl")) {
-                        ((LossProperties) getVerlustBerechnung()).getDetailedLosses().readLossesFromFileAndSetDetailedLossType(foundLossFileName);
-                    } else {
-                        throw new RuntimeException("Invalid loss file " + foundLossFileName);
+                        if (lossFile.exists() && !lossFile.isDirectory()) {
+                            final String foundLossFileName = lossFile.getAbsolutePath();
+                            if (foundLossFileName.endsWith(".scl")) {
+                                ((LossProperties) getVerlustBerechnung())
+                                        .getDetailedLosses()
+                                        .readLossesFromFileAndSetDetailedLossType(
+                                                foundLossFileName);
+                            } else {
+                                throw new RuntimeException(
+                                        "Invalid loss file " + foundLossFileName);
+                            }
+                        } else {
+                            throw new RuntimeException(
+                                    "Specified loss file: " + parameterValue + " does not exist.");
+                        }
+                        return null;
                     }
-                } else {
-                    throw new RuntimeException("Specified loss file: " + parameterValue + " does not exist.");
-                }
-                return null;
-            }
-        });
+                });
 
         return Collections.unmodifiableList(returnValue);
     }

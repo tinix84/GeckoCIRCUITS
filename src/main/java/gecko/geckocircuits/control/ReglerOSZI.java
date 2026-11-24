@@ -41,14 +41,21 @@ import java.util.Stack;
  *
  * @author andreas
  */
-@SuppressFBWarnings(value = {"EI_EXPOSE_REP", "SE_TRANSIENT_FIELD_NOT_RESTORED", "DE_MIGHT_IGNORE"},
-        justification = "Scope block exposes data container for efficient simulation data access; transient fields are repopulated during component initialization; exception in setInputTerminalNumber is safely ignored during init")
-public final class ReglerOSZI extends RegelBlock implements VariableTerminalNumber,
-        SpecialNameVisible {
+@SuppressFBWarnings(
+        value = {"EI_EXPOSE_REP", "SE_TRANSIENT_FIELD_NOT_RESTORED", "DE_MIGHT_IGNORE"},
+        justification =
+                "Scope block exposes data container for efficient simulation data access; transient fields are repopulated during component initialization; exception in setInputTerminalNumber is safely ignored during init")
+public final class ReglerOSZI extends RegelBlock
+        implements VariableTerminalNumber, SpecialNameVisible {
     private static final long serialVersionUID = 1L;
 
     private static final int TERM_POS_X = -2;
-    public static final ControlTypeInfo tinfo = new ControlTypeInfo(ReglerOSZI.class, "SCOPE", I18nKeys.SCOPE, I18nKeys.COMPONENT_FOR_DATA_VISUALIZATION);
+    public static final ControlTypeInfo tinfo =
+            new ControlTypeInfo(
+                    ReglerOSZI.class,
+                    "SCOPE",
+                    I18nKeys.SCOPE,
+                    I18nKeys.COMPONENT_FOR_DATA_VISUALIZATION);
 
     private transient final UserParameter<Integer> _inputTerminalNumber = UserParameter.Builder.
             <Integer>start("tn", 0).
@@ -255,7 +262,7 @@ public final class ReglerOSZI extends RegelBlock implements VariableTerminalNumb
         String pathToComponent = "";
         CircuitSheet cs = getParentCircuitSheet();
 
-        while (cs != null && cs instanceof SubCircuitSheet) {
+        while (cs instanceof SubCircuitSheet) {
             SubCircuitSheet subSheet = (SubCircuitSheet) cs;
             pathToComponent = subSheet._subBlock.getStringID() + "#" + pathToComponent;
             cs = subSheet._subBlock.getParentCircuitSheet();
@@ -306,11 +313,22 @@ public final class ReglerOSZI extends RegelBlock implements VariableTerminalNumb
         Color origColor = graphics.getColor();
         graphics.setColor(getBackgroundColor());
 
-        graphics.fillRect((int) (dpix * (x - WIDTH)), (int) (dpix * (y - WIDTH)), (int) (dpix * 2 * WIDTH), (int) (dpix * 1.0 * _inputTerminalNumber.getValue()));
+        graphics.fillRect(
+                (int) (dpix * (x - WIDTH)),
+                (int) (dpix * (y - WIDTH)),
+                (int) (dpix * 2 * WIDTH),
+                (int) (dpix * 1.0 * _inputTerminalNumber.getValue()));
         graphics.setColor(origColor);
-        graphics.drawRect((int) (dpix * (x - WIDTH)), (int) (dpix * (y - WIDTH)), (int) (dpix * 2 * WIDTH), (int) (dpix * 1.0 * _inputTerminalNumber.getValue()));
+        graphics.drawRect(
+                (int) (dpix * (x - WIDTH)),
+                (int) (dpix * (y - WIDTH)),
+                (int) (dpix * 2 * WIDTH),
+                (int) (dpix * 1.0 * _inputTerminalNumber.getValue()));
 
-        graphics.drawRect((int) (dpix * (x - WIDTH)) + INSIDE_RECT, (int) (dpix * (y - WIDTH)) + 2 * INSIDE_RECT, (int) (dpix * 2 * WIDTH) - 2 * INSIDE_RECT,
+        graphics.drawRect(
+                (int) (dpix * (x - WIDTH)) + INSIDE_RECT,
+                (int) (dpix * (y - WIDTH)) + 2 * INSIDE_RECT,
+                (int) (dpix * 2 * WIDTH) - 2 * INSIDE_RECT,
                 (int) (dpix * 1.0 * _inputTerminalNumber.getValue()) - 4 * INSIDE_RECT);
 
         // Rote Dreiecke zum Klicken --> Aenderung der Terminal-Anzahl:

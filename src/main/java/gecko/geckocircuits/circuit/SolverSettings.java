@@ -18,7 +18,8 @@ import gecko.modelviewcontrol.ModelMVC;
 
 public class SolverSettings {
 
-    public ModelMVC<SolverType> SOLVER_TYPE = new ModelMVC<SolverType>(SolverType.SOLVER_BE ,"solver");
+    public ModelMVC<SolverType> SOLVER_TYPE =
+            new ModelMVC<SolverType>(SolverType.SOLVER_BE, "solver");
     public final ModelMVC<Double> _T_pre = new ModelMVC<Double>(-100e-3, "pre-calculation time");
     public final ModelMVC<Double> _dt_pre = new ModelMVC<Double>(100e-9, "pre-calculation stepwidth");
 

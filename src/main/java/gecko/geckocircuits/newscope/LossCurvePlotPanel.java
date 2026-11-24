@@ -32,14 +32,16 @@ public final class LossCurvePlotPanel extends SimpleGraferPanel {
 
     public void highlightMessKurve(int index) {
         AbstractDiagram diag = _grafer._manager.getDiagram(0);
-        for(AbstractCurve curve : diag.getCurves()) {
-            if(curve.getStroke() != GeckoLineStyle.DOTTED_FAT) {
+        for (AbstractCurve curve : diag.getCurves()) {
+            if (curve.getStroke() != GeckoLineStyle.DOTTED_FAT) {
                 curve.setStroke(GeckoLineStyle.SOLID_PLAIN);
             }
         }
         diag.getCurves().get(index).setStroke(GeckoLineStyle.SOLID_FAT_2);
-        if(_moreDataFactor > 1) {
-            diag.getCurves().get(index + diag.getCurves().size()/2).setStroke(GeckoLineStyle.SOLID_FAT_2);
+        if (_moreDataFactor > 1) {
+            diag.getCurves()
+                    .get(index + diag.getCurves().size() / 2)
+                    .setStroke(GeckoLineStyle.SOLID_FAT_2);
         }
         repaint();
     }
@@ -48,13 +50,13 @@ public final class LossCurvePlotPanel extends SimpleGraferPanel {
         List<LossCurve> lossCurves = new ArrayList<LossCurve>();
         lossCurves.addAll(lossCurvesWOTest);
 
-        if(testCurve != null) {
+        if (testCurve != null) {
             lossCurves.add(testCurve);
         }
 
 
         int moreDataFactor = 1;
-        if(lossCurves.get(0) instanceof SwitchingLossCurve) {
+        if (lossCurves.get(0) instanceof SwitchingLossCurve) {
             moreDataFactor = 2;
         }
 
@@ -69,29 +71,30 @@ public final class LossCurvePlotPanel extends SimpleGraferPanel {
 
         DataContainerManyTimeSeries dcs1 = new DataContainerManyTimeSeries(moreDataFactor * lossCurves.size(), 1000);
 
-        for(LossCurve curve : lossCurves) {
+        for (LossCurve curve : lossCurves) {
             dcs1.setSignalName(curve.getName(), lossCurves.indexOf(curve));
             try {
-            for(int i = 0; i < curve.data[0].length; i++) {
+                for (int i = 0; i < curve.data[0].length; i++) {
                 float yValue = (float) curve.data[1][i];
                 double xValue = curve.data[0][i];
-                dcs1.insertValueAtEnd(yValue , xValue , lossCurves.indexOf(curve));
+                    dcs1.insertValueAtEnd(yValue, xValue, lossCurves.indexOf(curve));
 
-                if(curve.data.length > 2) {
+                    if (curve.data.length > 2) {
                     float yValue2 = (float) curve.data[2][i];
-                    dcs1.insertValueAtEnd(yValue2 , xValue , lossCurves.size() + lossCurves.indexOf(curve));
+                        dcs1.insertValueAtEnd(
+                                yValue2, xValue, lossCurves.size() + lossCurves.indexOf(curve));
                 }
             }
             } catch (Exception ex) {
-                System.err.println(curve + " " + curve.data );
+                System.err.println(curve + " " + curve.data);
                 ex.printStackTrace();
             }
         }
 
-        if(moreDataFactor == 2) {
+        if (moreDataFactor == 2) {
             List<AbstractCurve> curves = _grafer._manager.getDiagrams().get(0).getCurves();
-            for(int i = curves.size()/2; i < curves.size(); i++) {
-                curves.get(i).setColor(curves.get(i - curves.size()/2).getColor());
+            for (int i = curves.size() / 2; i < curves.size(); i++) {
+                curves.get(i).setColor(curves.get(i - curves.size() / 2).getColor());
             }
         }
 
@@ -100,13 +103,14 @@ public final class LossCurvePlotPanel extends SimpleGraferPanel {
         returnValue._moreDataFactor = moreDataFactor;
         _grafer.setSimulationTimeBoundaries(0, dcs1.getNiceMaximumXValue());
 
-        if(testCurve != null) {
+        if (testCurve != null) {
             AbstractDiagram diag = _grafer._manager.getDiagram(0);
-            AbstractCurve lastCurve = diag.getCurves().get(diag.getCurves().size()-1);
+            AbstractCurve lastCurve = diag.getCurves().get(diag.getCurves().size() - 1);
             lastCurve.setStroke(GeckoLineStyle.DOTTED_FAT);
             lastCurve.setSymbolEnabled(false);
-            if(returnValue._moreDataFactor > 1) {
-                AbstractCurve beforeLastCurve = diag.getCurves().get(diag.getCurves().size()/2-1);
+            if (returnValue._moreDataFactor > 1) {
+                AbstractCurve beforeLastCurve =
+                        diag.getCurves().get(diag.getCurves().size() / 2 - 1);
                 beforeLastCurve.setStroke(GeckoLineStyle.DOTTED_FAT);
                 beforeLastCurve.setSymbolEnabled(false);
             }

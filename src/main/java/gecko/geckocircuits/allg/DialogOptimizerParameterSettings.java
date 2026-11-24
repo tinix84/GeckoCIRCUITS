@@ -57,12 +57,12 @@ public class DialogOptimizerParameterSettings extends GeckoDialog {
     public DialogOptimizerParameterSettings(OptimizerParameterData optData, List<AbstractBlockInterface> e) {
         super(GeckoSim._win, true);
         _optData = optData;
-        for(AbstractBlockInterface block : e) {
-            for(UserParameter<? extends Object> parameter : block.getRegisteredParameters()) {
+        for (AbstractBlockInterface block : e) {
+            for (UserParameter<? extends Object> parameter : block.getRegisteredParameters()) {
                 String nameOpt = parameter.getNameOpt();
-                if(!nameOpt.isEmpty()) {
+                if (!nameOpt.isEmpty()) {
                     int oldNumber = 0;
-                    if(_numberOfUsedParamemters.containsKey(nameOpt)) {
+                    if (_numberOfUsedParamemters.containsKey(nameOpt)) {
                         oldNumber = _numberOfUsedParamemters.remove(nameOpt);
                     }
                     _numberOfUsedParamemters.put(nameOpt, oldNumber + 1);

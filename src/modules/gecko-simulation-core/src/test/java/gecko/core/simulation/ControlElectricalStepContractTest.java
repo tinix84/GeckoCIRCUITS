@@ -24,7 +24,8 @@ class ControlElectricalStepContractTest {
             assertEquals(1e6, netlist.getParameter(2)[0], "Publishing CONTROL must not change the solved resistance");
             coupler.applyGateSignals(netlist);
             electrical.advance(0.001, 0, null);
-            SemiconductorStepContractTest.assertSeriesCurrent(netlist, 2.25);
+            double branch = (6 - 1.5 + 1.5 * .25 / 1e6) / 2;
+            SemiconductorStepContractTest.assertCurrents(netlist, branch, branch - 1.5 / 1e6);
 
             gate._inputSignal[0][0] = 0;
             coupler.transferGateSignalsToLk(netlist);
@@ -32,7 +33,7 @@ class ControlElectricalStepContractTest {
             coupler.applyGateSignals(netlist);
             assertEquals(0, netlist.getParameter(2)[8], "The OFF flag reaches the electrical device");
             electrical.advance(0.001, 0.001, null);
-            double expected = type == CircuitTypCore.LK_IGBT ? 6 / 1000001.75 : 2.25;
+            double expected = type == CircuitTypCore.LK_IGBT ? (6 - 1.5) / 1000001.75 : 2.25;
             SemiconductorStepContractTest.assertSeriesCurrent(netlist, expected);
             assertEquals(type == CircuitTypCore.LK_IGBT ? 1e6 : 0.25, netlist.getParameter(2)[0]);
         }

@@ -42,7 +42,12 @@ final class OperationalAmplifierDialog extends DialogElementLK<OperationalAmplif
 
     @SuppressWarnings({"varargs", "unchecked"})
     protected JTabbedPane createGUI_OPV1() {
-        JPanel mainParameter = createParameterPanel(element.gainValue, element.inputResistance, element.outputResistance, element.frequencyDependency);
+        JPanel mainParameter =
+                createParameterPanel(
+                        element.gainValue,
+                        element.inputResistance,
+                        element.outputResistance,
+                        element.frequencyDependency);
         mainParameter.setBorder(new TitledBorder("Main Parameters"));
 
         JPanel voltDivPanel = createParameterPanel(element.voltageDividerRa, element.voltageDividerRb);

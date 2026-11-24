@@ -36,7 +36,7 @@ public final class ReglerAmperemeter extends AbstractCurrentMeasurement {
 
     @Override
     public void checkComponentCompatibility(final Object testObject, final List<AbstractBlockInterface> insertList) {
-        if(testObject instanceof CurrentMeasurable) {
+        if (testObject instanceof CurrentMeasurable) {
             final CurrentMeasurable measurable = (CurrentMeasurable) testObject;
             insertList.addAll(Arrays.asList(measurable.getCurrentMeasurementComponents(ConnectorType.LK)));
         }

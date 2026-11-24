@@ -141,7 +141,7 @@ public final class DataContainerCompressable extends AbstractDataContainer imple
 
         assert columnMin <= columnMax : columnMin + " " + columnMax;
 
-        final ArrayList<HiLoData> mergeList = new ArrayList<HiLoData>();
+        final List<HiLoData> mergeList = new ArrayList<HiLoData>();
 
         for (int junkIndex = columnMin / JUNK_SIZE; junkIndex <= columnMax / JUNK_SIZE; junkIndex++) {
             final DataJunk junk = _data.get(junkIndex);

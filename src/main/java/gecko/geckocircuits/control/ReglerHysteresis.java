@@ -58,17 +58,21 @@ public final class ReglerHysteresis extends RegelBlock implements ControlInputTw
 
         setExpandedParameterListener(_useExternal);
 
-        _hysteresisThreshold.addActionListener(new ActionListener() {
+        _hysteresisThreshold.addActionListener(
+                new ActionListener() {
 
-            @Override
-            public void actionPerformed(final ActionEvent event) {
-                if(_calculator instanceof HysteresisCalculatorInternal) {
-                    ((HysteresisCalculatorInternal) _calculator).setHValue(_hysteresisThreshold.getValue());
-                    return;
-                }
-                assert _calculator == null || _calculator instanceof HysteresisCalculatorExternal : "Calculator not know!";
-            }
-        });
+                    @Override
+                    public void actionPerformed(final ActionEvent event) {
+                        if (_calculator instanceof HysteresisCalculatorInternal) {
+                            ((HysteresisCalculatorInternal) _calculator)
+                                    .setHValue(_hysteresisThreshold.getValue());
+                            return;
+                        }
+                        assert _calculator == null
+                                        || _calculator instanceof HysteresisCalculatorExternal
+                                : "Calculator not know!";
+                    }
+                });
     }
 
 
@@ -122,10 +126,10 @@ public final class ReglerHysteresis extends RegelBlock implements ControlInputTw
 
     @Override
     public void setFolded() {
-        if(XIN.size() == 2) {
+        if (XIN.size() == 2) {
             _stashedTerminal = (TerminalControlInput) XIN.pop();
         }
-        if(XIN.size() == 1) {
+        if (XIN.size() == 1) {
             return;
         }
         assert false : "Impossible input terminal number!";
@@ -134,11 +138,11 @@ public final class ReglerHysteresis extends RegelBlock implements ControlInputTw
     @Override
     public void setExpanded() {
 
-        if(XIN.size() == 2) {
+        if (XIN.size() == 2) {
             return;
         }
 
-        if(_stashedTerminal != null) {
+        if (_stashedTerminal != null) {
             XIN.push(_stashedTerminal);
         } else {
             XIN.add(new TerminalControlInput(this, X_EXTERNAL, Y_EXTERNAL));

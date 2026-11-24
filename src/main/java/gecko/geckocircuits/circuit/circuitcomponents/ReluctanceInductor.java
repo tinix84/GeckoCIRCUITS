@@ -209,7 +209,7 @@ public final class ReluctanceInductor extends AbstractCircuitBlockInterface
             int reversed;
             if (i == 1) {
                 if (_inputReversed.getValue()) {
-                    reversed = - 1;
+                    reversed = -1;
                 } else {
                     reversed = 1;
                 }
@@ -256,7 +256,11 @@ public final class ReluctanceInductor extends AbstractCircuitBlockInterface
         }
 
         g2d.setStroke(new BasicStroke((float) 1.0));
-        g2d.drawLine((int) (dpix * (- 1)), (int) (dpix * (+HEIGHT) + radiusQ), (int) (dpix * (- 1)), (int) (dpix * (+2)));
+        g2d.drawLine(
+                (int) (dpix * (-1)),
+                (int) (dpix * (+HEIGHT) + radiusQ),
+                (int) (dpix * (-1)),
+                (int) (dpix * (+2)));
         g2d.drawLine((int) -dpix, (int) (-dpix * HEIGHT - radiusQ), (int) -dpix, (int) (-dpix * 2));
 
     }

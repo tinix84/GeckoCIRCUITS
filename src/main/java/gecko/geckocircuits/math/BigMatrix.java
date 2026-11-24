@@ -13,6 +13,8 @@
  */
 package gecko.geckocircuits.math;
 
+import java.util.List;
+
 
 //package Jama;
 
@@ -88,35 +90,32 @@ public final class BigMatrix implements java.io.Serializable {
    */
    private int m, n;
 
-/* ------------------------
-   Constructors
- * ------------------------ */
+    /* ------------------------
+      Constructors
+    * ------------------------ */
 
-   /** Construct an m-by-n matrix of zeros.
-   @param m    Number of rows.
-   @param n    Number of colums.
-   */
-
-   public BigMatrix (int m, int n) {
+    /** Construct an m-by-n matrix of zeros.
+     * @param m    Number of rows.
+     * @param n    Number of colums.
+     */
+    public BigMatrix(int m, int n) {
       this.m = m;
       this.n = n;
       A = new BigDecimal[m][n];
-      for(int i = 0; i < m; i++) {
-          for(int j = 0; j < n; j++) {
-              A[i][j] = new BigDecimal(0);
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+              A[i][j] = BigDecimal.ZERO;
           }
       }
       luDecomp = null;
    }
 
-
-
-   /** Construct a matrix from a 2-D array.
-   @param initA    Two-dimensional array of doubles.
-   @exception  IllegalArgumentException All rows must have the same length
-   @see        #constructWithCopy
-   */
-   public BigMatrix (BigDecimal[][] initA) {
+    /** Construct a matrix from a 2-D array.
+     * @param initA    Two-dimensional array of doubles.
+     * @exception  IllegalArgumentException All rows must have the same length
+     * @see        #constructWithCopy
+     */
+    public BigMatrix(BigDecimal[][] initA) {
       m = initA.length;
       n = initA[0].length;
       this.A = new BigDecimal[m][n];
@@ -124,55 +123,51 @@ public final class BigMatrix implements java.io.Serializable {
          if (initA[i].length != n) {
             throw new IllegalArgumentException("All rows must have the same length.");
          }
-         for(int j = 0; j < n; j++) {
-             BigDecimal tmpNumber = new BigDecimal(0);
+            for (int j = 0; j < n; j++) {
+             BigDecimal tmpNumber = BigDecimal.ZERO;
              this.A[i][j] = tmpNumber.add(initA[i][j]);
          }
       }
    }
 
-   /** Construct a matrix from a one-dimensional packed array
-   @param vals One-dimensional array of doubles, packed by columns (ala Fortran).
-   @param m    Number of rows.
-   @exception  IllegalArgumentException Array length must be a multiple of m.
-   */
-
-   public BigMatrix (double vals[], int m) {
+    /** Construct a matrix from a one-dimensional packed array
+     * @param vals One-dimensional array of doubles, packed by columns (ala Fortran).
+     * @param m    Number of rows.
+     * @exception  IllegalArgumentException Array length must be a multiple of m.
+     */
+    public BigMatrix(double vals[], int m) {
       this.m = m;
-      n = (m != 0 ? vals.length/m : 0);
-      if (m*n != vals.length) {
+        n = (m != 0 ? vals.length / m : 0);
+        if (m * n != vals.length) {
          throw new IllegalArgumentException("Array length must be a multiple of m.");
       }
       A = new BigDecimal[m][n];
       for (int i = 0; i < m; i++) {
          for (int j = 0; j < n; j++) {
-            A[i][j] = new BigDecimal(vals[i+j*m]);
+                A[i][j] = new BigDecimal(vals[i + j * m]);
          }
       }
    }
 
-/* ------------------------
-   Public Methods
- * ------------------------ */
+    /* ------------------------
+      Public Methods
+    * ------------------------ */
 
-
-   /** Access the internal two-dimensional array.
-   @return     Pointer to the two-dimensional array of matrix elements.
-   */
-
-   public BigDecimal[][] getArray () {
+    /** Access the internal two-dimensional array.
+     * @return     Pointer to the two-dimensional array of matrix elements.
+     */
+    public BigDecimal[][] getArray() {
       return A;
    }
 
-   /** Copy the internal two-dimensional array.
-   @return     Two-dimensional array copy of matrix elements.
-   */
-
-   public BigDecimal[][] getArrayCopy () {
+    /** Copy the internal two-dimensional array.
+     * @return     Two-dimensional array copy of matrix elements.
+     */
+    public BigDecimal[][] getArrayCopy() {
       BigDecimal[][] C = new BigDecimal[m][n];
       for (int i = 0; i < m; i++) {
          for (int j = 0; j < n; j++) {
-            C[i][j] = new BigDecimal(0);
+            C[i][j] = BigDecimal.ZERO;
             C[i][j] = C[i][j].add(A[i][j]);
          }
       }
@@ -180,59 +175,50 @@ public final class BigMatrix implements java.io.Serializable {
       return C;
    }
 
-   /** Make a one-dimensional column packed copy of the internal array.
-   @return     Matrix elements packed in a one-dimensional array by columns.
-   */
-
-   public double[] getColumnPackedCopy () {
-      double[] vals = new double[m*n];
+    /** Make a one-dimensional column packed copy of the internal array.
+     * @return     Matrix elements packed in a one-dimensional array by columns.
+     */
+    public double[] getColumnPackedCopy() {
+        double[] vals = new double[m * n];
       for (int i = 0; i < m; i++) {
          for (int j = 0; j < n; j++) {
-            vals[i+j*m] = A[i][j].doubleValue();
+                vals[i + j * m] = A[i][j].doubleValue();
          }
       }
       return vals;
    }
 
-
-   /** Get row dimension.
-   @return     m, the number of rows.
-   */
-
-   public int getRowDimension () {
+    /** Get row dimension.
+     * @return     m, the number of rows.
+     */
+    public int getRowDimension() {
       return m;
    }
 
-   /** Get column dimension.
-   @return     n, the number of columns.
-   */
-
-   public int getColumnDimension () {
+    /** Get column dimension.
+     * @return     n, the number of columns.
+     */
+    public int getColumnDimension() {
       return n;
    }
 
-
-
-
-
-   /** Get a submatrix.
-   @param r    Array of row indices.
-   @param i0   Initial column index
-   @param i1   Final column index
-   @return     A(r(:),j0:j1)
-   @exception  ArrayIndexOutOfBoundsException Submatrix indices
-   */
-
-   public BigMatrix getMatrix (int[] r, int j0, int j1) {
-      BigMatrix X = new BigMatrix(r.length,j1-j0+1);
+    /** Get a submatrix.
+     * @param r    Array of row indices.
+     * @param i0   Initial column index
+     * @param i1   Final column index
+     * @return     A(r(:),j0:j1)
+     * @exception  ArrayIndexOutOfBoundsException Submatrix indices
+     */
+    public BigMatrix getMatrix(int[] r, int j0, int j1) {
+        BigMatrix X = new BigMatrix(r.length, j1 - j0 + 1);
       BigDecimal[][] B = X.getArray();
       try {
          for (int i = 0; i < r.length; i++) {
             for (int j = j0; j <= j1; j++) {
-               B[i][j-j0] = A[r[i]][j];
+                    B[i][j - j0] = A[r[i]][j];
             }
          }
-      } catch(ArrayIndexOutOfBoundsException e) {
+        } catch (ArrayIndexOutOfBoundsException e) {
          ArrayIndexOutOfBoundsException aioobe = new ArrayIndexOutOfBoundsException("Submatrix indices");
          aioobe.initCause(e);
          throw aioobe;
@@ -240,11 +226,10 @@ public final class BigMatrix implements java.io.Serializable {
       return X;
    }
 
-   /** One norm
-   @return    maximum column sum.
-   */
-
-   public double norm1 () {
+    /** One norm
+     * @return    maximum column sum.
+     */
+    public double norm1() {
       double f = 0;
       for (int j = 0; j < n; j++) {
          double s = 0;
@@ -256,12 +241,10 @@ public final class BigMatrix implements java.io.Serializable {
       return f;
    }
 
-
-   /** Infinity norm
-   @return    maximum row sum.
-   */
-
-   public double normInf () {
+    /** Infinity norm
+     * @return    maximum row sum.
+     */
+    public double normInf() {
       double f = 0;
       for (int i = 0; i < m; i++) {
          double s = 0;
@@ -273,278 +256,276 @@ public final class BigMatrix implements java.io.Serializable {
       return f;
    }
 
+    /** C = A + B
+     * @param B    another matrix
+     * @return     A + B
+     */
+    //
+    //   public Matrix plus (BigMatrix B) {
+    //      checkMatrixDimensions(B);
+    //      Matrix X = new Matrix(m,n);
+    //      double[][] C = X.getArray();
+    //      for (int i = 0; i < m; i++) {
+    //         for (int j = 0; j < n; j++) {
+    //            C[i][j] = A[i][j] + B.A[i][j];
+    //         }
+    //      }
+    //      return X;
+    //   }
 
-   /** C = A + B
-   @param B    another matrix
-   @return     A + B
-   */
-//
-//   public Matrix plus (BigMatrix B) {
-//      checkMatrixDimensions(B);
-//      Matrix X = new Matrix(m,n);
-//      double[][] C = X.getArray();
-//      for (int i = 0; i < m; i++) {
-//         for (int j = 0; j < n; j++) {
-//            C[i][j] = A[i][j] + B.A[i][j];
-//         }
-//      }
-//      return X;
-//   }
+    /** A = A + B
+     * @param B    another matrix
+     * @return     A + B
+     */
+    //
+    //   public Matrix plusEquals (Matrix B) {
+    //      checkMatrixDimensions(B);
+    //      for (int i = 0; i < m; i++) {
+    //         for (int j = 0; j < n; j++) {
+    //            A[i][j] = A[i][j] + B.A[i][j];
+    //         }
+    //      }
+    //      return this;
+    //   }
 
-   /** A = A + B
-   @param B    another matrix
-   @return     A + B
-   */
-//
-//   public Matrix plusEquals (Matrix B) {
-//      checkMatrixDimensions(B);
-//      for (int i = 0; i < m; i++) {
-//         for (int j = 0; j < n; j++) {
-//            A[i][j] = A[i][j] + B.A[i][j];
-//         }
-//      }
-//      return this;
-//   }
+    /** C = A - B
+     * @param B    another matrix
+     * @return     A - B
+     */
 
-   /** C = A - B
-   @param B    another matrix
-   @return     A - B
-   */
+    //   public Matrix minus (Matrix B) {
+    //      checkMatrixDimensions(B);
+    //      Matrix X = new Matrix(m,n);
+    //      double[][] C = X.getArray();
+    //      for (int i = 0; i < m; i++) {
+    //         for (int j = 0; j < n; j++) {
+    //            C[i][j] = A[i][j] - B.A[i][j];
+    //         }
+    //      }
+    //      return X;
+    //   }
 
-//   public Matrix minus (Matrix B) {
-//      checkMatrixDimensions(B);
-//      Matrix X = new Matrix(m,n);
-//      double[][] C = X.getArray();
-//      for (int i = 0; i < m; i++) {
-//         for (int j = 0; j < n; j++) {
-//            C[i][j] = A[i][j] - B.A[i][j];
-//         }
-//      }
-//      return X;
-//   }
+    /** A = A - B
+     * @param B    another matrix
+     * @return     A - B
+     */
 
-   /** A = A - B
-   @param B    another matrix
-   @return     A - B
-   */
+    //   public Matrix minusEquals (Matrix B) {
+    //      checkMatrixDimensions(B);
+    //      for (int i = 0; i < m; i++) {
+    //         for (int j = 0; j < n; j++) {
+    //            A[i][j] = A[i][j] - B.A[i][j];
+    //         }
+    //      }
+    //      return this;
+    //   }
 
-//   public Matrix minusEquals (Matrix B) {
-//      checkMatrixDimensions(B);
-//      for (int i = 0; i < m; i++) {
-//         for (int j = 0; j < n; j++) {
-//            A[i][j] = A[i][j] - B.A[i][j];
-//         }
-//      }
-//      return this;
-//   }
+    /** Element-by-element multiplication, C = A.*B
+     * @param B    another matrix
+     * @return     A.*B
+     */
 
-   /** Element-by-element multiplication, C = A.*B
-   @param B    another matrix
-   @return     A.*B
-   */
+    //   public Matrix arrayTimes (Matrix B) {
+    //      checkMatrixDimensions(B);
+    //      Matrix X = new Matrix(m,n);
+    //      double[][] C = X.getArray();
+    //      for (int i = 0; i < m; i++) {
+    //         for (int j = 0; j < n; j++) {
+    //            C[i][j] = A[i][j] * B.A[i][j];
+    //         }
+    //      }
+    //      return X;
+    //   }
 
-//   public Matrix arrayTimes (Matrix B) {
-//      checkMatrixDimensions(B);
-//      Matrix X = new Matrix(m,n);
-//      double[][] C = X.getArray();
-//      for (int i = 0; i < m; i++) {
-//         for (int j = 0; j < n; j++) {
-//            C[i][j] = A[i][j] * B.A[i][j];
-//         }
-//      }
-//      return X;
-//   }
+    /** Element-by-element multiplication in place, A = A.*B
+     * @param B    another matrix
+     * @return     A.*B
+     */
 
-   /** Element-by-element multiplication in place, A = A.*B
-   @param B    another matrix
-   @return     A.*B
-   */
+    //   public Matrix arrayTimesEquals (Matrix B) {
+    //      checkMatrixDimensions(B);
+    //      for (int i = 0; i < m; i++) {
+    //         for (int j = 0; j < n; j++) {
+    //            A[i][j] = A[i][j] * B.A[i][j];
+    //         }
+    //      }
+    //      return this;
+    //   }
 
-//   public Matrix arrayTimesEquals (Matrix B) {
-//      checkMatrixDimensions(B);
-//      for (int i = 0; i < m; i++) {
-//         for (int j = 0; j < n; j++) {
-//            A[i][j] = A[i][j] * B.A[i][j];
-//         }
-//      }
-//      return this;
-//   }
+    /** Element-by-element right division, C = A./B
+     * @param B    another matrix
+     * @return     A./B
+     */
 
-   /** Element-by-element right division, C = A./B
-   @param B    another matrix
-   @return     A./B
-   */
+    //   public Matrix arrayRightDivide (Matrix B) {
+    //      checkMatrixDimensions(B);
+    //      Matrix X = new Matrix(m,n);
+    //      double[][] C = X.getArray();
+    //      for (int i = 0; i < m; i++) {
+    //         for (int j = 0; j < n; j++) {
+    //            C[i][j] = A[i][j] / B.A[i][j];
+    //         }
+    //      }
+    //      return X;
+    //   }
 
-//   public Matrix arrayRightDivide (Matrix B) {
-//      checkMatrixDimensions(B);
-//      Matrix X = new Matrix(m,n);
-//      double[][] C = X.getArray();
-//      for (int i = 0; i < m; i++) {
-//         for (int j = 0; j < n; j++) {
-//            C[i][j] = A[i][j] / B.A[i][j];
-//         }
-//      }
-//      return X;
-//   }
+    /** Element-by-element right division in place, A = A./B
+     * @param B    another matrix
+     * @return     A./B
+     */
 
-   /** Element-by-element right division in place, A = A./B
-   @param B    another matrix
-   @return     A./B
-   */
+    //   public Matrix arrayRightDivideEquals (Matrix B) {
+    //      checkMatrixDimensions(B);
+    //      for (int i = 0; i < m; i++) {
+    //         for (int j = 0; j < n; j++) {
+    //            A[i][j] = A[i][j] / B.A[i][j];
+    //         }
+    //      }
+    //      return this;
+    //   }
 
-//   public Matrix arrayRightDivideEquals (Matrix B) {
-//      checkMatrixDimensions(B);
-//      for (int i = 0; i < m; i++) {
-//         for (int j = 0; j < n; j++) {
-//            A[i][j] = A[i][j] / B.A[i][j];
-//         }
-//      }
-//      return this;
-//   }
+    /** Element-by-element left division, C = A.\B
+     * @param B    another matrix
+     * @return     A.\B
+     */
 
-   /** Element-by-element left division, C = A.\B
-   @param B    another matrix
-   @return     A.\B
-   */
+    //   public Matrix arrayLeftDivide (Matrix B) {
+    //      checkMatrixDimensions(B);
+    //      Matrix X = new Matrix(m,n);
+    //      double[][] C = X.getArray();
+    //      for (int i = 0; i < m; i++) {
+    //         for (int j = 0; j < n; j++) {
+    //            C[i][j] = B.A[i][j] / A[i][j];
+    //         }
+    //      }
+    //      return X;
+    //   }
 
-//   public Matrix arrayLeftDivide (Matrix B) {
-//      checkMatrixDimensions(B);
-//      Matrix X = new Matrix(m,n);
-//      double[][] C = X.getArray();
-//      for (int i = 0; i < m; i++) {
-//         for (int j = 0; j < n; j++) {
-//            C[i][j] = B.A[i][j] / A[i][j];
-//         }
-//      }
-//      return X;
-//   }
+    /** Element-by-element left division in place, A = A.\B
+     * @param B    another matrix
+     * @return     A.\B
+     */
 
-   /** Element-by-element left division in place, A = A.\B
-   @param B    another matrix
-   @return     A.\B
-   */
+    //   public Matrix arrayLeftDivideEquals (Matrix B) {
+    //      checkMatrixDimensions(B);
+    //      for (int i = 0; i < m; i++) {
+    //         for (int j = 0; j < n; j++) {
+    //            A[i][j] = B.A[i][j] / A[i][j];
+    //         }
+    //      }
+    //      return this;
+    //   }
 
-//   public Matrix arrayLeftDivideEquals (Matrix B) {
-//      checkMatrixDimensions(B);
-//      for (int i = 0; i < m; i++) {
-//         for (int j = 0; j < n; j++) {
-//            A[i][j] = B.A[i][j] / A[i][j];
-//         }
-//      }
-//      return this;
-//   }
+    /** Multiply a matrix by a scalar, C = s*A
+     * @param s    scalar
+     * @return     s*A
+     */
 
-   /** Multiply a matrix by a scalar, C = s*A
-   @param s    scalar
-   @return     s*A
-   */
+    //   public Matrix times (double s) {
+    //      Matrix X = new Matrix(m,n);
+    //      double[][] C = X.getArray();
+    //      for (int i = 0; i < m; i++) {
+    //         for (int j = 0; j < n; j++) {
+    //            C[i][j] = s*A[i][j];
+    //         }
+    //      }
+    //      return X;
+    //   }
+    //
+    //   /** Multiply a matrix by a scalar in place, A = s*A
+    //   @param s    scalar
+    //   @return     replace A by s*A
+    //   */
+    //
+    //   public Matrix timesEquals (double s) {
+    //      for (int i = 0; i < m; i++) {
+    //         for (int j = 0; j < n; j++) {
+    //            A[i][j] = s*A[i][j];
+    //         }
+    //      }
+    //      return this;
+    //   }
+    //
+    //   /** Linear algebraic matrix multiplication, A * B
+    //   @param B    another matrix
+    //   @return     Matrix product, A * B
+    //   @exception  IllegalArgumentException Matrix inner dimensions must agree.
+    //   */
+    //
+    //   public Matrix times (Matrix B) {
+    //      if (B.m != n) {
+    //         throw new IllegalArgumentException("Matrix inner dimensions must agree.");
+    //      }
+    //      Matrix X = new Matrix(m,B.n);
+    //      double[][] C = X.getArray();
+    //      double[] Bcolj = new double[n];
+    //      for (int j = 0; j < B.n; j++) {
+    //         for (int k = 0; k < n; k++) {
+    //            Bcolj[k] = B.A[k][j];
+    //         }
+    //         for (int i = 0; i < m; i++) {
+    //            double[] Arowi = A[i];
+    //            double s = 0;
+    //            for (int k = 0; k < n; k++) {
+    //               s += Arowi[k]*Bcolj[k];
+    //            }
+    //            C[i][j] = s;
+    //         }
+    //      }
+    //      return X;
+    //   }
 
-//   public Matrix times (double s) {
-//      Matrix X = new Matrix(m,n);
-//      double[][] C = X.getArray();
-//      for (int i = 0; i < m; i++) {
-//         for (int j = 0; j < n; j++) {
-//            C[i][j] = s*A[i][j];
-//         }
-//      }
-//      return X;
-//   }
-//
-//   /** Multiply a matrix by a scalar in place, A = s*A
-//   @param s    scalar
-//   @return     replace A by s*A
-//   */
-//
-//   public Matrix timesEquals (double s) {
-//      for (int i = 0; i < m; i++) {
-//         for (int j = 0; j < n; j++) {
-//            A[i][j] = s*A[i][j];
-//         }
-//      }
-//      return this;
-//   }
-//
-//   /** Linear algebraic matrix multiplication, A * B
-//   @param B    another matrix
-//   @return     Matrix product, A * B
-//   @exception  IllegalArgumentException Matrix inner dimensions must agree.
-//   */
-//
-//   public Matrix times (Matrix B) {
-//      if (B.m != n) {
-//         throw new IllegalArgumentException("Matrix inner dimensions must agree.");
-//      }
-//      Matrix X = new Matrix(m,B.n);
-//      double[][] C = X.getArray();
-//      double[] Bcolj = new double[n];
-//      for (int j = 0; j < B.n; j++) {
-//         for (int k = 0; k < n; k++) {
-//            Bcolj[k] = B.A[k][j];
-//         }
-//         for (int i = 0; i < m; i++) {
-//            double[] Arowi = A[i];
-//            double s = 0;
-//            for (int k = 0; k < n; k++) {
-//               s += Arowi[k]*Bcolj[k];
-//            }
-//            C[i][j] = s;
-//         }
-//      }
-//      return X;
-//   }
-
-   /** LU Decomposition
-   @return     LUDecomposition
-   @see LUDecomposition
-   */
-
-   public BigLUDecomposition lu () {
+    /** LU Decomposition
+     * @return     LUDecomposition
+     * @see LUDecomposition
+     */
+    public BigLUDecomposition lu() {
       return new BigLUDecomposition(this);
    }
 
-   /** QR Decomposition
-   @return     QRDecomposition
-   @see QRDecomposition
-   */
+    /** QR Decomposition
+     * @return     QRDecomposition
+     * @see QRDecomposition
+     */
 
-//   public QRDecomposition qr () {
-//      return new QRDecomposition(this);
-//   }
+    //   public QRDecomposition qr () {
+    //      return new QRDecomposition(this);
+    //   }
 
-   /** Cholesky Decomposition
-   @return     CholeskyDecomposition
-   @see CholeskyDecomposition
-   */
+    /** Cholesky Decomposition
+     * @return     CholeskyDecomposition
+     * @see CholeskyDecomposition
+     */
 
-//   public CholeskyDecomposition chol () {
-//      return new CholeskyDecomposition(this);
-//   }
-//
-//   /** Singular Value Decomposition
-//   @return     SingularValueDecomposition
-//   @see SingularValueDecomposition
-//   */
-//
-//   public SingularValueDecomposition svd () {
-//      return new SingularValueDecomposition(this);
-//   }
+    //   public CholeskyDecomposition chol () {
+    //      return new CholeskyDecomposition(this);
+    //   }
+    //
+    //   /** Singular Value Decomposition
+    //   @return     SingularValueDecomposition
+    //   @see SingularValueDecomposition
+    //   */
+    //
+    //   public SingularValueDecomposition svd () {
+    //      return new SingularValueDecomposition(this);
+    //   }
 
-   /** Eigenvalue Decomposition
-   @return     EigenvalueDecomposition
-   @see EigenvalueDecomposition
-   */
+    /** Eigenvalue Decomposition
+     * @return     EigenvalueDecomposition
+     * @see EigenvalueDecomposition
+     */
 
-//   public EigenvalueDecomposition eig () {
-//      return new EigenvalueDecomposition(this);
-//   }
+    //   public EigenvalueDecomposition eig () {
+    //      return new EigenvalueDecomposition(this);
+    //   }
 
-   /** Solve A*X = B
-   @param B    right hand side
-   @return     solution if A is square, least squares solution otherwise
-   */
-   public BigMatrix solve (BigMatrix B) {
-      if(m == n) {
-          if(luDecomp == null) {
+    /** Solve A*X = B
+     * @param B    right hand side
+     * @return     solution if A is square, least squares solution otherwise
+     */
+    public BigMatrix solve(BigMatrix B) {
+        if (m == n) {
+            if (luDecomp == null) {
               luDecomp = new BigLUDecomposition(this);
           }
           return luDecomp.solve(B);
@@ -559,68 +540,63 @@ public final class BigMatrix implements java.io.Serializable {
     luDecomp = null;
    }
 
-
-   /** Print the matrix to stdout.   Line the elements up in columns
+    /** Print the matrix to stdout.   Line the elements up in columns
      * with a Fortran-like 'Fw.d' style format.
-   @param w    Column width.
-   @param d    Number of digits after the decimal.
-   */
-
-   public void print (int w, int d) {
+     * @param w    Column width.
+     * @param d    Number of digits after the decimal.
+     */
+    public void print(int w, int d) {
       print(new PrintWriter(System.out, true, StandardCharsets.UTF_8),w,d); }
 
-   /** Print the matrix to the output stream.   Line the elements up in
+    /** Print the matrix to the output stream.   Line the elements up in
      * columns with a Fortran-like 'Fw.d' style format.
-   @param output Output stream.
-   @param w      Column width.
-   @param d      Number of digits after the decimal.
-   */
-
-   public void print (PrintWriter output, int w, int d) {
+     * @param output Output stream.
+     * @param w      Column width.
+     * @param d      Number of digits after the decimal.
+     */
+    public void print(PrintWriter output, int w, int d) {
       DecimalFormat format = new DecimalFormat();
       format.setDecimalFormatSymbols(new DecimalFormatSymbols(Locale.US));
       format.setMinimumIntegerDigits(1);
       format.setMaximumFractionDigits(d);
       format.setMinimumFractionDigits(d);
       format.setGroupingUsed(false);
-      print(output,format,w+2);
+        print(output, format, w + 2);
    }
 
-   /** Print the matrix to stdout.  Line the elements up in columns.
+    /** Print the matrix to stdout.  Line the elements up in columns.
      * Use the format object, and right justify within columns of width
      * characters.
      * Note that is the matrix is to be read back in, you probably will want
      * to use a NumberFormat that is set to US Locale.
-   @param format A  Formatting object for individual elements.
-   @param width     Field width for each column.
-   @see java.text.DecimalFormat#setDecimalFormatSymbols
-   */
-
-   public void print (NumberFormat format, int width) {
+     * @param format A  Formatting object for individual elements.
+     * @param width     Field width for each column.
+     * @see java.text.DecimalFormat#setDecimalFormatSymbols
+     */
+    public void print(NumberFormat format, int width) {
       print(new PrintWriter(System.out, true, StandardCharsets.UTF_8),format,width); }
 
-   // DecimalFormat is a little disappointing coming from Fortran or C's printf.
-   // Since it doesn't pad on the left, the elements will come out different
-   // widths.  Consequently, we'll pass the desired column width in as an
-   // argument and do the extra padding ourselves.
+    // DecimalFormat is a little disappointing coming from Fortran or C's printf.
+    // Since it doesn't pad on the left, the elements will come out different
+    // widths.  Consequently, we'll pass the desired column width in as an
+    // argument and do the extra padding ourselves.
 
-   /** Print the matrix to the output stream.  Line the elements up in columns.
+    /** Print the matrix to the output stream.  Line the elements up in columns.
      * Use the format object, and right justify within columns of width
      * characters.
      * Note that is the matrix is to be read back in, you probably will want
      * to use a NumberFormat that is set to US Locale.
-   @param output the output stream.
-   @param format A formatting object to format the matrix elements
-   @param width  Column width.
-   @see java.text.DecimalFormat#setDecimalFormatSymbols
-   */
-
-   public void print (PrintWriter output, NumberFormat format, int width) {
+     * @param output the output stream.
+     * @param format A formatting object to format the matrix elements
+     * @param width  Column width.
+     * @see java.text.DecimalFormat#setDecimalFormatSymbols
+     */
+    public void print(PrintWriter output, NumberFormat format, int width) {
       output.println();  // start on new line.
       for (int i = 0; i < m; i++) {
          for (int j = 0; j < n; j++) {
             String s = format.format(A[i][j]); // format the number
-            int padding = Math.max(1,width-s.length()); // At _least_ 1 space
+                int padding = Math.max(1, width - s.length()); // At _least_ 1 space
             for (int k = 0; k < padding; k++) {
                output.print(' ');
             }
@@ -631,16 +607,15 @@ public final class BigMatrix implements java.io.Serializable {
       output.println();   // end with blank line.
    }
 
-   /** Read a matrix from a stream.  The format is the same the print method,
+    /** Read a matrix from a stream.  The format is the same the print method,
      * so printed matrices can be read back in (provided they were printed using
      * US Locale).  Elements are separated by
      * whitespace, all the elements for each row appear on a single line,
      * the last row is followed by a blank line.
-   @param input the input stream.
-   */
-
-   public static Matrix read (BufferedReader input) throws java.io.IOException {
-      StreamTokenizer tokenizer= new StreamTokenizer(input);
+     * @param input the input stream.
+     */
+    public static Matrix read(BufferedReader input) throws java.io.IOException {
+        StreamTokenizer tokenizer = new StreamTokenizer(input);
 
       // Although StreamTokenizer will parse numbers, it doesn't recognize
       // scientific notation (E or D); however, Double.valueOf does.
@@ -652,41 +627,43 @@ public final class BigMatrix implements java.io.Serializable {
       tokenizer.wordChars(0,255);
       tokenizer.whitespaceChars(0, ' ');
       tokenizer.eolIsSignificant(true);
-      java.util.Vector v = new java.util.Vector();
+      List v = new java.util.Vector();
 
       // Ignore initial empty lines
       while (tokenizer.nextToken() == StreamTokenizer.TT_EOL) {
           continue; // skip EOL tokens until non-EOL token found
       }
       if (tokenizer.ttype == StreamTokenizer.TT_EOF) {
-	throw new java.io.IOException("Unexpected EOF on matrix read.");
+            throw new java.io.IOException("Unexpected EOF on matrix read.");
       }
       do {
-         v.addElement(Double.valueOf(tokenizer.sval)); // Read & store 1st row.
+         v.add(Double.valueOf(tokenizer.sval)); // Read & store 1st row.
       } while (tokenizer.nextToken() == StreamTokenizer.TT_WORD);
 
       int n = v.size();  // Now we've got the number of columns!
       double row[] = new double[n];
-      for (int j=0; j<n; j++) { // extract the elements of the 1st row.
-         row[j]=((Double)v.elementAt(j)).doubleValue();
+        for (int j = 0; j < n; j++) { // extract the elements of the 1st row.
+            row[j] = ((Double) v.get(j)).doubleValue();
       }
-      v.removeAllElements();
-      v.addElement(row);  // Start storing rows instead of columns.
+      v.clear();
+      v.add(row);  // Start storing rows instead of columns.
       while (tokenizer.nextToken() == StreamTokenizer.TT_WORD) {
          // While non-empty lines
-         v.addElement(row = new double[n]);
+         v.add(row = new double[n]);
          int j = 0;
          do {
-            if (j >= n) { throw new java.io.IOException
-               ("Row " + v.size() + " is too long."); }
+                if (j >= n) {
+                    throw new java.io.IOException("Row " + v.size() + " is too long.");
+                }
             row[j++] = Double.parseDouble(tokenizer.sval);
          } while (tokenizer.nextToken() == StreamTokenizer.TT_WORD);
-         if (j < n) { throw new java.io.IOException
-            ("Row " + v.size() + " is too short."); }
+            if (j < n) {
+                throw new java.io.IOException("Row " + v.size() + " is too short.");
+            }
       }
       int m = v.size();  // Now we've got the number of rows.
       double[][] A = new double[m][];
-      v.copyInto(A);  // copy the rows out of the vector
+      v.toArray(A);  // copy the rows out of the vector
       return new Matrix(A);
    }
 }

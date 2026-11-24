@@ -75,9 +75,10 @@ public final class ReglerFlowMeter extends AbstractCurrentMeasurement {
 
     @Override
     public void checkComponentCompatibility(final Object testObject, final List<AbstractBlockInterface> insertList) {
-        if(testObject instanceof CurrentMeasurable) {
+        if (testObject instanceof CurrentMeasurable) {
             final CurrentMeasurable curMeas = (CurrentMeasurable) testObject;
-            if(((AbstractCircuitBlockInterface) curMeas).getSimulationDomain() != ConnectorType.THERMAL) {
+            if (((AbstractCircuitBlockInterface) curMeas).getSimulationDomain()
+                    != ConnectorType.THERMAL) {
                 return;
             }
             insertList.addAll(Arrays.asList(curMeas.getCurrentMeasurementComponents(ConnectorType.THERMAL)));

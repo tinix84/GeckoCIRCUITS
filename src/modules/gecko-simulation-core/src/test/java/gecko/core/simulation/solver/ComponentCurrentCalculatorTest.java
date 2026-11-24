@@ -17,6 +17,8 @@ import gecko.core.allg.SolverType;
 import gecko.core.circuit.circuitcomponents.CircuitTypCore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -120,5 +122,26 @@ class ComponentCurrentCalculatorTest {
                 matrixSolver, netlist, 0.01, DT, 0.0, true);
 
         assertFalse(needsRecalculation, "Simplified version should return false");
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = CircuitTypCore.class, names = {"LK_THYR", "LK_IGBT"})
+    void blockingDevicePreservesReleaseReportedCurrent(CircuitTypCore type) {
+        matrixSolver.initializeMatrices(1, 0, 1);
+        double[] parameters = new double[13];
+        parameters[0] = 1e7;
+        parameters[1] = .6;
+        parameters[2] = .01;
+        parameters[3] = 1e7;
+        SimpleNetList netlist = new SimpleNetList();
+        netlist.addComponent(type, 1, 0, parameters);
+        double[] currents = new double[1];
+
+        calculator.calculateComponentCurrents(matrixSolver, netlist, currents, 0, DT, 0, true);
+
+        assertEquals(-6e-8, currents[0], 1e-20, "v2.02 reports the forward-drop offset while blocking.");
+        assertEquals(currents[0], netlist.getParameter(0)[4]);
+        assertEquals(.6, netlist.getParameter(0)[1], "Current reporting preserves the configured forward drop.");
+        assertEquals(1e7, netlist.getParameter(0)[0], "Current reporting preserves the device resistance.");
     }
 }

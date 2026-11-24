@@ -240,7 +240,7 @@ public class ComponentCurrentCalculator {
 
                 case LK_THYR: {
                     double rDThyr = parameters[0];
-                    double ufThyr = rDThyr < 10000 ? parameters[1] : 0;  // Match the stamped forward-voltage source
+                    double ufThyr = parameters[1];  // Preserve v2.02 current reporting in both switching states.
                     current = (p[nodeX] - p[nodeY] - ufThyr) / rDThyr;
                     parameters[4] = current;
                     parameters[5] = p[nodeX] - p[nodeY];
@@ -249,7 +249,7 @@ public class ComponentCurrentCalculator {
 
                 case LK_IGBT: {
                     double rDIgbt = parameters[0];
-                    double ufIgbt = rDIgbt < 10000 ? parameters[1] : 0;  // Match the stamped forward-voltage source
+                    double ufIgbt = parameters[1];  // Preserve v2.02 current reporting in both switching states.
                     current = (p[nodeX] - p[nodeY] - ufIgbt) / rDIgbt;
                     parameters[4] = current;
                     parameters[5] = p[nodeX] - p[nodeY];

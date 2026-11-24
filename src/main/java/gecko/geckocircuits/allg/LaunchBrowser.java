@@ -38,7 +38,7 @@ public final class LaunchBrowser {
 
     private static boolean isWindows() {
         final String osString = System.getProperty("os.name");
-        if(osString == null || osString.isEmpty()) {
+        if (osString == null || osString.isEmpty()) {
             return false;
         }
         return osString.startsWith("Windows");

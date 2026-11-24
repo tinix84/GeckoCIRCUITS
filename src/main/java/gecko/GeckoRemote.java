@@ -76,7 +76,7 @@ public class GeckoRemote {
             }
             try {
                 return _methodMap.get(method).invoke(this.object, args);
-            } catch(Throwable ex) {
+            } catch (Throwable ex) {
                 Throwable cause = ex.getCause();
                 if (cause != null) {
                     cause.addSuppressed(ex);
@@ -89,7 +89,7 @@ public class GeckoRemote {
     }
 
     public static void setJavaPath(final String pathToJavaExe) {
-        if(new File(pathToJavaExe).exists()) {
+        if (new File(pathToJavaExe).exists()) {
             _pathToJava = pathToJavaExe;
         } else {
             throw new RuntimeException("Error: Path to Java executable: " + pathToJavaExe + " does not exist!");
@@ -111,7 +111,7 @@ public class GeckoRemote {
 
             final List<String> argsList = new ArrayList<String>();
 
-            if(! _pathToJava.isEmpty()) {
+            if (!_pathToJava.isEmpty()) {
                 argsList.add("-j");
                 argsList.add(_pathToJava);
             }
@@ -211,7 +211,10 @@ public class GeckoRemote {
     //try to connect to an existing instance of GeckoCIRCUITS
     private static void connectToExistingInstance(final GeckoRemoteInterface existingInstance, final int port) {
         try {
-            if (existingInstance.isFree() && !existingInstance.checkSessionID(sessionID)) { //with multiple connections, GeckoCIRCUITS may be free AND this client may be already connected!
+            if (existingInstance.isFree()
+                    && !existingInstance.checkSessionID(
+                            sessionID)) { // with multiple connections, GeckoCIRCUITS may be free
+                                          // AND this client may be already connected!
                 try {
                     final long newSessionID = existingInstance.connect();
                     if (_wrapped != null) {

@@ -31,13 +31,13 @@ public enum ControlSourceType {
     }
 
     public static ControlSourceType getFromID(final int idValue) {
-        for(ControlSourceType tmp : values()) {
-            if(idValue == tmp._oldGeckoID) {
+        for (ControlSourceType tmp : values()) {
+            if (idValue == tmp._oldGeckoID) {
                     return tmp;
             }
         }
-        for(ControlSourceType tmp : values()) {
-            if(idValue == tmp._newGeckoID) {
+        for (ControlSourceType tmp : values()) {
+            if (idValue == tmp._newGeckoID) {
                     return tmp;
             }
         }

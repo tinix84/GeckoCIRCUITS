@@ -46,7 +46,7 @@ class ReglerHysteresisDialog extends AbstractDialogWithExternalOption<ReglerHyst
         _parameterPanel = createParameterPanel(element._hysteresisThreshold);
         jpM.add(_parameterPanel, BorderLayout.SOUTH);
 
-        for(JComponent comp : getComponentsDisabledExternal()) {
+        for (JComponent comp : getComponentsDisabledExternal()) {
             comp.setEnabled(!element.isExternalSet());
         }
 

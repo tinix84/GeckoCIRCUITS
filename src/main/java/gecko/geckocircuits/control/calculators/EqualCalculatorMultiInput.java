@@ -22,8 +22,8 @@ public final class EqualCalculatorMultiInput extends AbstractControlCalculatable
     @Override
     public void berechneYOUT(final double deltaT) {
         _outputSignal[0][0] = 1;
-        for(int i = 1; i < _inputSignal.length; i++) {
-            if(_inputSignal[i][0] != _inputSignal[0][0]) {
+        for (int i = 1; i < _inputSignal.length; i++) {
+            if (_inputSignal[i][0] != _inputSignal[0][0]) {
                 _outputSignal[0][0] = 0;
                 return;
             }

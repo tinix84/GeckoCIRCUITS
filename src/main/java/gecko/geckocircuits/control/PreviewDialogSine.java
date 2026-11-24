@@ -40,37 +40,93 @@ public class PreviewDialogSine extends PreviewDialog {
             sinY[i1] = y0 - (offset + (int) (ac * Math.sin((i1 * 2 * Math.PI / sinX.length) - phase * Math.PI / 180.0)));
         }
         final int xPh = (int) (phase / 360.0 * b), xMx = xPh + b / 4;
-        JComponent jcp = new JComponent() {
-            @Override
-            public void paint(Graphics g) {
-                g.setFont(GlobalFonts.foAUSWAHL);
-                g.setColor(Color.white);
-                g.drawRect(0, 0, x1 + 2 * rand, y2 + 4 * rand);
-                g.setColor(Color.black);
-                g.drawPolyline(kordX, kordY, kordX.length);  // Koord.
-                g.setColor(Color.blue);
-                g.drawPolyline(sinX, sinY, sinX.length);  // Signalkurve
-                g.setColor(Color.lightGray);
-                g.drawLine(x2, y0 - offset, x1, y0 - offset);  // offset-Linie (Mittelwert)
-                g.setColor(Color.gray);
-                g.drawLine(x0 + xPh, y0 - offset - 10, x0 + xPh, y0 + 10);  // Markierungsline fuer Phasenverschiebung
-                g.drawLine(x1, y0 - offset / 2, x1, y0 - offset - ac / 2);  // senkrechte Linie bei (2*PI)
-                g.drawPolyline(new int[]{x0 + xPh, x0 + xPh, x0 + xPh - p2, x0 + xPh}, new int[]{y0 - offset - 2 * p1, y0 - offset, y0 - offset - p1, y0 - offset - p1}, 4);  // Pfeilspitze senkrecht
-                g.drawPolyline(new int[]{x0 + xPh, x0 + xPh, x0 + xPh - p2, x0 + xPh}, new int[]{y0 + 2 * p1, y0, y0 + p1, y0 + p1}, 4);  // Pfeilspitze senkrecht
-                g.drawPolyline(new int[]{x0 + xMx, x0 + xMx + p2, x0 + xMx, x0 + xMx, x0 + xMx + p2, x0 + xMx}, new int[]{y0 - offset - ac + p1, y0 - offset - ac + p1, y0 - offset - ac, y0 - offset, y0 - offset - p1, y0 - offset - p1}, 6);  // AC-max-Linie (senkrecht) plus Pfeilspitzen
-                g.setColor(Color.white);
-                g.fillRect(x0 + xMx + 10, y0 - offset - ac / 2 - 7, 50, 16);
-                g.fillRect(x0 - 1, y0 - offset - 30, xMx - 5, 16);
-                g.setColor(Color.magenta);
-                g.drawPolyline(new int[]{x0 + q, x0 + q, x0 + q, x0 + q + xPh, x0 + q + xPh - p1, x0 + q + xPh - p1, x0 + q + xPh}, new int[]{y0 + q - offset - p2, y0 + q - offset + p2, y0 + q - offset, y0 + q - offset, y0 + q - offset - p2, y0 + q - offset + p2, y0 + q - offset}, 7);  // Phasenverschiebung: Pfeil waagrecht
-                g.drawLine(x0, y0 - offset - p2, x0, y0 - offset + p2);
-                g.drawString("phase = " + phase + "°", 5, y0 - offset - 17);
-                g.drawString("offset", x0 + xPh + 4, y0 + 14);
-                g.drawString("amplMAX", x0 + xMx + 4, y0 - offset - ac / 2 + 7);
-                g.setColor(Color.black);
-                g.fillOval(x0 + xPh - rd, y0 - offset - rd, 2 * rd, 2 * rd);
-            }
-        };
+        JComponent jcp =
+                new JComponent() {
+                    @Override
+                    public void paint(Graphics g) {
+                        g.setFont(GlobalFonts.foAUSWAHL);
+                        g.setColor(Color.white);
+                        g.drawRect(0, 0, x1 + 2 * rand, y2 + 4 * rand);
+                        g.setColor(Color.black);
+                        g.drawPolyline(kordX, kordY, kordX.length); // Koord.
+                        g.setColor(Color.blue);
+                        g.drawPolyline(sinX, sinY, sinX.length); // Signalkurve
+                        g.setColor(Color.lightGray);
+                        g.drawLine(x2, y0 - offset, x1, y0 - offset); // offset-Linie (Mittelwert)
+                        g.setColor(Color.gray);
+                        g.drawLine(
+                                x0 + xPh,
+                                y0 - offset - 10,
+                                x0 + xPh,
+                                y0 + 10); // Markierungsline fuer Phasenverschiebung
+                        g.drawLine(
+                                x1,
+                                y0 - offset / 2,
+                                x1,
+                                y0 - offset - ac / 2); // senkrechte Linie bei (2*PI)
+                        g.drawPolyline(
+                                new int[] {x0 + xPh, x0 + xPh, x0 + xPh - p2, x0 + xPh},
+                                new int[] {
+                                    y0 - offset - 2 * p1,
+                                    y0 - offset,
+                                    y0 - offset - p1,
+                                    y0 - offset - p1
+                                },
+                                4); // Pfeilspitze senkrecht
+                        g.drawPolyline(
+                                new int[] {x0 + xPh, x0 + xPh, x0 + xPh - p2, x0 + xPh},
+                                new int[] {y0 + 2 * p1, y0, y0 + p1, y0 + p1},
+                                4); // Pfeilspitze senkrecht
+                        g.drawPolyline(
+                                new int[] {
+                                    x0 + xMx,
+                                    x0 + xMx + p2,
+                                    x0 + xMx,
+                                    x0 + xMx,
+                                    x0 + xMx + p2,
+                                    x0 + xMx
+                                },
+                                new int[] {
+                                    y0 - offset - ac + p1,
+                                    y0 - offset - ac + p1,
+                                    y0 - offset - ac,
+                                    y0 - offset,
+                                    y0 - offset - p1,
+                                    y0 - offset - p1
+                                },
+                                6); // AC-max-Linie (senkrecht) plus Pfeilspitzen
+                        g.setColor(Color.white);
+                        g.fillRect(x0 + xMx + 10, y0 - offset - ac / 2 - 7, 50, 16);
+                        g.fillRect(x0 - 1, y0 - offset - 30, xMx - 5, 16);
+                        g.setColor(Color.magenta);
+                        g.drawPolyline(
+                                new int[] {
+                                    x0 + q,
+                                    x0 + q,
+                                    x0 + q,
+                                    x0 + q + xPh,
+                                    x0 + q + xPh - p1,
+                                    x0 + q + xPh - p1,
+                                    x0 + q + xPh
+                                },
+                                new int[] {
+                                    y0 + q - offset - p2,
+                                    y0 + q - offset + p2,
+                                    y0 + q - offset,
+                                    y0 + q - offset,
+                                    y0 + q - offset - p2,
+                                    y0 + q - offset + p2,
+                                    y0 + q - offset
+                                },
+                                7); // Phasenverschiebung: Pfeil waagrecht
+                        g.drawLine(x0, y0 - offset - p2, x0, y0 - offset + p2);
+                        g.drawString("phase = " + phase + "°", 5, y0 - offset - 17);
+                        g.drawString("offset", x0 + xPh + 4, y0 + 14);
+                        g.drawString("amplMAX", x0 + xMx + 4, y0 - offset - ac / 2 + 7);
+                        g.setColor(Color.black);
+                        g.fillOval(x0 + xPh - rd, y0 - offset - rd, 2 * rd, 2 * rd);
+                    }
+                };
         jcp.setPreferredSize(new Dimension(x1 + 2 * rand, y2 + 4 * rand));
         return jcp;
     }

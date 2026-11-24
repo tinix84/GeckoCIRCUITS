@@ -24,7 +24,7 @@ class MyTableCellRenderer extends DefaultTableCellRenderer {
 
     @Override
     public void setValue(Object value) {
-        if(value == null) {
+        if (value == null) {
             setText("");
         } else {
             setText(tf.formatENG(Double.parseDouble(value.toString()), 3));

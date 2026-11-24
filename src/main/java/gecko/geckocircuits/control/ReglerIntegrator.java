@@ -59,22 +59,24 @@ public final class ReglerIntegrator extends RegelBlock {
     public ReglerIntegrator() {
         super(2, 1);
 
-        final ActionListener minMaxAction = new ActionListener() {
+        final ActionListener minMaxAction =
+                new ActionListener() {
 
-            @Override
-            public void actionPerformed(final ActionEvent event) {
-                if (_calculator instanceof IntegratorCalculation) {
-                    final IntegratorCalculation intCalc = (IntegratorCalculation) _calculator;
-                    final double min = _minLimit.getValue();
-                    final double max = _maxLimit.getValue();
-                    if(min < max) {
-                        intCalc.setMinMax(min, max);
+                    @Override
+                    public void actionPerformed(final ActionEvent event) {
+                        if (_calculator instanceof IntegratorCalculation) {
+                            final IntegratorCalculation intCalc =
+                                    (IntegratorCalculation) _calculator;
+                            final double min = _minLimit.getValue();
+                            final double max = _maxLimit.getValue();
+                            if (min < max) {
+                                intCalc.setMinMax(min, max);
+                            }
+                            return;
+                        }
+                        assert _calculator == null : "Calculator not known!";
                     }
-                    return;
-                }
-                assert _calculator == null : "Calculator not known!";
-            }
-        };
+                };
 
         _maxLimit.addActionListener(minMaxAction);
         _minLimit.addActionListener(minMaxAction);

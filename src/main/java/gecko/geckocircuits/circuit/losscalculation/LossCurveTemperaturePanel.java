@@ -57,7 +57,7 @@ public final class LossCurveTemperaturePanel extends JPanel {
     }
 
     private void sendActionEvent(final ActionEvent event) {
-        for(ActionListener listener : _listeners) {
+        for (ActionListener listener : _listeners) {
             listener.actionPerformed(event);
         }
     }
@@ -77,17 +77,16 @@ public final class LossCurveTemperaturePanel extends JPanel {
             _gbc.gridy = i1;
             final JRadioButton newButton = new JRadioButton(curveList.get(i1).getName());
             _radioButtons.add(newButton);
-            newButton.addActionListener(new ActionListener() {
+            newButton.addActionListener(
+                    new ActionListener() {
 
-                @Override
-                public void actionPerformed(final ActionEvent actionEvent) {
-                    if(newButton.isSelected()) {
-                        sendActionEvent(actionEvent);
-                    }
-
-                }
-
-            });
+                        @Override
+                        public void actionPerformed(final ActionEvent actionEvent) {
+                            if (newButton.isSelected()) {
+                                sendActionEvent(actionEvent);
+                            }
+                        }
+                    });
 
             _buttonGroup.add(newButton);
             this.add(newButton, _gbc);

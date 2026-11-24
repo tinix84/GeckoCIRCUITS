@@ -108,7 +108,10 @@ public final class GeckoMemoryMappedFile {
         final File file = new File(fileName);
         //given file must exist already!
         if (!file.exists()) {
-            throw new FileNotFoundException("The file for remote access: " + fileName + " does not exist. Please check if GeckoCIRCUITS is enabled for remote access.");
+            throw new FileNotFoundException(
+                    "The file for remote access: "
+                            + fileName
+                            + " does not exist. Please check if GeckoCIRCUITS is enabled for remote access.");
         }
         //create initial memory mapped byte buffer to read buffer size
         final MappedByteBuffer mmb;
@@ -280,7 +283,9 @@ public final class GeckoMemoryMappedFile {
      * @throws IOException if something goes wrong reading or writing the memory-mapped file or (de)serializing the pipe object
      * @throws ClassNotFoundException if the pipe object cannot be reconstructed properly
      */
-    public GeckoRemotePipeObject callMethod(final long connectionID, final GeckoRemotePipeObject methodObject) throws IOException, ClassNotFoundException {
+    public GeckoRemotePipeObject callMethod(
+            final long connectionID, final GeckoRemotePipeObject methodObject)
+            throws IOException, ClassNotFoundException {
         checkConnectionID(connectionID);
         if (methodObject.isMethodCall()) {
             final byte[] serializedPipe = serializePipeObject(methodObject);
@@ -316,7 +321,7 @@ public final class GeckoMemoryMappedFile {
                         returnedSerializedPipe = new byte[(int)returnedPipeSize];
                         //read byte by byte
                         for (int i = startIndex; i < (startIndex + returnedPipeSize); i++) {
-                            returnedSerializedPipe[i-startIndex] = _mmb.get(i);
+                            returnedSerializedPipe[i - startIndex] = _mmb.get(i);
                         }
                         final GeckoRemotePipeObject response = deserializePipeObject(returnedSerializedPipe);
                         setIdle();

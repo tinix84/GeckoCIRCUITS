@@ -24,9 +24,10 @@ package gecko.geckocircuits.nativec;
  */
 public interface InterfaceNativeCWrapper {
 
-    void loadLibrary (String name);
+    void loadLibrary(String name);
 
-    void initParameters ();
+    void initParameters();
 
-    void calcOutputs (double[] xINVector, double[] xOUTVector, int numberOfOuts, double time, double deltaT);
+    void calcOutputs(
+            double[] xINVector, double[] xOUTVector, int numberOfOuts, double time, double deltaT);
 }

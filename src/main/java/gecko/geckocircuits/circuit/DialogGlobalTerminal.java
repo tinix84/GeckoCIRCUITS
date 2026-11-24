@@ -27,7 +27,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 @SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "Dialog stores terminal reference for global connection configuration")
 public class DialogGlobalTerminal extends javax.swing.JDialog {
     private final GlobalTerminable _globalTerminable;
-    private final HashSet<GlobalTerminable> _allGlobalTerminals;
+    private final Set<GlobalTerminable> _allGlobalTerminals;
     private final AbstractBlockInterface _thisTerminal;
     private boolean _initDone = false;
     /**

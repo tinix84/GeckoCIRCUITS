@@ -41,19 +41,25 @@ public final class DEMUXCalculator extends AbstractControlCalculatable implement
 
     @Override
     public void initializeAtSimulationStart(final double deltaT) {
-        if(_parent._connectedJavaBlock != null) {
+        if (_parent._connectedJavaBlock != null) {
             _inputSignal[0] = _parent._connectedJavaBlock._calculator._outputSignal[_parent._connectedJavaOutputIndex];
         }
         if (_outputSignal.length != _inputSignal[0].length) {
-            throw new RuntimeException("Signals of DEMUX \"" + _parent.getStringID() +"\" input are not consistent:\n"
-                    + "Input size: " + _inputSignal[0].length + "\n"
-                    + "Output size: " + _outputSignal.length);
+            throw new RuntimeException(
+                    "Signals of DEMUX \""
+                            + _parent.getStringID()
+                            + "\" input are not consistent:\n"
+                            + "Input size: "
+                            + _inputSignal[0].length
+                            + "\n"
+                            + "Output size: "
+                            + _outputSignal.length);
         }
     }
 
     @Override
     public boolean checkInputWithoutConnectionAndFill(final int inputIndex) {
-        if(_inputSignal[inputIndex] == null) {
+        if (_inputSignal[inputIndex] == null) {
             final int dummyLength = _outputSignal.length;
             _inputSignal[inputIndex] = new double[dummyLength];
             return true;

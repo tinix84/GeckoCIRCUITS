@@ -29,14 +29,15 @@ public abstract class AbstractInductor extends AbstractNonLinearCircuitComponent
         implements PostCalculatable, CurrentMeasurable, DirectVoltageMeasurable {
 
     private static final double HEIGHT = 0.8;
-    final UserParameter<Double> _inductance = UserParameter.Builder.
-            <Double>start("inductance", 3.0E-4).
-            longName(I18nKeys.INDUCTANCE).
-            shortName("L").
-            unit("H").
-            showInTextInfo(TextInfoType.SHOW_NEVER). // noninearity: custom display
-            arrayIndex(this, 0).
-            build();
+    final UserParameter<Double> _inductance =
+            UserParameter.Builder.<Double>start("inductance", 3.0E-4)
+                    .longName(I18nKeys.INDUCTANCE)
+                    .shortName("L")
+                    .unit("H")
+                    .showInTextInfo(TextInfoType.SHOW_NEVER)
+                    . // noninearity: custom display
+                    arrayIndex(this, 0)
+                    .build();
     final UserParameter<Double> _initialCurrent = UserParameter.Builder.
             <Double>start("initialCurrent", 0.0).
             longName(I18nKeys.INITIAL_CURRENT).

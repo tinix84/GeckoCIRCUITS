@@ -28,60 +28,61 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
  * reference from the Listener-List still exists.
  *
  */
-@SuppressFBWarnings(value = "PA_PUBLIC_PRIMITIVE_ATTRIBUTE",
+@SuppressFBWarnings(
+        value = "PA_PUBLIC_PRIMITIVE_ATTRIBUTE",
         justification = "Public listeners field for MVC observer registration by subclasses")
-public abstract class ModelMVCGeneric<T> implements Serializable{
+public abstract class ModelMVCGeneric<T> implements Serializable {
   // transient private Set<ActionListener> listeners = new HashSet<ActionListener>();
   transient public WeakListModel listeners = new WeakListModel();
   private static final long serialVersionUID = 784638463745367L;
 
-  /**
-   * register Listener in list. Careful: the listener is not updated during
-   * registration, that means the listener must aquire its initialisation data
-   * manually. But thats ok, since we have a reference to the values, anyway.
-   * this saves some events.
-   *
-   * @param listener instance of ListenerMVCGeneric
-   */
-  public void addModelListener(final ActionListener listener){
+    /**
+     * register Listener in list. Careful: the listener is not updated during
+     * registration, that means the listener must aquire its initialisation data
+     * manually. But thats ok, since we have a reference to the values, anyway.
+     * this saves some events.
+     *
+     * @param listener instance of ListenerMVCGeneric
+     */
+    public void addModelListener(final ActionListener listener) {
 
-    if(listeners == null){
+        if (listeners == null) {
       listeners = new WeakListModel();
     }
 
     this.listeners.addElement(listener);
   }
 
-  /**
-   * remove listener from List
-   *
-   * @param listener instance of ListenerMVCGeneric
-   */
-  public void removeModelListener(final ActionListener listener){
+    /**
+     * remove listener from List
+     *
+     * @param listener instance of ListenerMVCGeneric
+     */
+    public void removeModelListener(final ActionListener listener) {
     listeners.removeElement(listener);
   }
 
-  /**
-   * send a notify event to all registered listeners.
-   *
-   * @param source inner Property class which is sending the event
-   */
-  public void notifyModelListeners(Object source){
-    if(listeners == null){
+    /**
+     * send a notify event to all registered listeners.
+     *
+     * @param source inner Property class which is sending the event
+     */
+    public void notifyModelListeners(Object source) {
+        if (listeners == null) {
       return;
     }
-    for(int i = 0; i < listeners.getSize(); i++){
+        for (int i = 0; i < listeners.getSize(); i++) {
       notifyModelListener((ActionListener)listeners.getElementAt(i), source);
     }
   }
 
-  /**
-   * Send a notif event to a specifig Listener. Caution, the listener does not
-   * have to be in the register list!
-   *
-   * @param listener an instance of ListenerMVCGeneric
-   */
-  protected void notifyModelListener(final ActionListener listener, Object source){
+    /**
+     * Send a notif event to a specifig Listener. Caution, the listener does not
+     * have to be in the register list!
+     *
+     * @param listener an instance of ListenerMVCGeneric
+     */
+    protected void notifyModelListener(final ActionListener listener, Object source) {
     listener.actionPerformed(new ActionEvent(source, 0, "mvc change"));
   }
   /**
@@ -94,24 +95,24 @@ public abstract class ModelMVCGeneric<T> implements Serializable{
    */
   protected T _value;
 
-  /**
-   * initialisation konstructor. Please consider that the write access to the
-   * value should be done throug setValue() method.
-   *
-   * @param initialValue
-   */
-  public ModelMVCGeneric(final T initialValue){
+    /**
+     * initialisation konstructor. Please consider that the write access to the
+     * value should be done throug setValue() method.
+     *
+     * @param initialValue
+     */
+    public ModelMVCGeneric(final T initialValue) {
     this._value = initialValue;
   }
 
-  /**
-   * writes the new value and sends an update notification to all listeners
-   *
-   * @param value
-   */
-  public void setValue(final T value){
+    /**
+     * writes the new value and sends an update notification to all listeners
+     *
+     * @param value
+     */
+    public void setValue(final T value) {
     this._value = value;
-    if(value instanceof Double) {
+        if (value instanceof Double) {
         double dVal = (Double) value;
         if (Double.isNaN(dVal)) {
             @SuppressWarnings("unchecked")
@@ -123,11 +124,11 @@ public abstract class ModelMVCGeneric<T> implements Serializable{
 
   }
 
-  /**
-   *
-   * @return the stored value
-   */
-  public T getValue(){
+    /**
+     *
+     * @return the stored value
+     */
+    public T getValue() {
     return this._value;
   }
 }

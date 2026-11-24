@@ -27,7 +27,11 @@ class ReluctanceAndCircuitTypeInfo extends AbstractCircuitTypeInfo {
         super(typeClass, idString, typeDescription);
     }
 
-    public ReluctanceAndCircuitTypeInfo(Class<? extends AbstractBlockInterface> typeClass, String idString, I18nKeys typeDescription, I18nKeys typeDescriptionVerbose) {
+    public ReluctanceAndCircuitTypeInfo(
+            Class<? extends AbstractBlockInterface> typeClass,
+            String idString,
+            I18nKeys typeDescription,
+            I18nKeys typeDescriptionVerbose) {
         super(typeClass, idString, typeDescription, typeDescriptionVerbose);
     }
 

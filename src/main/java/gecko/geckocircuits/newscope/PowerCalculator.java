@@ -50,9 +50,9 @@ public final class PowerCalculator {
         int[] voltageIndices = new int[_noOfPowerAnals];
         int[] currentIndices = new int[_noOfPowerAnals];
 
-        for(int i = 0; i < _noOfPowerAnals; i++) {
-            voltageIndices[i] = selectedIndices._selVoltageInd.get(i)-1;
-            currentIndices[i] = selectedIndices._selCurrentInd.get(i)-1;
+        for (int i = 0; i < _noOfPowerAnals; i++) {
+            voltageIndices[i] = selectedIndices._selVoltageInd.get(i) - 1;
+            currentIndices[i] = selectedIndices._selCurrentInd.get(i) - 1;
         }
 
         calculate(worksheet, voltageIndices, currentIndices, selectedIndices.startTime, selectedIndices.stopTime);
@@ -125,10 +125,10 @@ public final class PowerCalculator {
             }
             //--------
             for (int n = 0; n < CALC_NUM_HARM; n++) {
-                anU[n] /= totalT/2;
-                bnU[n] /= totalT/2;
-                anI[n] /= totalT/2;
-                bnI[n] /= totalT/2;
+                anU[n] /= totalT / 2;
+                bnU[n] /= totalT / 2;
+                anI[n] /= totalT / 2;
+                bnI[n] /= totalT / 2;
                 cnU[n] = Math.sqrt(anU[n] * anU[n] + bnU[n] * bnU[n]);
                 cnI[n] = Math.sqrt(anI[n] * anI[n] + bnI[n] * bnI[n]);
                 dphiUI[n] = Math.atan2(bnU[n], anU[n]) - Math.atan2(bnI[n], anI[n]);

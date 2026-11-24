@@ -72,12 +72,12 @@ public final class PolynomTools {
             }
 
             if (firstFlag) {
-                if(value == -1) {
+                if (value == -1) {
                     returnValue.append("-");
-                } else if(value != 1){
+                } else if (value != 1) {
                     returnValue.append(niceFormValue);
                 }
-                if(power == 0 && Math.abs(value) == 1) {
+                if (power == 0 && Math.abs(value) == 1) {
                     returnValue.append('1');
                 }
                 firstFlag = false;

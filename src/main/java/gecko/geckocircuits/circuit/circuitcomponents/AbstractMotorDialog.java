@@ -119,7 +119,12 @@ abstract class AbstractMotorDialog<T extends AbstractMotor> extends DialogElemen
 
     static JPanel panelFabric() {
         JPanel jPanelMOTOR = new JPanel();
-        jPanelMOTOR.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), "Initial values at t=0", TitledBorder.LEFT, TitledBorder.TOP));
+        jPanelMOTOR.setBorder(
+                BorderFactory.createTitledBorder(
+                        BorderFactory.createEtchedBorder(),
+                        "Initial values at t=0",
+                        TitledBorder.LEFT,
+                        TitledBorder.TOP));
         jPanelMOTOR.setLayout(new GridBagLayout());
         return jPanelMOTOR;
     }
@@ -148,7 +153,7 @@ abstract class AbstractMotorDialog<T extends AbstractMotor> extends DialogElemen
                 }
             }
         }
-        if(addTorqueCombo) {
+        if (addTorqueCombo) {
             addTorqueCombo(gbc.gridy + 1, jpParMOTOR, gbc);
         }
         return jpParMOTOR;

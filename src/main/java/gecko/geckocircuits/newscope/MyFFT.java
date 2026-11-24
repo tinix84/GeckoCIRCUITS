@@ -181,7 +181,7 @@ public final class MyFFT {
 //     System.out.println("Averaged " + (time/iter) + "ms per iteration");
     }
 
-    protected static void beforeAfter(MyFFT fft, double[] re, double[] im) {
+    static void beforeAfter(MyFFT fft, double[] re, double[] im) {
         System.out.println("Before: ");
         printReIm(re, im);
         fft.fft(re, im);
@@ -189,7 +189,7 @@ public final class MyFFT {
         printReIm(re, im);
     }
 
-    protected static void printReIm(double[] re, double[] im) {
+    static void printReIm(double[] re, double[] im) {
         System.out.print("Re: [");
         for (double value : re) {
             System.out.print(((int) (value * 1000) / 1000.0) + " ");

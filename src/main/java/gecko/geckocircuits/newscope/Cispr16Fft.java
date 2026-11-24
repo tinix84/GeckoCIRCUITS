@@ -46,15 +46,15 @@ public final class Cispr16Fft {
         normalizeFFTArray(_zvResampled);
 
         double maxValue = -1e30;
-        for (int i = 0; i < _zvResampled.length/ 2 - 1; i++) {
+        for (int i = 0; i < _zvResampled.length / 2 - 1; i++) {
             double abs = Math.sqrt(_zvResampled[2 * i] * _zvResampled[2 * i] + _zvResampled[2 * i + 1] * _zvResampled[2 * i + 1]);
             if (abs > maxValue) {
                 maxValue = abs;
             }
         }
 
-        _magnitudes = new float[_zvResampled.length/2];
-        for(int i = 0; i < _zvResampled.length/2; i++) {
+        _magnitudes = new float[_zvResampled.length / 2];
+        for (int i = 0; i < _zvResampled.length / 2; i++) {
             _magnitudes[i] = getMagnitude(i);
         }
     }
@@ -98,12 +98,12 @@ public final class Cispr16Fft {
 
     private static void blackmanFiltering(final float[] data) {
         assert data.length % 2 == 0 : "Error: data array must be even length!";
-        final int NNN = data.length -1;
+        final int NNN = data.length - 1;
 
         final double const1 = 2 * Math.PI / NNN;
 
         // the blackman curve is symmetric... speed it up by calculation only half the values.
-        for (int ii = 0; ii < NNN / 2+1; ii++) {
+        for (int ii = 0; ii < NNN / 2 + 1; ii++) {
             double factor = calculateBlackmanFactor(const1, ii);
             data[ii] *= factor;
             data[NNN - ii] *= factor;
@@ -115,18 +115,18 @@ public final class Cispr16Fft {
 
         // the cos calculation is quite expensive. We need cos (2* x) here, which can be
         // calculated via the cosine addition theorem!
-        final double cos2X = 2 * cosX * cosX -1;
+        final double cos2X = 2 * cosX * cosX - 1;
         return BLACKMAN_NORM * (BLACKMAN_A0 - BLACKMAN_A1 * cosX + BLACKMAN_A2 * cos2X);
     }
 
 
     public static void inverseBlackman(final float[] data) {
         assert data.length % 2 == 0 : "Error: data array must be even length!";
-        final int NNN = data.length -1;
+        final int NNN = data.length - 1;
         final double const1 = 2 * Math.PI / NNN;
 
         // the blackman curve is symmetric... speed it up by calculation only half the values.
-        for (int ii = 0; ii < NNN/2+1; ii++) {
+        for (int ii = 0; ii < NNN / 2 + 1; ii++) {
             final double factor = 1.0 / calculateBlackmanFactor(const1, ii);
             data[ii] *= factor;
             data[NNN - ii] *= factor;
@@ -263,7 +263,7 @@ public final class Cispr16Fft {
     private static void normalizeFFTArray(float[] data) {
         final int dataSize = data.length;
         final float normalizeFactor = (float) (2.0 / dataSize);
-        for(int i = 0; i < dataSize; i++) {
+        for (int i = 0; i < dataSize; i++) {
             data[i] *= normalizeFactor;
         }
     }

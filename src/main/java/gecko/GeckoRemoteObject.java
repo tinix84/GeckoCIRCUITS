@@ -102,7 +102,7 @@ public class GeckoRemoteObject {
         if (portFree(port)) {
             GeckoSim.operatingmode = OperatingMode.REMOTE;
             final List<String> argsList = new ArrayList<String>();
-            if(!_pathToJava.isEmpty()) {
+            if (!_pathToJava.isEmpty()) {
                 argsList.add("-j");
                 argsList.add(_pathToJava);
             }
@@ -110,7 +110,7 @@ public class GeckoRemoteObject {
             argsList.add(Integer.toString(port));
             final String[] args = argsList.toArray(new String[0]);
 
-            for(String arg : args) {
+            for (String arg : args) {
                 System.out.println("arg " + arg);
             }
             GeckoSim.main(args);
@@ -214,7 +214,10 @@ public class GeckoRemoteObject {
     //try to connect to an existing instance of GeckoCIRCUITS
     private void connectToExistingInstance(final GeckoRemoteInterface existingInstance, final int port) {
         try {
-            if (existingInstance.isFree() && !existingInstance.checkSessionID(sessionID)) { //with multiple connections, GeckoCIRCUITS may be free AND this client may be already connected!
+            if (existingInstance.isFree()
+                    && !existingInstance.checkSessionID(
+                            sessionID)) { // with multiple connections, GeckoCIRCUITS may be free
+                                          // AND this client may be already connected!
                 try {
                     final long newSessionID = existingInstance.connect();
                     if (_wrapped != null) {
@@ -260,7 +263,7 @@ public class GeckoRemoteObject {
      * @param pathToJavaExe the path to the java executable
      */
     public static void setJavaPath(final String pathToJavaExe) {
-        if(new File(pathToJavaExe).exists()) {
+        if (new File(pathToJavaExe).exists()) {
             _pathToJava = pathToJavaExe;
         } else {
             throw new RuntimeException("Error: Path to Java executable: " + pathToJavaExe + " does not exist!");

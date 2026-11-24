@@ -13,6 +13,8 @@
  */
 package gecko.geckocircuits.allg;
 
+import java.util.Locale;
+
 import gecko.geckocircuits.newscope.GeckoDialog;
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -605,7 +607,7 @@ public final class SaveViewFrame extends GeckoDialog {
                 return true;
             }
             for (String end : _endings) {
-                if (file.getName().toLowerCase().endsWith(end)) {
+                if (file.getName().toLowerCase(Locale.getDefault()).endsWith(end)) {
                     return true;
                 }
             }

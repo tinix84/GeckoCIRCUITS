@@ -281,20 +281,64 @@ public class IdealTransformer extends AbstractCircuitBlockInterface implements H
             graphics.setFont(SchematicEditor2.foLKSmall);
             switch (getComponentDirection()) {
                 case EAST_WEST:
-                    graphics.drawString("" + _windings1.getValue().floatValue(), dpix * x - graphics.getFontMetrics().stringWidth("" + _windings1.getValue().floatValue()) / 2, (int) (dpix * (y - 1.3)));
-                    graphics.drawString("" + _windings2.getValue().floatValue(), dpix * x - graphics.getFontMetrics().stringWidth("" + _windings1.getValue().floatValue()) / 2, (int) (dpix * (y + 1.3)) + graphics.getFont().getSize());
+                    graphics.drawString(
+                            "" + _windings1.getValue().floatValue(),
+                            dpix * x
+                                    - graphics.getFontMetrics()
+                                                    .stringWidth(
+                                                            "" + _windings1.getValue().floatValue())
+                                            / 2,
+                            (int) (dpix * (y - 1.3)));
+                    graphics.drawString(
+                            "" + _windings2.getValue().floatValue(),
+                            dpix * x
+                                    - graphics.getFontMetrics()
+                                                    .stringWidth(
+                                                            "" + _windings1.getValue().floatValue())
+                                            / 2,
+                            (int) (dpix * (y + 1.3)) + graphics.getFont().getSize());
                     break;
                 case NORTH_SOUTH:
-                    graphics.drawString("" + _windings1.getValue().floatValue(), (int) (dpix * (x - 1.5)) - graphics.getFontMetrics().stringWidth("" + _windings1.getValue().floatValue()), dpix * y + graphics.getFont().getSize() / 2 - 1);
-                    graphics.drawString("" + _windings2.getValue().floatValue(), (int) (dpix * (x + 1.5)), dpix * y + graphics.getFont().getSize() / 2 - 1);
+                    graphics.drawString(
+                            "" + _windings1.getValue().floatValue(),
+                            (int) (dpix * (x - 1.5))
+                                    - graphics.getFontMetrics()
+                                            .stringWidth("" + _windings1.getValue().floatValue()),
+                            dpix * y + graphics.getFont().getSize() / 2 - 1);
+                    graphics.drawString(
+                            "" + _windings2.getValue().floatValue(),
+                            (int) (dpix * (x + 1.5)),
+                            dpix * y + graphics.getFont().getSize() / 2 - 1);
                     break;
                 case WEST_EAST:
-                    graphics.drawString("" + _windings2.getValue().floatValue(), dpix * x - graphics.getFontMetrics().stringWidth("" + _windings1.getValue().floatValue()) / 2, (int) (dpix * (y - 1.3)));
-                    graphics.drawString("" + _windings1.getValue().floatValue(), dpix * x - graphics.getFontMetrics().stringWidth("" + _windings1.getValue().floatValue()) / 2, (int) (dpix * (y + 1.3)) + graphics.getFont().getSize());
+                    graphics.drawString(
+                            "" + _windings2.getValue().floatValue(),
+                            dpix * x
+                                    - graphics.getFontMetrics()
+                                                    .stringWidth(
+                                                            "" + _windings1.getValue().floatValue())
+                                            / 2,
+                            (int) (dpix * (y - 1.3)));
+                    graphics.drawString(
+                            "" + _windings1.getValue().floatValue(),
+                            dpix * x
+                                    - graphics.getFontMetrics()
+                                                    .stringWidth(
+                                                            "" + _windings1.getValue().floatValue())
+                                            / 2,
+                            (int) (dpix * (y + 1.3)) + graphics.getFont().getSize());
                     break;
                 case SOUTH_NORTH:
-                    graphics.drawString("" + _windings2.getValue().floatValue(), (int) (dpix * (x - 1.5)) - graphics.getFontMetrics().stringWidth("" + _windings2.getValue().floatValue()), dpix * y + graphics.getFont().getSize() / 2 - 1);
-                    graphics.drawString("" + _windings1.getValue().floatValue(), (int) (dpix * (x + 1.5)), dpix * y + graphics.getFont().getSize() / 2 - 1);
+                    graphics.drawString(
+                            "" + _windings2.getValue().floatValue(),
+                            (int) (dpix * (x - 1.5))
+                                    - graphics.getFontMetrics()
+                                            .stringWidth("" + _windings2.getValue().floatValue()),
+                            dpix * y + graphics.getFont().getSize() / 2 - 1);
+                    graphics.drawString(
+                            "" + _windings1.getValue().floatValue(),
+                            (int) (dpix * (x + 1.5)),
+                            dpix * y + graphics.getFont().getSize() / 2 - 1);
                     break;
             }
 

@@ -114,12 +114,12 @@ public class FourierKurvenRekonstruktion extends GraferV3 implements MouseListen
                 j++;
             }
             xNeu[i] = (float) worksheet.getTimeValue(j, 0);
-            yRef[i] = (float) worksheet.getValue(dataIndex-1, j);
+            yRef[i] = (float) worksheet.getValue(dataIndex - 1, j);
         }
 
-        for(i = 0; i < an.length; i++) {
-            yNeu[2* i] = (float) an[i];
-            yNeu[2*i+1] = (float) bn[i];
+        for (i = 0; i < an.length; i++) {
+            yNeu[2 * i] = (float) an[i];
+            yNeu[2 * i + 1] = (float) bn[i];
         }
 
         Cispr16Fft.realft(yNeu, -1);
@@ -183,7 +183,13 @@ public class FourierKurvenRekonstruktion extends GraferV3 implements MouseListen
                 }
             }
             double[] empf = auto_Achsenbegrenzung_Wertempfehlung(ymin, ymax);
-            this.setzeAchsenBegrenzungen(new double[]{xNeu[0]}, new double[]{xNeu[xNeu.length - 1]}, new boolean[]{true}, new double[]{empf[0]}, new double[]{empf[1]}, new boolean[]{true});
+            this.setzeAchsenBegrenzungen(
+                    new double[] {xNeu[0]},
+                    new double[] {xNeu[xNeu.length - 1]},
+                    new boolean[] {true},
+                    new double[] {empf[0]},
+                    new double[] {empf[1]},
+                    new boolean[] {true});
             this.setzeTickSpacing(new double[]{(0.2 / f1)}, new double[]{empf[4]});
             repaint();
         } else if (mausModus == GraferImplementation.MAUSMODUS_WERTANZEIGE_SCHIEBER) {
@@ -245,9 +251,10 @@ public class FourierKurvenRekonstruktion extends GraferV3 implements MouseListen
         this.setzeTickLabelAnzeige(new boolean[]{true}, new boolean[]{true}, new boolean[]{false}, new boolean[]{false});
         this.setzeTickLabelPosition(new int[]{20}, new int[]{16});
         this.setzeTickLabelFont(new Font[]{new Font("Arial", Font.PLAIN, 12)}, new Font[]{new Font("Arial", Font.PLAIN, 12)});
-        //=========================================
-//        this.setzeAchsenBegrenzungen(new double[]{0.02}, new double[]{0.06}, new boolean[]{true}, new double[]{-4}, new double[]{4}, new boolean[]{true});
-//        this.setzeTickSpacing(new double[]{0.01}, new double[]{2});
+        // =========================================
+        //        this.setzeAchsenBegrenzungen(new double[]{0.02}, new double[]{0.06}, new
+        // boolean[]{true}, new double[]{-4}, new double[]{4}, new boolean[]{true});
+        //        this.setzeTickSpacing(new double[]{0.01}, new double[]{2});
         double ymin = 1e99, ymax = -1e99;
         for (int i1 = 0; i1 < yNeu.length; i1++) {
             if (yNeu[i1] > ymax) {
@@ -268,7 +275,13 @@ public class FourierKurvenRekonstruktion extends GraferV3 implements MouseListen
             empf[4] *= 0.5;
         }
         //
-        this.setzeAchsenBegrenzungen(new double[]{xNeu[0]}, new double[]{xNeu[xNeu.length - 1]}, new boolean[]{true}, new double[]{empf[0]}, new double[]{empf[1]}, new boolean[]{true});
+        this.setzeAchsenBegrenzungen(
+                new double[] {xNeu[0]},
+                new double[] {xNeu[xNeu.length - 1]},
+                new boolean[] {true},
+                new double[] {empf[0]},
+                new double[] {empf[1]},
+                new boolean[] {true});
         this.setzeTickSpacing(new double[]{(0.2 / f1)}, new double[]{empf[4]});
         //-------------------------------------
     }

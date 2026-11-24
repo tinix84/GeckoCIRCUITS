@@ -18,6 +18,8 @@
  */
 package gecko.i18n;
 
+import java.util.Map;
+
 import gecko.i18n.resources.I18nKeys;
 import java.util.HashMap;
 import java.util.Set;
@@ -27,12 +29,12 @@ public final class DoubleMap {
     /**
      * maps keys to values, e.g. "GeckoFrame.jMenuItem17.text" to "Export"
      */
-    private HashMap<I18nKeys,String> _keytoValue = new HashMap<I18nKeys, String>();
+    private Map<I18nKeys,String> _keytoValue = new HashMap<I18nKeys, String>();
 
     /**
      * maps values to keys, e.g. "Export" to "GeckoFrame.jMenuItem17.text"
      */
-    private HashMap<String, I18nKeys> _valuetoKey = new HashMap<String,I18nKeys>();
+    private Map<String, I18nKeys> _valuetoKey = new HashMap<String,I18nKeys>();
 
 
     public void insertPair(final I18nKeys englishKey, final String value) {

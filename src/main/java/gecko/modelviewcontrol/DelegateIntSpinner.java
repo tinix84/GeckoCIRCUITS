@@ -45,21 +45,21 @@ public class DelegateIntSpinner<M extends ModelMVC<Integer>> extends JSpinner
         _model = integerModel;
         _model.addModelListener(this);
 
-
-        _changeListener = new ChangeListener() {
-            @Override
-            public void stateChanged(javax.swing.event.ChangeEvent evt) {
-                if(_model != null) {
-                    _model.setValue(getIntegerValue());
-                }
-            }
-        };
+        _changeListener =
+                new ChangeListener() {
+                    @Override
+                    public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                        if (_model != null) {
+                            _model.setValue(getIntegerValue());
+                        }
+                    }
+                };
         addChangeListener(_changeListener);
     }
 
     @Override
     public void unregisterModel() {
-        if(_model!= null) {
+        if (_model != null) {
             _model.removeModelListener(this);
             _model = null;
         }

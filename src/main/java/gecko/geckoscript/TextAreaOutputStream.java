@@ -26,12 +26,12 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 @SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "Output stream stores text area reference for appending output")
 public final class TextAreaOutputStream extends OutputStream {
 
-	private final JTextArea textArea;
-	private final StringBuilder sb = new StringBuilder(4048);
+    private final JTextArea textArea;
+    private final StringBuilder sb = new StringBuilder(4048);
 
-	public TextAreaOutputStream(final JTextArea textArea) {
-		this.textArea = textArea;
-	}
+    public TextAreaOutputStream(final JTextArea textArea) {
+        this.textArea = textArea;
+    }
 
     @Override
     public void flush(){ /* no-op */ }
@@ -39,17 +39,17 @@ public final class TextAreaOutputStream extends OutputStream {
     @Override
     public void close(){ /* no-op */ }
 
-	@Override
-	public void write(int b) throws IOException {
-		if (b == '\r') {
-			return;
-		}
+    @Override
+    public void write(int b) throws IOException {
+        if (b == '\r') {
+            return;
+        }
 
-		if (b == '\n') {
-			textArea.append(sb.toString());
-			sb.setLength(0);
-		}
+        if (b == '\n') {
+            textArea.append(sb.toString());
+            sb.setLength(0);
+        }
 
-		sb.append((char)b);
-	}
+        sb.append((char) b);
+    }
 }

@@ -122,7 +122,12 @@ public class DialogSimParameter extends JDialog implements ActionListener {
         //------------------
         JPanel jpAllg = new JPanel();
         jpAllg.setLayout(new GridLayout(1, 1));
-        jpAllg.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), "Integration algorithm selection", TitledBorder.LEFT, TitledBorder.TOP));
+        jpAllg.setBorder(
+                BorderFactory.createTitledBorder(
+                        BorderFactory.createEtchedBorder(),
+                        "Integration algorithm selection",
+                        TitledBorder.LEFT,
+                        TitledBorder.TOP));
 
         _dropdownSolvSel.setSelectedIndex(_solvertype);
         jpAllg.add(_dropdownSolvSel); //jpM.add(new JLabel(" "));

@@ -71,8 +71,13 @@ class ControlElectricalEngineContractTest {
                 int resistor = netlist.getElementIndexByName("R.1");
                 int source = netlist.getElementIndexByName("U.1");
                 currents.add(amps[device]);
-                assertEquals(amps[device], amps[resistor], 1e-10);
-                assertEquals(-amps[device], amps[source], 1e-10);
+                assertEquals(-amps[resistor], amps[source], 1e-10, "MNA branch current balances the source");
+                if (type == CircuitTypCore.LK_THYR || type == CircuitTypCore.LK_IGBT) {
+                    double[] parameters = netlist.getParameter(device);
+                    double reported = (volts[netlist.getNodeX(device)] - volts[netlist.getNodeY(device)]
+                            - parameters[1]) / parameters[0];
+                    assertEquals(reported, amps[device], 1e-10, "Device reporting follows v2.02");
+                } else assertEquals(amps[device], amps[resistor], 1e-10);
             });
             var result = engine.runSimulation(config);
             assertTrue(result.isSuccess(), result.getErrorMessage());
@@ -81,6 +86,11 @@ class ControlElectricalEngineContractTest {
             for (int step = 0; step < 9; step++) {
                 boolean conducting = step >= 1 && (type == CircuitTypCore.LK_THYR || step <= 3);
                 double expected = conducting ? onCurrent : 6 / 1000001.75;
+                if (type == CircuitTypCore.LK_THYR || type == CircuitTypCore.LK_IGBT) {
+                    if (!conducting) expected -= 1.5 / 1e6;
+                    if (step == 1) expected += (1.5 * .25 / 1e6) / 2 - 1.5 / 1e6;
+                    if (type == CircuitTypCore.LK_IGBT && step == 4) expected = (6 - 1.5) / 1000001.75;
+                }
                 assertEquals(expected, currents.get(step), 1e-10, type + " electrical sample " + step);
                 assertEquals(expected, result.getSignalData(1)[step], 1e-6);
                 double publishedGate = step <= 2 || step == 8 ? 1 : 0;

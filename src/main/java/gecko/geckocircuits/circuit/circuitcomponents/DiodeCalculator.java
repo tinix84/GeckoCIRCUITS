@@ -24,9 +24,12 @@ import gecko.core.circuit.waveform.TimeFunctionConstant;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
-@SuppressFBWarnings(value = {"ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD", "EI_EXPOSE_REP2"},
-        justification = "Static flags intentionally written from instance methods for cross-component diode state coordination during simulation; stores BVector reference")
-public final class DiodeCalculator extends CircuitComponent<Diode> implements AStampable, BStampable, CurrentCalculatable {
+@SuppressFBWarnings(
+        value = {"ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD", "EI_EXPOSE_REP2"},
+        justification =
+                "Static flags intentionally written from instance methods for cross-component diode state coordination during simulation; stores BVector reference")
+public final class DiodeCalculator extends CircuitComponent<Diode>
+        implements AStampable, BStampable, CurrentCalculatable {
 
     private double _uForward = DEFAULT_U_FORWARD;
     private double _rOn = DEFAULT_R_ON;

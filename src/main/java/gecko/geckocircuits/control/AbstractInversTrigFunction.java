@@ -13,13 +13,15 @@
  */
 package gecko.geckocircuits.control;
 
+import java.util.Locale;
+
 import gecko.i18n.resources.I18nKeys;
 import java.awt.Window;
 
 abstract class AbstractInversTrigFunction extends AbstractReglerSingleInputSingleOutput {
     @Override
     public final String[] getOutputNames() {
-        return new String[]{getFixedIDString().toLowerCase()};
+        return new String[]{getFixedIDString().toLowerCase(Locale.getDefault())};
     }
 
     @Override

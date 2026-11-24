@@ -23,8 +23,8 @@ public enum Enabled {
     DISABLED_SHORT;
 
     public static Enabled getFromOrdinal(final int ordinal) {
-        for(Enabled val : values()) {
-            if(val.ordinal() == ordinal) {
+        for (Enabled val : values()) {
+            if (val.ordinal() == ordinal) {
                 return val;
             }
         }
@@ -34,7 +34,7 @@ public enum Enabled {
 
     @Override
     public String toString() {
-        switch(this) {
+        switch (this) {
             case DISABLED:
                 return "disabled";
             case ENABLED:

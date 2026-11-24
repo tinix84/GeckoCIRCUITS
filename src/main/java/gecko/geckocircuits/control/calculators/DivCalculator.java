@@ -25,13 +25,15 @@ public final class DivCalculator extends AbstractTwoInputsOneOutputCalculator {
     public void berechneYOUT(final double deltaT) {
         final double result = _inputSignal[0][0] / _inputSignal[1][0];  // normale Division
         _outputSignal[0][0] = result;
-        if(Double.isNaN(result)) { // here, we assume 0/0 = 0, since possibly no input is selected to this block!
+        if (Double.isNaN(
+                result)) { // here, we assume 0/0 = 0, since possibly no input is selected to this
+                           // block!
             assert _inputSignal[0][0] == 0 : "illegal division! " + _inputSignal[0][0] + "/" + _inputSignal[1][0];
             assert _inputSignal[1][0] == 0 : "illegal division! " + _inputSignal[0][0] + "/" + _inputSignal[1][0];
             _outputSignal[0][0] = 0;
         }
 
-        if(Double.isInfinite(result)) { // this is the case when dividing e.g. 1/0
+        if (Double.isInfinite(result)) { // this is the case when dividing e.g. 1/0
 
             //assert false : "illegal division! " + _inputSignal[0][0] + "/" + _inputSignal[1][0];
             // just return a largge value with the sign of the input.

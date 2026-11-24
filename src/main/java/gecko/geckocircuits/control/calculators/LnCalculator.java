@@ -17,7 +17,7 @@ public final class LnCalculator extends AbstractSingleInputSingleOutputCalculato
 
     @Override
     public void berechneYOUT(final double deltaT) {
-        assert _inputSignal[0][0] > 0: "Error: input signal must be > 0!";
+        assert _inputSignal[0][0] > 0 : "Error: input signal must be > 0!";
         _outputSignal[0][0] = Math.log(_inputSignal[0][0]);
     }
 }

@@ -74,11 +74,18 @@ class SemiconductorPreparationTest {
                 new PreparationRequest(SolverOverrides.none(), Map.of("device.onResistance", 3.0))));
         var off = assertInstanceOf(PreparationResult.Ready.class, preparation.prepare(snapshot,
                 new PreparationRequest(SolverOverrides.none(), Map.of("device.offResistance", type == 6 ? 2e12 : 39999.0))));
-        assertCurrents(original.execution(), type == 6 ? 2.5 : 0.0003, 2.5, 2.5);
-        assertCurrents(drop.execution(), type == 6 ? 2 : 0.0003, 2, 2);
-        assertCurrents(on.execution(), type == 6 ? 1.25 : 0.0003, 1.25, 1.25);
-        assertCurrents(off.execution(), type == 6 ? 2.5 : 0.00015, 2.5, 2.5);
-        assertCurrents(original.execution(), type == 6 ? 2.5 : 0.0003, 2.5, 2.5);
+        double offResistance = type == 6 ? 1e12 : 19999;
+        double changedOffResistance = type == 6 ? 2e12 : 39999;
+        // The release incremental turn-on patch subtracts the previous Uf/Roff contribution.
+        double turnOn = (6 - 1 + 1 / offResistance) / 2;
+        assertCurrents(original.execution(), type == 6 ? turnOn : 0.0003, type == 6 ? 2.5 : turnOn, 2.5);
+        double changedDrop = (6 - 2 + 2 / offResistance) / 2;
+        assertCurrents(drop.execution(), type == 6 ? changedDrop : 0.0003, type == 6 ? 2 : changedDrop, 2);
+        double changedOn = (6 - 1 + 3 / offResistance) / 4;
+        assertCurrents(on.execution(), type == 6 ? changedOn : 0.0003, type == 6 ? 1.25 : changedOn, 1.25);
+        double changedOff = (6 - 1 + 1 / changedOffResistance) / 2;
+        assertCurrents(off.execution(), type == 6 ? changedOff : 0.00015, type == 6 ? 2.5 : changedOff, 2.5);
+        assertCurrents(original.execution(), type == 6 ? turnOn : 0.0003, type == 6 ? 2.5 : turnOn, 2.5);
     }
 
     @Test

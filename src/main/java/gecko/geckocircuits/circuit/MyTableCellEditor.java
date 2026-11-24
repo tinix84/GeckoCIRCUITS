@@ -26,7 +26,7 @@ class MyTableCellEditor extends AbstractCellEditor implements TableCellEditor {
   @Override
   public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected,
       int rowIndex, int vColIndex) {
-      if(value != null) {
+        if (value != null) {
           component.setNumberToField((Double) value);
       } else {
           component.setText("");
@@ -37,7 +37,7 @@ class MyTableCellEditor extends AbstractCellEditor implements TableCellEditor {
 
   @Override
   public Object getCellEditorValue() {
-      if(component.getText().isEmpty()) {
+        if (component.getText().isEmpty()) {
           return null;
       }
     return component.getNumberFromField();

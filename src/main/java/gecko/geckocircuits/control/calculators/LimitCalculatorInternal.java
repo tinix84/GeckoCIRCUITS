@@ -35,7 +35,7 @@ public final class LimitCalculatorInternal extends AbstractControlCalculatable {
     }
 
     public void setMinMaxValues(final double min, final double max) {
-        if(min > max) {
+        if (min > max) {
             throw new IllegalArgumentException("Error in limit calculation: the minimum value"
                     + "\nmust be smaller than the maximum value!");
         }

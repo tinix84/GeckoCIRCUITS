@@ -108,9 +108,15 @@ public class ComponentPositionManager {
                 case 270: return WEST;
                 default:
                     // Round to nearest 90°
-                    if (normalized < 45 || normalized >= 315) { return NORTH; }
-                    if (normalized < 135) { return EAST; }
-                    if (normalized < 225) { return SOUTH; }
+                    if (normalized < 45 || normalized >= 315) {
+                        return NORTH;
+                    }
+                    if (normalized < 135) {
+                        return EAST;
+                    }
+                    if (normalized < 225) {
+                        return SOUTH;
+                    }
                     { return WEST; }
             }
         }
@@ -503,7 +509,9 @@ public class ComponentPositionManager {
      * Checks if this component intersects with another.
      */
     public boolean intersects(ComponentPositionManager other) {
-        if (other == null) { return false; }
+        if (other == null) {
+            return false;
+        }
 
         return getLeft() < other.getRight() &&
                getRight() > other.getLeft() &&
@@ -631,8 +639,12 @@ public class ComponentPositionManager {
 
     @Override
     public boolean equals(Object obj) {
-        if (this == obj) { return true; }
-        if (!(obj instanceof ComponentPositionManager)) { return false; }
+        if (this == obj) {
+            return true;
+        }
+        if (!(obj instanceof ComponentPositionManager)) {
+            return false;
+        }
 
         ComponentPositionManager other = (ComponentPositionManager) obj;
         return x == other.x && y == other.y &&

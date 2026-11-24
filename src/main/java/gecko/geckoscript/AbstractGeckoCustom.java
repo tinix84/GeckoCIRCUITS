@@ -886,7 +886,10 @@ public abstract class AbstractGeckoCustom implements GeckoRemoteInterface {
             for (String stateVariable : stateVariables) {
                 elem = IDStringDialog.getComponentByName(stateVariable);
                 if (!((elem instanceof ReglerVOLT) || (elem instanceof ReglerAmperemeter) || (elem instanceof ReglerTEMP))) {
-                    writerOutputErrorLn("Supplied element " + stateVariable + " is not a measuring element. Steady state monitoring not initialized!");
+                    writerOutputErrorLn(
+                            "Supplied element "
+                                    + stateVariable
+                                    + " is not a measuring element. Steady state monitoring not initialized!");
                     return;
                 }
             }
@@ -992,7 +995,9 @@ public abstract class AbstractGeckoCustom implements GeckoRemoteInterface {
             //number of points which must be below allowed error
             final int requiredPrecision = (int) Math.round(diff.length * 0.75);
 
-            if ((noOfPointsBelowError >= requiredPrecision) && (noOfPointsBelowTwiceError <= (diff.length - requiredPrecision)) && (noOfPointsAboveTwiceError == 0)) {
+            if ((noOfPointsBelowError >= requiredPrecision)
+                    && (noOfPointsBelowTwiceError <= (diff.length - requiredPrecision))
+                    && (noOfPointsAboveTwiceError == 0)) {
                 steadystate = true;
             } else {
                 steadystate = false;
@@ -1006,7 +1011,8 @@ public abstract class AbstractGeckoCustom implements GeckoRemoteInterface {
     @SuppressWarnings("deprecation")
     public final double[] simulateUntilSteadyState(final boolean supressMessages) {
         if (!_steadyStateInitialized) {
-            writerOutputErrorLn("Steady state detection is not initialized! Please call initSteadyStateDetection() with appropriate arguments first!");
+            writerOutputErrorLn(
+                    "Steady state detection is not initialized! Please call initSteadyStateDetection() with appropriate arguments first!");
             return new double[0];
         }
 
@@ -1135,7 +1141,8 @@ public abstract class AbstractGeckoCustom implements GeckoRemoteInterface {
     @Override
     public final double[] simulateToSteadyState(final boolean supressMessages, final double targetCorrelation, final double targetMeanPctDiff) {
         if (!_steadyStateCrossCorrelationInitialized) {
-            writerOutputErrorLn("Steady state detection is not initialized! Please call initSteadyStateDetection() with appropriate arguments first!");
+            writerOutputErrorLn(
+                    "Steady state detection is not initialized! Please call initSteadyStateDetection() with appropriate arguments first!");
             return new double[0];
         }
 

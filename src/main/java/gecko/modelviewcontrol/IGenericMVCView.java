@@ -13,14 +13,12 @@
  */
 package gecko.modelviewcontrol;
 
-
-
 /**
  *
  * @param <L>
  * @author andy
  */
-public interface IGenericMVCView <L extends ModelMVCGeneric> {
+public interface IGenericMVCView<L extends ModelMVCGeneric> {
     /**
      *
      * @param pointModel

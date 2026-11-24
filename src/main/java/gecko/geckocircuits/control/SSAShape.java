@@ -27,8 +27,8 @@ public enum SSAShape {
     }
 
     public static SSAShape getFromOrdinal(final int ordinal) {
-        for(SSAShape val : values()) {
-            if(val.ordinal() == ordinal) {
+        for (SSAShape val : values()) {
+            if (val.ordinal() == ordinal) {
                 return val;
             }
         }

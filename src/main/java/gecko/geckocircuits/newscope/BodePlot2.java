@@ -46,7 +46,7 @@ public class BodePlot2 extends JPanel {
     public void insertData(double[][]erg) {
         _graferNew = new GraferV4(new ScopeSettings());
         _graferNew.setNewXNames("w [rad / sec] = ", "1/w [sec] = ");
-        _graferNew.setSimulationTimeBoundaries(erg[0][0], erg[0][erg[0].length-1]);
+        _graferNew.setSimulationTimeBoundaries(erg[0][0], erg[0][erg[0].length - 1]);
         _graferPanel = new NewScope(_graferNew);
         this.add(_graferPanel);
         _graferNew.createInitialAndSingleDiagram(true, false, 2);
@@ -69,7 +69,7 @@ public class BodePlot2 extends JPanel {
             float[] data = new float[]{(float) erg[1][i], (float) erg[2][i]};
             _dataContainer.insertValuesAtEnd(data, 2 * Math.PI * erg[0][i]);
         }
-        for(int i = 0; i < SIGNAL_NAMES.length; i++) {
+        for (int i = 0; i < SIGNAL_NAMES.length; i++) {
             _dataContainer.setSignalName(SIGNAL_NAMES[i], i);
         }
 

@@ -99,7 +99,7 @@ public final class WorksheetSize {
                 if (_parent instanceof SubCircuitSheet) {
                     SubCircuitSheet subSheet = (SubCircuitSheet) _parent;
                     final Collection<SubCircuitTerminable> allSheetTerminals = subSheet._subBlock._myTerminals;
-                    if(allSheetTerminals != null) {
+                    if (allSheetTerminals != null) {
                         for (SubCircuitTerminable term : allSheetTerminals) {
                         if (term instanceof gecko.geckocircuits.circuit.circuitcomponents.AbstractCircuitTerminal imported
                                 && imported.importedBlockOffset() != null) continue;

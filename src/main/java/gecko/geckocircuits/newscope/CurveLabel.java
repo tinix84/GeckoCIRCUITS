@@ -22,7 +22,7 @@ import java.awt.event.MouseEvent;
  *
  * @author andy
  */
-class CurveLabel{
+class CurveLabel {
   protected int _labelYMin, _labelYMax;
   protected static final int SGN_NAME_OFFSET = 10;
   protected static final int DIST_SIG_NAMES = 16;
@@ -36,38 +36,38 @@ class CurveLabel{
   final AbstractDiagram _diagram;
   int _labelIndex;
 
-  public CurveLabel(final AbstractCurve curve){
+    public CurveLabel(final AbstractCurve curve) {
     super();
     _curve = curve;
     _diagram = _curve._diagram;
     _slider = _diagram._grafer._sliderContainer;
   }
 
-  public void setLabelIndex(final int labelIndex){
+    public void setLabelIndex(final int labelIndex) {
     _labelIndex = labelIndex;
   }
 
-  public void drawLabel(final Graphics2D g2d){
+    public void drawLabel(final Graphics2D g2d) {
     final CurveSettings curveSettings = _curve.getCurveSettings();
     drawCurveSelection(g2d, _diagram.getLabelPanel().getWidth());
     g2d.setColor(curveSettings._curveColor.getJavaColor());
 
-    if(_slider.isSliderActive()){
+        if (_slider.isSliderActive()) {
       g2d.setFont(FONT_LABEL);
-    }else{
+        } else {
       g2d.setFont(FONT_NUMBER_LABEL);
     }
 
   }
 
-  /**
-   * draw a red rectangle around the selected curve label
-   *
-   * @param g2d
-   * @param width
-   */
-  public final void drawCurveSelection(final Graphics2D g2d, final int width){
-    if(!_curve._isSelected){
+    /**
+     * draw a red rectangle around the selected curve label
+     *
+     * @param g2d
+     * @param width
+     */
+    public final void drawCurveSelection(final Graphics2D g2d, final int width) {
+        if (!_curve._isSelected) {
       return;
     }
     final int posYMin = _labelYMin;
@@ -77,7 +77,7 @@ class CurveLabel{
                  width - 1, posYMax - posYMin + 2 * SELECTION_OFFSET - 2);
   }
 
-  public final boolean isInSelectionWindow(final MouseEvent mouseEvent){
+    public final boolean isInSelectionWindow(final MouseEvent mouseEvent) {
     final int posY = mouseEvent.getY();
     return posY >= _labelYMin && posY <= _labelYMax;
   }
