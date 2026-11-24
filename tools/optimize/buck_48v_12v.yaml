@@ -1,0 +1,41 @@
+circuit_file: ../../src/modules/gecko-simulation-core/src/test/resources/ipes/buck_simple.ipes
+duration: 0.008
+time_step: 0.0000001
+measure_from: 0.006
+trials: 240
+batch_size: 8
+concurrency: 4
+seed: 42
+parameters:
+  L: {path: L.1.inductance, min: 0.00005, max: 0.00025}
+  C: {path: C.1.capacitance, min: 0.00016, max: 0.00024}
+  fsw: {path: SIGNAL.1.frequency, min: 18000, max: 37000}
+  D: {path: SIGNAL.1.duty, min: 0.258, max: 0.270}
+  Rload: {path: R.1.resistance, min: 1.2, max: 1.2}
+metrics:
+  vout: {kind: analysis, signal: u2, field: average}
+  ripple_pp: {kind: analysis, signal: u2, field: peak_to_peak}
+  ripple_ratio: {kind: ratio, terms: [ripple_pp, vout]}
+  i_rms: {kind: analysis, signal: iL, field: rms}
+  i_peak: {kind: analysis, signal: iL, field: max}
+  conduction_loss:
+    kind: conduction
+    inputs: {current: i_rms, on_resistance: 0.010, threshold_voltage: 0.0}
+    scale: D
+  switching_loss:
+    kind: switching
+    inputs:
+      current: i_peak
+      voltage: 48.0
+      reference_voltage: 400.0
+      temperature: 25.0
+      turn_on_energy: 0.000030
+      turn_off_energy: 0.000015
+    frequency: fsw
+  total_loss: {kind: sum, terms: [conduction_loss, switching_loss]}
+objectives:
+  - {metric: total_loss}
+  - {metric: L}
+constraints:
+  - {metric: ripple_ratio, max: 0.01}
+  - {metric: vout, min: 11.88, max: 12.12}
