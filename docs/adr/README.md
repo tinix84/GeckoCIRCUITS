@@ -15,3 +15,4 @@
 | 2026-11-17 | [ADR-0012: Isolated electrical groups](0012-isolated-electrical-groups.md) |
 | 2026-02-12 | [ADR-0013: GUI-free simulation core](0013-gui-free-simulation-core.md) |
 | 2026-02-05 | [ADR-0014: Java solver with optional native sparse backend](0014-java-solver-with-optional-native-sparse.md) |
+| 2026-11-24 | [ADR-0019: Headless circuit import writer](0019-headless-circuit-import-writer.md) |
