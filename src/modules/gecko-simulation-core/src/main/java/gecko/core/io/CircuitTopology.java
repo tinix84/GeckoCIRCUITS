@@ -520,7 +520,14 @@ public final class CircuitTopology {
             for (Side side : Side.values()) {
                 if (side == Side.INPUT && type <= 3 || side == Side.OUTPUT && (type == 5 || type == 6)) continue;
                 String[] labels = portLabels(component, side);
-                for (int port = 0; port < labels.length; port++) {
+                int count = side == Side.OUTPUT ? 1 : switch (type) {
+                    case 4 -> component.getNumericParameters().length > 6 && component.getNumericParameters()[6] != 0 ? 5 : 0;
+                    case 6, 7, 18, 25 -> 1;
+                    case 11 -> component.getNumericParameters().length > 1 && component.getNumericParameters()[1] != 0 ? 2 : 1;
+                    case 64 -> 2;
+                    default -> labels.length;
+                };
+                for (int port = 0; port < Math.min(labels.length, count); port++) {
                     int dx = side == Side.INPUT ? -2 : type <= 4 ? 2 : 1;
                     int dy = -port;
                     // Expanded SIGNAL inputs are below the source, as in ReglerSignalSource.setExpanded().

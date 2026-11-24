@@ -42,7 +42,9 @@ class SavedControlPortPreparationTest {
         var model = parse(electricalCircuit()
                 + element("CONTROL", 3, "constant", "2", "/NIX_NIX_NIX", "/drive/NIX_NIX_NIX", "")
                 + element("CONTROL", 7, "gain", "3", "/drive/NIX_NIX_NIX", "/amplified/NIX_NIX_NIX", "")
-                + element("CONTROL", 5, "scope", "", "/NIX_NIX_NIX/amplified/NIX_NIX_NIX/drive/NIX_NIX_NIX", "/NIX_NIX_NIX", ""));
+                        .replace("\nx 0\n", "\nx 10\n")
+                + element("CONTROL", 5, "scope", "", "/NIX_NIX_NIX/amplified/NIX_NIX_NIX/drive/NIX_NIX_NIX", "/NIX_NIX_NIX", "")
+                        .replace("\nx 0\n", "\nx 20\n"));
         var preparation = new CircuitPreparation();
         var ready = assertInstanceOf(PreparationResult.Ready.class,
                 preparation.prepare(preparation.capture(model), PreparationRequest.defaults()));
