@@ -62,7 +62,7 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
 
     public AcDocumentSettings getAcSettings() { return acSettings.getValue().orElse(null); }
     public AcProvenance getAcProvenance() { return acProvenance; }
-    public List<ImportIssue> getConversionIssues() { return conversionIssues; }
+    public List<ImportIssue> getConversionIssues() { return List.copyOf(conversionIssues); }
 
     /** Blocks simulation when an import dropped or approximated behavior. */
     public void requireCompleteConversion() {

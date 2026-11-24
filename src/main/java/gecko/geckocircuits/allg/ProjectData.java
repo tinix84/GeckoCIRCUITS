@@ -50,7 +50,7 @@ public final class ProjectData implements Serializable {
 
     public AcDocumentSettings getAcSettings() { return acSettings; }
     public AcProvenance getAcProvenance() { return acProvenance; }
-    public List<ImportIssue> getConversionIssues() { return conversionIssues; }
+    public List<ImportIssue> getConversionIssues() { return List.copyOf(conversionIssues); }
     private static final long serialVersionUID = 1L;
 
     private static final Random RANDOM = new Random();
