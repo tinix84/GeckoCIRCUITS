@@ -809,7 +809,7 @@ public class MatrixSolver {
             }
         }
 
-        // Enabled dense solves of a pinned system factor the same equations with node 0 ordered last (ADR-0020).
+        // Enabled dense solves of a pinned system factor the same equations with node 0 ordered last (ADR-0021).
         // Null settings keep the legacy order, and every other branch below is unchanged.
         boolean referenceLast = sparseSettings != null && !wireReference;
 

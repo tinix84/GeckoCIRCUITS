@@ -1,6 +1,6 @@
 # Order the enabled LU like the dense reference or like EJML
 
-ADR-0020 · Claude Opus 5.5 for tinix84 · 2026-11-24 · Status: Accepted · Version 1.1
+ADR-0021 · Claude Opus 5.5 for tinix84 · 2026-11-24 · Status: Accepted · Version 1.1
 Audience: maintainers who implement or review the sparse and dense LU in `gecko-simulation-core`.
 Source: EJML 0.46.1, Java 21.
 
