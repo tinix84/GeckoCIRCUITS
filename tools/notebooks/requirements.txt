@@ -1,0 +1,3 @@
+# Install the generated GeckoCIRCUITS SDK separately. See clients/README.md.
+ipykernel
+nbconvert

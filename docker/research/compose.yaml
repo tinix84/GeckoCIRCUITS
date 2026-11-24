@@ -1,0 +1,11 @@
+services:
+  gecko-api:
+    image: geckocircuits/research:${GECKO_RESEARCH_TAG:-3.1.0-bundles.1}
+    pull_policy: missing
+    build:
+      context: ../..
+      dockerfile: src/modules/gecko-rest-api/Dockerfile
+      args:
+        GECKO_GIT_SHA: ${GECKO_GIT_SHA:-}
+    ports:
+      - "127.0.0.1:${GECKO_RESEARCH_PORT:-8080}:8080"

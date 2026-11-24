@@ -39,6 +39,9 @@ FROM eclipse-temurin:21-jre-alpine
 LABEL maintainer="GeckoCIRCUITS Team"
 LABEL description="GeckoCIRCUITS REST API - Headless circuit simulation engine"
 LABEL version="1.0.0"
+ARG GECKO_GIT_SHA
+LABEL org.opencontainers.image.revision="${GECKO_GIT_SHA}"
+ENV GECKO_BUILD_GIT_SHA="${GECKO_GIT_SHA}"
 
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
@@ -65,7 +68,7 @@ EXPOSE 8080
 
 # Health check (Spring Boot Actuator health endpoint)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/gecko/api/health || exit 1
 
 # Environment variables with defaults
 ENV JAVA_OPTS="-Xmx512m -Xms256m" \
