@@ -1009,6 +1009,82 @@ public final class SyntheticCircuitBuilder {
                 new String[]{"T_ambient", "P_source", "R_th", "C_th"});
     }
 
+    /**
+     * One MMC arm: a DC source, an arm inductor, a series chain of half-bridge submodules and a load resistor.
+     * Each submodule has a capacitor between P and N, an upper device X-P and a lower device X-N with N the
+     * submodule output, each device an ideal switch with an antiparallel diode. Even submodules are bypassed
+     * (lower switch on, upper off) and odd ones are inserted (both switches off), so inserted capacitors charge
+     * through their upper diodes and those diodes turn off as the capacitors reach the source share.
+     * The netlist has {@code 2 * submodules + 2} nodes and {@code 5 * submodules + 3} elements.
+     */
+    public static CircuitNetlist mmcArm(int submodules, double vSubmodule, double cSubmodule, double rLoad) {
+        int elementCount = 3 + 5 * submodules;
+        int maxNode = 2 * submodules + 2;
+        CircuitTypCore[] types = new CircuitTypCore[elementCount];
+        int[] nodeX = new int[elementCount];
+        int[] nodeY = new int[elementCount];
+        int[] vSrcNr = new int[elementCount];
+        double[][] params = new double[elementCount][];
+        java.util.Arrays.fill(vSrcNr, -1);
+        types[0] = CircuitTypCore.LK_U;
+        nodeX[0] = 1;
+        nodeY[0] = 0;
+        vSrcNr[0] = 1;
+        params[0] = makeParams();
+        params[0][0] = SourceType.QUELLE_DC_NEW;
+        params[0][1] = submodules * vSubmodule * 0.5;
+        types[1] = CircuitTypCore.LK_L;
+        nodeX[1] = 1;
+        nodeY[1] = 2;
+        params[1] = makeParams();
+        params[1][0] = 1e-4;
+        double rOn = 1e-3;
+        double rOff = 1e7;
+        int e = 2;
+        for (int sm = 1; sm <= submodules; sm++) {
+            int x = sm == 1 ? 2 : 2 * sm;
+            int p = 2 * sm + 1;
+            int n = 2 * sm + 2;
+            boolean bypassed = sm % 2 == 0;
+            e = mmcDevice(types, nodeX, nodeY, params, e, CircuitTypCore.LK_S, x, p, bypassed ? rOff : rOff, rOn, rOff, false);
+            e = mmcDevice(types, nodeX, nodeY, params, e, CircuitTypCore.LK_S, x, n, bypassed ? rOn : rOff, rOn, rOff, false);
+            e = mmcDevice(types, nodeX, nodeY, params, e, CircuitTypCore.LK_D, x, p, rOff, rOn, rOff, true);
+            e = mmcDevice(types, nodeX, nodeY, params, e, CircuitTypCore.LK_D, n, x, rOff, rOn, rOff, true);
+            types[e] = CircuitTypCore.LK_C;
+            nodeX[e] = p;
+            nodeY[e] = n;
+            params[e] = makeParams();
+            params[e][0] = cSubmodule;
+            params[e][6] = cSubmodule;
+            params[e][7] = cSubmodule;
+            e++;
+        }
+        types[e] = CircuitTypCore.LK_R;
+        nodeX[e] = maxNode;
+        nodeY[e] = 0;
+        params[e] = makeParams();
+        params[e][0] = rLoad;
+        return buildNetlist(types, nodeX, nodeY, vSrcNr, params, maxNode, 1, null);
+    }
+
+    private static int mmcDevice(CircuitTypCore[] types, int[] nodeX, int[] nodeY, double[][] params, int index,
+            CircuitTypCore type, int x, int y, double r0, double rOn, double rOff, boolean diode) {
+        types[index] = type;
+        nodeX[index] = x;
+        nodeY[index] = y;
+        params[index] = makeParams();
+        params[index][0] = r0;
+        if (diode) {
+            params[index][1] = 0.7;
+            params[index][2] = rOn;
+            params[index][3] = rOff;
+        } else {
+            params[index][1] = rOn;
+            params[index][2] = rOff;
+        }
+        return index + 1;
+    }
+
     // ========================================================================
     // Helper methods
     // ========================================================================

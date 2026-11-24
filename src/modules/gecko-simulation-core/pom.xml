@@ -28,6 +28,8 @@
         <junit.version>5.11.3</junit.version>
         <!-- Benchmarks run only when requested with -Dgroups=benchmark (see the benchmark profile). -->
         <gecko.excludedGroups>application,benchmark</gecko.excludedGroups>
+        <!-- The all-tests profile runs application tests but still leaves benchmarks out unless requested. -->
+        <gecko.allTestsExcluded>benchmark</gecko.allTestsExcluded>
     </properties>
 
     <dependencies>
@@ -36,6 +38,13 @@
             <groupId>edu.emory.mathcs</groupId>
             <artifactId>JTransforms</artifactId>
             <version>2.4</version>
+        </dependency>
+
+        <!-- EJML sparse LU for large circuits (pure Java, Apache-2.0). Version checked against Maven Central metadata. -->
+        <dependency>
+            <groupId>org.ejml</groupId>
+            <artifactId>ejml-dsparse</artifactId>
+            <version>0.46.1</version>
         </dependency>
 
         <!-- SpotBugs annotations (compile-only, for @SuppressFBWarnings) -->
@@ -490,6 +499,7 @@
             </activation>
             <properties>
                 <gecko.excludedGroups>application</gecko.excludedGroups>
+                <gecko.allTestsExcluded></gecko.allTestsExcluded>
             </properties>
         </profile>
 
@@ -521,7 +531,7 @@
                         <artifactId>maven-surefire-plugin</artifactId>
                         <version>3.5.4</version>
                         <configuration>
-                            <excludedGroups combine.self="override"/>
+                            <excludedGroups combine.self="override">${gecko.allTestsExcluded}</excludedGroups>
                         </configuration>
                     </plugin>
                 </plugins>
