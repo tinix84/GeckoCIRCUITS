@@ -104,3 +104,11 @@ _Avoid_: Expected output, baseline snapshot
 
 **Trace alias**:
 A display name for a voltage or current trace. It has no electrical effect on the circuit.
+
+**Thermal network**:
+The THERMAL domain of a circuit. Its node potentials are temperatures in °C and its branch currents are heat flows in W.
+_Avoid_: Thermal circuit, heat model
+
+**Loss source**:
+A heat-flow source in the thermal network whose value is the power loss of one coupled electrical component.
+_Avoid_: Pv chip, heat source
