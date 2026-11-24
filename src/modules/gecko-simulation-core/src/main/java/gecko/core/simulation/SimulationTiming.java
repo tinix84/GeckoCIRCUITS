@@ -1,16 +1,24 @@
 package gecko.core.simulation;
 
+import gecko.core.allg.AdaptiveStepSettings;
+import gecko.core.allg.PeriodicSteadyStateSettings;
 import gecko.core.allg.SolverSettingsCore;
 import gecko.core.allg.SolverType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/** Shares scalar timing validation between preparation and persistent execution. */
+/**
+ * Shares timing validation between preparation and persistent execution. It covers scalar timing settings and the
+ * periodic steady-state settings, including the forcing check on an assembled circuit.
+ */
 public final class SimulationTiming {
+    private static final double WHOLE_STEP = 1e-9;
     private static final int MAXIMUM_STEPS = Integer.MAX_VALUE - 2;
     private static final String STEP_MESSAGE = "Step width must be finite and positive.";
     private static final String DURATION_MESSAGE = "Simulation duration must be finite and positive.";
+    /** The reason the adaptive step rejects the Gear-Shichman solver, shared by settings validation and the solver. */
+    static final String GS_ADAPTIVE_MESSAGE = "The adaptive step does not support the Gear-Shichman solver.";
 
     private SimulationTiming() { }
 
@@ -61,7 +69,120 @@ public final class SimulationTiming {
         if (mainCapacity > 0 && (long) mainCapacity + warmupCapacity > MAXIMUM_STEPS) {
             issues.add(new SettingIssue("duration", "Combined simulation step count is too large."));
         }
+        issues.addAll(periodicSteadyStateIssues(settings.getPeriodicSteadyState(), step, duration, preTime, samplePeriod));
+        issues.addAll(adaptiveStepIssues(settings.getAdaptiveStep(), settings.getSolverType(), step, preTime, preStep));
         return List.copyOf(issues);
+    }
+
+    /**
+     * Checks the adaptive-step settings against the grid steps, before any allocation.
+     * An explicit clamp must be finite and positive, the smallest step cannot exceed the largest, and the
+     * largest cannot exceed the main grid step or, when a warmup exists, the warmup grid step.
+     *
+     * @param adaptive the settings, or null for off
+     * @param solver the solver type, which cannot be Gear-Shichman
+     * @param step the main grid step in seconds
+     * @param preTime the pre-calculation time, zero or negative for none
+     * @param preStep the warmup grid step in seconds
+     * @return one issue per violation, each with its parameter path
+     */
+    public static List<SettingIssue> adaptiveStepIssues(AdaptiveStepSettings adaptive, SolverType solver, double step,
+            double preTime, double preStep) {
+        var issues = new ArrayList<SettingIssue>();
+        if (adaptive == null) return issues;
+        if (solver == SolverType.SOLVER_GS) issues.add(new SettingIssue("adaptiveStep", GS_ADAPTIVE_MESSAGE));
+        if (!(adaptive.tolerance() > 0 && adaptive.tolerance() <= AdaptiveStepSettings.MAX_TOLERANCE)) {
+            issues.add(new SettingIssue("adaptiveStep.tolerance", "Tolerance must be above 0 and at most 0.1."));
+        }
+        boolean minValid = Double.isNaN(adaptive.minStep()) || positive(adaptive.minStep());
+        boolean maxValid = Double.isNaN(adaptive.maxStep()) || positive(adaptive.maxStep());
+        if (!minValid) issues.add(new SettingIssue("adaptiveStep.minStep", "Smallest step must be finite and positive."));
+        if (!maxValid) issues.add(new SettingIssue("adaptiveStep.maxStep", "Largest step must be finite and positive."));
+        if (!positive(step)) return issues;
+        if (minValid && maxValid && adaptive.resolvedMinStep(step) > adaptive.resolvedMaxStep(step)) {
+            issues.add(new SettingIssue("adaptiveStep.minStep", "Smallest step must not exceed the largest step."));
+        }
+        if (maxValid && !Double.isNaN(adaptive.maxStep())) {
+            if (adaptive.maxStep() > step) {
+                issues.add(new SettingIssue("adaptiveStep.maxStep", "Largest step must not exceed the main step."));
+            } else if (preTime > 0 && positive(preStep) && adaptive.maxStep() > preStep) {
+                issues.add(new SettingIssue("adaptiveStep.maxStep", "Largest step must not exceed the warmup step."));
+            }
+        }
+        return issues;
+    }
+
+    /**
+     * Checks the circuit parts of the periodic steady-state settings on an execution model, before any session exists.
+     * It assembles the CONTROL chain only to inspect it and closes it again. A model that cannot be assembled has
+     * no issues here, because preparation reports its own findings.
+     *
+     * @param model the execution model
+     * @param step the main electrical step in seconds
+     * @param samplePeriod the CONTROL sample period, zero for every step
+     * @param pss the settings, or null
+     * @return one issue per violation, each with its parameter path
+     */
+    public static List<SettingIssue> periodicSteadyStateCircuitIssues(gecko.core.io.CircuitModel model, double step,
+            double samplePeriod, PeriodicSteadyStateSettings pss) {
+        if (pss == null || !positive(pss.period()) || !positive(step) || !Double.isFinite(samplePeriod) || samplePeriod < 0) {
+            return List.of();
+        }
+        ControlRuntime runtime = null;
+        try {
+            var netlist = gecko.core.circuit.netlist.NetlistBuilder.buildFromCircuitModel(model);
+            runtime = ControlRuntime.fromDeferred(model, step, netlist, samplePeriod);
+            return PeriodicSteadyStateValidation.circuitIssues(pss.period(), netlist, runtime.calculators());
+        } catch (RuntimeException unassembled) {
+            return List.of();
+        } finally {
+            if (runtime != null) runtime.close();
+        }
+    }
+
+    /**
+     * Checks the scalar periodic steady-state settings against the resolved step, duration and sample period.
+     * A null setting is off and has no issues.
+     *
+     * @param pss the settings, or null
+     * @param step the main electrical step in seconds
+     * @param duration the main duration in seconds
+     * @param preTime the pre-calculation time, which cannot combine with the search
+     * @param samplePeriod the CONTROL sample period, zero for every step
+     * @return one issue per violation, each with its parameter path
+     */
+    public static List<SettingIssue> periodicSteadyStateIssues(PeriodicSteadyStateSettings pss, double step,
+            double duration, double preTime, double samplePeriod) {
+        var issues = new ArrayList<SettingIssue>();
+        if (pss == null) return issues;
+        double period = pss.period();
+        boolean periodValid = positive(period);
+        if (!periodValid) issues.add(new SettingIssue("periodicSteadyState.period", "Period must be finite and positive."));
+        if (!(pss.tolerance() > 0 && pss.tolerance() <= PeriodicSteadyStateSettings.MAX_TOLERANCE)) {
+            issues.add(new SettingIssue("periodicSteadyState.tolerance", "Tolerance must be above 0 and at most 0.1."));
+        }
+        if (pss.maxPeriods() < PeriodicSteadyStateSettings.MIN_PERIODS || pss.maxPeriods() > PeriodicSteadyStateSettings.MAX_PERIODS) {
+            issues.add(new SettingIssue("periodicSteadyState.maxPeriods", "Period limit must be from 3 to 1000000."));
+        }
+        if (preTime > 0) {
+            issues.add(new SettingIssue("preSimulationTime", "Pre-calculation time cannot combine with the periodic steady-state search."));
+        }
+        if (periodValid && positive(step)) {
+            double steps = Math.rint(period / step);
+            if (steps < 2 || Math.abs(steps * step - period) > WHOLE_STEP * period) {
+                issues.add(new SettingIssue("periodicSteadyState.period", "Period must be a whole number of steps, at least 2."));
+            } else if (positive(duration) && pss.maxPeriods() >= PeriodicSteadyStateSettings.MIN_PERIODS
+                    && pss.maxPeriods() * steps + Math.ceil(duration / step) + 1 > MAXIMUM_STEPS) {
+                issues.add(new SettingIssue("periodicSteadyState.maxPeriods", "Search and main step count is too large."));
+            }
+        }
+        if (periodValid && positive(samplePeriod)) {
+            double ratio = period / samplePeriod;
+            if (Math.rint(ratio) < 1 || Math.abs(ratio - Math.rint(ratio)) > WHOLE_STEP * ratio) {
+                issues.add(new SettingIssue("periodicSteadyState.period", "Period must be a whole multiple of the CONTROL sample period."));
+            }
+        }
+        return issues;
     }
 
     /**
