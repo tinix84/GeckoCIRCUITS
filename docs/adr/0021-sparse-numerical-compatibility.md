@@ -10,8 +10,8 @@ Source: EJML 0.46.1, Java 21.
 
 Issue [#60](https://github.com/tinix84/GeckoCIRCUITS/issues/60) requires dense and sparse results to agree to 1e-9 relative on RC ladders and the 21 regression circuits.
 With the EJML LU, 4 of 21 wired circuits missed that bound on node potentials, by 5.8e-9 to 2.6e-6, while switch states and time grids agreed exactly [M, High].
-Wired captures drop row and column 0 ([ADR-0011](0011-numerical-reference-compatibility.md)), so the two LUs differ only in rounding order, and EJML exposes neither the Crout dot products nor the lowest-row pivot tie [C from bytecode, High].
-The pinned 300-node DC-seeded ladder missed by 32 % on component currents at its first sub-step, because the dense LU eliminates the 1e15-pinned node 0 first and 299 equal ground products round in one direction [M, High] (mechanism: E).
+Both wired LUs drop row and column 0 ([ADR-0011](0011-numerical-reference-compatibility.md)), but EJML cannot repeat the Crout summation or the pivot ties [C from bytecode, High].
+The pinned 300-node DC-seeded ladder missed the bound by 32 % on component currents at its first sub-step [M, High].
 A sparse LU in that order fills fully, with 1.0e6 factor nonzeros against 7002 for EJML at 1000 nodes [M, High].
 
 ## Options
@@ -31,7 +31,7 @@ The solve repeats `LUDecomposition.solve`, and only exact zero products are skip
 A prototype solved 3000 seeded wire-reference MNA matrices of order 3 to 66. All 2931 nonsingular solutions were numerically identical to `LUDecomposition` (signed zero ignored), all 69 singular verdicts agreed, and EJML matched in 79 [M, High].
 The kernel runs only where the threshold exceeds the node count. Larger wired and pinned sparse systems keep EJML with node 0 last, and pinned ladders agree to 6.7e-14 or better [M, Medium].
 
-Pinned dense systems: with explicit settings the dense LU factors the same complete system with row and column 0 moved last. The mapping covers potentials and voltage-source branch currents, and `LUDecomposition`, the 1e15 pin and the equations do not change [C, High].
+Pinned dense systems: the legacy LU eliminates the 1e15-pinned node 0 first, so 299 equal ground products round in one direction (mechanism: E). With explicit settings the dense LU factors the same complete system with row and column 0 moved last. The mapping covers potentials and voltage-source branch currents, and `LUDecomposition`, the 1e15 pin and the equations do not change [C, High].
 A prototype `MatrixSolver` gave 0.0 A and 8.5e-43 relative on the 300-node ladder for both integration methods, and the null path kept its 28 trace fingerprints [M, High]. Node 0 last is closer to the exact double solution, 1.17e-14 A against 1.31e-12 A of error at 300 nodes [M, High].
 Wire-reference ladders and source-limit patches matched the null path and EJML [M, High]. The legacy order stays the compatibility reference, and an MMC arm with ground degree 2 agrees in both orders [M, High].
 This evidence comes from prototypes, so the implementation tests decide the final result.
