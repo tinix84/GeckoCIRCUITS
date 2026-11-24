@@ -257,11 +257,11 @@ That shares mutable state across validation, repeated runs, or Batch children.
 
 ## References
 
-- [Domain language](../../CONTEXT.md)
+- [Domain language](https://github.com/tinix84/GeckoCIRCUITS/blob/dev/CONTEXT.md)
 - [Admission contract](ADR-0001-circuit-preparation-admission.md)
-- [Core parser](../../src/modules/gecko-simulation-core/src/main/java/gecko/core/io/CircuitFileParser.java)
-- [Parameter overrides](../../src/modules/gecko-simulation-core/src/main/java/gecko/core/io/ParameterOverrideApplicator.java)
-- [Netlist construction](../../src/modules/gecko-simulation-core/src/main/java/gecko/core/circuit/netlist/NetlistBuilder.java)
-- [Engine](../../src/modules/gecko-simulation-core/src/main/java/gecko/core/simulation/HeadlessSimulationEngine.java)
-- [Desktop source import](../../src/main/java/gecko/geckocircuits/circuit/circuitcomponents/AbstractCircuitSource.java)
-- [CONTROL factory](../../src/modules/gecko-simulation-core/src/main/java/gecko/core/simulation/ControlCalculatorFactory.java)
+- [Core parser](https://github.com/tinix84/GeckoCIRCUITS/blob/dev/src/modules/gecko-simulation-core/src/main/java/gecko/core/io/CircuitFileParser.java)
+- [Parameter overrides](https://github.com/tinix84/GeckoCIRCUITS/blob/dev/src/modules/gecko-simulation-core/src/main/java/gecko/core/io/ParameterOverrideApplicator.java)
+- [Netlist construction](https://github.com/tinix84/GeckoCIRCUITS/blob/dev/src/modules/gecko-simulation-core/src/main/java/gecko/core/circuit/netlist/NetlistBuilder.java)
+- [Engine](https://github.com/tinix84/GeckoCIRCUITS/blob/dev/src/modules/gecko-simulation-core/src/main/java/gecko/core/simulation/HeadlessSimulationEngine.java)
+- [Desktop source import](https://github.com/tinix84/GeckoCIRCUITS/blob/dev/src/main/java/gecko/geckocircuits/circuit/circuitcomponents/AbstractCircuitSource.java)
+- [CONTROL factory](https://github.com/tinix84/GeckoCIRCUITS/blob/dev/src/modules/gecko-simulation-core/src/main/java/gecko/core/simulation/ControlCalculatorFactory.java)

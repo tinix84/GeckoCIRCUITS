@@ -12,7 +12,7 @@ We use identified v2.02 release captures as reference traces and keep current le
 Trace parity needs evidence from the release whose behavior it preserves.
 Agreement with summary measurements does not establish agreement at every committed step.
 Development captures establish a development baseline, even when their engine descends from the release.
-The domain terms belong in [CONTEXT.md](../../CONTEXT.md).
+The domain terms belong in [CONTEXT.md](https://github.com/tinix84/GeckoCIRCUITS/blob/dev/CONTEXT.md).
 The acceptance requirements belong in [issue #62](https://github.com/tinix84/GeckoCIRCUITS/issues/62) and [issue #63](https://github.com/tinix84/GeckoCIRCUITS/issues/63).
 
 ## Options
