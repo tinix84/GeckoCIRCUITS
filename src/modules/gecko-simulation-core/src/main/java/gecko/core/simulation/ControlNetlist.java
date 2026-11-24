@@ -78,8 +78,6 @@ public class ControlNetlist {
         stateVersion++;
     }
 
-    int groupCount() { return lastSteps.length; }
-
     int groupOf(AbstractControlCalculatable calculator) {
         return groups == null ? 0 : groups.getOrDefault(calculator, 0);
     }
@@ -196,10 +194,9 @@ public class ControlNetlist {
         }
         boolean[] changed = null;
         if (anyChange) {
+            // Every write replaces the whole array: all NaN before initialization, all finite after. So here all are finite.
             changed = new boolean[steps.length];
-            for (int group = 0; group < steps.length; group++) {
-                changed[group] = !Double.isNaN(lastSteps[group]) && lastSteps[group] != steps[group];
-            }
+            for (int group = 0; group < steps.length; group++) changed[group] = lastSteps[group] != steps[group];
         }
         var planned = dependencyOrder != null && (anyUninitialized || anyChange)
                 ? dependencyOrder.apply(steps, anyChange).toArray(AbstractControlCalculatable[]::new) : sortedCalculators;

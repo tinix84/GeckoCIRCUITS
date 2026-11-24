@@ -289,7 +289,7 @@ class ControlSubsystemRateTest {
         }
     }
 
-    private static CircuitNetlist gateSwitch() {
+    static CircuitNetlist gateSwitch() {
         var netlist = new CircuitNetlist();
         netlist.initNetlist(new CircuitTypCore[]{CircuitTypCore.LK_S}, new int[]{1}, new int[]{0}, new int[]{-1},
                 new double[][]{new double[]{1e9, 0.01, 1e9, 0, 0, 0, 0, 0, 0}}, 2, 0, 1);
