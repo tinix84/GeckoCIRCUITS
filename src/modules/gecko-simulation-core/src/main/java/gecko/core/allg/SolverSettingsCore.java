@@ -33,6 +33,11 @@ public final class SolverSettingsCore {
     private double stepWidth;          // dt
     private double simulationDuration; // total simulation time
     private double pauseTime;          // optional pause time (-1 means no pause)
+    private double controlSamplePeriod; // CONTROL sample period Ts in seconds; 0 runs CONTROL every step
+    private boolean zeroCrossing;      // locate diode-family switching inside a step; off by default
+    private boolean dcOperatingPoint;  // seed the first step from a solved DC operating point; off by default
+    private PeriodicSteadyStateSettings periodicSteadyState; // periodic steady-state search; null means off
+    private AdaptiveStepSettings adaptiveStep; // adaptive electrical sub-step inside the fixed grid; null means off
 
     // State tracking
     private boolean inPreCalculationMode;
@@ -93,7 +98,76 @@ public final class SolverSettingsCore {
         return this;
     }
 
+    /**
+     * Runs CONTROL at the first electrical step at or after each multiple of the period,
+     * holding its outputs between samples. Zero keeps the default of one CONTROL run per step.
+     * Validation happens when a simulation starts.
+     */
+    public SolverSettingsCore withControlSamplePeriod(double period) {
+        this.controlSamplePeriod = period;
+        return this;
+    }
+
+    /**
+     * Locates diode-family switching events inside each electrical step. Off by default.
+     * Gear-Shichman is rejected when a simulation starts while this is on.
+     */
+    public SolverSettingsCore withZeroCrossing(boolean enabled) {
+        this.zeroCrossing = enabled;
+        return this;
+    }
+
+    /**
+     * Seeds the first electrical step from the circuit's DC operating point. Off by default.
+     * Capacitors open, inductors short, sources take their t=0 value, switches keep their initial gate state.
+     */
+    public SolverSettingsCore withDcOperatingPoint(boolean enabled) {
+        this.dcOperatingPoint = enabled;
+        return this;
+    }
+
+    /**
+     * Searches for the periodic steady state before the main phase. Null, the default, turns it off.
+     * The search seeds itself from the DC operating point without changing {@link #isDcOperatingPoint()}.
+     * Validation happens when a simulation starts.
+     */
+    public SolverSettingsCore withPeriodicSteadyState(PeriodicSteadyStateSettings settings) {
+        this.periodicSteadyState = settings;
+        return this;
+    }
+
+    /**
+     * Adapts the electrical sub-step between the fixed grid points from a local-error estimate. Null, the default,
+     * turns it off. A non-null value also turns on zero-crossing location. Validation happens when a simulation starts.
+     */
+    public SolverSettingsCore withAdaptiveStep(AdaptiveStepSettings settings) {
+        this.adaptiveStep = settings;
+        return this;
+    }
+
     // Getters
+
+    /** @return the adaptive-step settings, or null when the feature is off */
+    public AdaptiveStepSettings getAdaptiveStep() {
+        return adaptiveStep;
+    }
+
+    /** @return the periodic steady-state settings, or null when the search is off */
+    public PeriodicSteadyStateSettings getPeriodicSteadyState() {
+        return periodicSteadyState;
+    }
+
+    public boolean isDcOperatingPoint() {
+        return dcOperatingPoint;
+    }
+
+    public boolean isZeroCrossing() {
+        return zeroCrossing;
+    }
+
+    public double getControlSamplePeriod() {
+        return controlSamplePeriod;
+    }
 
     public SolverType getSolverType() {
         return solverType;
@@ -153,6 +227,11 @@ public final class SolverSettingsCore {
         copy.stepWidth = this.stepWidth;
         copy.simulationDuration = this.simulationDuration;
         copy.pauseTime = this.pauseTime;
+        copy.controlSamplePeriod = this.controlSamplePeriod;
+        copy.zeroCrossing = this.zeroCrossing;
+        copy.dcOperatingPoint = this.dcOperatingPoint;
+        copy.periodicSteadyState = this.periodicSteadyState;
+        copy.adaptiveStep = this.adaptiveStep;
         copy.inPreCalculationMode = this.inPreCalculationMode;
         return copy;
     }

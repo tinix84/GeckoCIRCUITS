@@ -220,7 +220,10 @@ public class HeadlessSimulationEngine {
                 new ExecutionOptions(config.isDataLoggingEnabled(), config.getDataLoggingInterval()))) {
             phase = session.status().phase();
             hasPreCalculation = phase == SimulationSession.Phase.WARMUP;
-            overallEndTime = hasPreCalculation ? settings.getPreCalculationTime() + duration : duration;
+            var search = settings.getPeriodicSteadyState();
+            // The search bound is only an upper limit for progress. The main phase replaces it on convergence.
+            overallEndTime = search != null ? session.status().endTime() + duration
+                    : hasPreCalculation ? settings.getPreCalculationTime() + duration : duration;
             endTime = session.status().endTime();
             expectedStepCount = expectedSegmentSteps(session.status());
             while (session.status().state() != SimulationSession.State.COMPLETED) {
@@ -229,14 +232,15 @@ public class HeadlessSimulationEngine {
                 if (cancelRequested.get() || Thread.currentThread().isInterrupted() || cancellationSignal.getAsBoolean()) {
                     session.pauseAtCommittedStep();
                     currentTime = session.status().time();
-                    return SimulationResult.builder()
+                    var cancelled = SimulationResult.builder()
                             .status(SimulationResult.Status.CANCELLED)
                             .dataContainer(session.currentSegmentRecording())
                             .executionTimeMs(System.currentTimeMillis() - startTime)
                             .totalTimeSteps(currentStep)
                             .simulatedTime(currentTime)
-                            .metadata("scopeChannels", session.scopeChannels())
-                            .build();
+                            .metadata("scopeChannels", session.scopeChannels());
+                    if (search != null) cancelled.metadata("steadyState", session.steadyStateReport());
+                    return cancelled.build();
                 }
                 currentTime = session.status().nextTime();
                 StepTraceListener listener = stepTraceListener;
@@ -253,14 +257,28 @@ public class HeadlessSimulationEngine {
                 currentTime = session.status().nextTime();
                 endTime = session.status().endTime();
                 phase = session.status().phase();
+                if (search != null && phase == SimulationSession.Phase.MAIN) overallEndTime = endTime;
                 expectedStepCount = expectedSegmentSteps(session.status());
                 if (sample == null) break;
                 if (progressListener != null && currentStep % 1000 == 0) {
                     progressListener.onProgress(sample.time(), endTime, currentStep);
                 }
             }
+            var steady = session.steadyStateReport();
+            if (steady != null && !steady.converged()) {
+                currentTime = session.status().time();
+                return SimulationResult.builder()
+                        .status(SimulationResult.Status.FAILED)
+                        .errorMessage(String.format("Periodic steady state did not converge after %d periods (residual %s, worst %s)",
+                                steady.periods(), steady.residual(), steady.worstState()))
+                        .executionTimeMs(System.currentTimeMillis() - startTime)
+                        .totalTimeSteps(session.status().committedSteps())
+                        .simulatedTime(currentTime)
+                        .metadata("steadyState", steady)
+                        .build();
+            }
             currentTime = session.status().segmentSteps() == 0 ? 0 : session.status().time();
-            return SimulationResult.builder()
+            var success = SimulationResult.builder()
                     .status(SimulationResult.Status.SUCCESS)
                     .dataContainer(session.currentSegmentRecording())
                     .executionTimeMs(System.currentTimeMillis() - startTime)
@@ -270,8 +288,18 @@ public class HeadlessSimulationEngine {
                     .metadata("dt", dt)
                     .metadata("scopeChannels", session.scopeChannels())
                     .metadata("circuitFile", config.getCircuitFilePath())
-                    .metadata("parameterOverrides", config.getParameterOverrides().size())
-                    .build();
+                    .metadata("parameterOverrides", config.getParameterOverrides().size());
+            if (steady != null) success.metadata("steadyState", steady);
+            if (session.locatesEvents()) {
+                var report = session.eventLocationReport();
+                success.metadata("zeroCrossingLocated", report.located())
+                        .metadata("zeroCrossingUnlocated", report.unlocated())
+                        .metadata("zeroCrossingFirstUnlocatedTime", report.firstUnlocatedTime())
+                        .metadata("zeroCrossingRetained", report.retained())
+                        .metadata("zeroCrossingDropped", report.dropped());
+            }
+            if (settings.getAdaptiveStep() != null) success.metadata("adaptiveStep", session.adaptiveStepReport());
+            return success.build();
         }
     }
 
