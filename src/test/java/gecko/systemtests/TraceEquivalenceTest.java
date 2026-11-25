@@ -51,6 +51,15 @@ class TraceEquivalenceTest {
     }
 
     @Test
+    void infinitiesOnEitherSideAreNeverEquivalent() {
+        for (double infinite : new double[]{Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY}) {
+            assertFalse(norm(infinite, 0.0).within(TraceEquivalence.TOLERANCE));
+            assertFalse(norm(0.0, infinite).within(TraceEquivalence.TOLERANCE));
+            assertFalse(norm(infinite, infinite).within(TraceEquivalence.TOLERANCE));
+        }
+    }
+
+    @Test
     void aNaNIsNeverEquivalent() {
         assertFalse(norm(1.0, Double.NaN).within(TraceEquivalence.TOLERANCE));
         assertFalse(norm(Double.NaN, 1.0).within(TraceEquivalence.TOLERANCE));

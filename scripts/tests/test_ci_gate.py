@@ -30,6 +30,18 @@ class CiGateTest(unittest.TestCase):
             self.assertIn("-Pall-tests", arguments)
             self.assertNotIn("-Dmaven.test.failure.ignore=true", arguments)
 
+    def test_pmd_gate_rejects_the_milestone_boundary(self):
+        from xml.etree import ElementTree
+
+        pom = ElementTree.parse(ROOT / "pom.xml")
+        namespace = {"m": "http://maven.apache.org/POM/4.0.0"}
+        plugin = next(plugin for plugin in pom.findall("./m:build//m:plugin", namespace)
+                      if plugin.findtext("m:artifactId", namespaces=namespace) == "maven-pmd-plugin")
+        config = plugin.find("m:configuration", namespace)
+        self.assertEqual("true", config.findtext("m:failOnViolation", namespaces=namespace))
+        # Maven interprets this limit inclusively, so 400 must exceed it.
+        self.assertLess(int(config.findtext("m:maxAllowedViolations", namespaces=namespace)), 400)
+
     def test_workflow_uses_the_enforcing_entry_point(self):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text()
         self.assertIn("bash scripts/verify-ci.sh", workflow)

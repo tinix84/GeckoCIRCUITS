@@ -32,6 +32,20 @@ public class ControlBlockMapping {
     /** AMP probe: calculator index → component name */
     private final List<AmpProbeMapping> ampProbeMappings = new ArrayList<>();
 
+    record ComponentProbe(AbstractControlCalculatable calculator, int output, int element,
+            ProbeReference.Quantity quantity) { }
+
+    private final List<ComponentProbe> componentProbes = new ArrayList<>();
+
+    void addComponentProbe(AbstractControlCalculatable calculator, int output, int element,
+            ProbeReference.Quantity quantity) {
+        componentProbes.add(new ComponentProbe(calculator, output, element, quantity));
+    }
+
+    List<ComponentProbe> componentProbes() {
+        return componentProbes;
+    }
+
     /** GATE: calculator index → switch component name */
     private final List<GateMapping> gateMappings = new ArrayList<>();
 

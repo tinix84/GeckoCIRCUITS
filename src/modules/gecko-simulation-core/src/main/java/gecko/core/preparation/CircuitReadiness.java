@@ -2,6 +2,7 @@ package gecko.core.preparation;
 
 import gecko.core.circuit.ControlTypCore;
 import gecko.core.simulation.ControlBlockDescriptor;
+import gecko.core.simulation.ProbeReference;
 import gecko.core.simulation.SimulationTiming;
 import gecko.core.allg.SolverSettingsCore;
 import gecko.core.circuit.circuitcomponents.CircuitTypCore;
@@ -331,6 +332,19 @@ final class CircuitReadiness {
                         diagnostics.add(control("INVALID_PROBE_REFERENCE", Diagnostic.Category.REFERENCES, component,
                                 "A voltage probe label must identify a valid electrical terminal in its saved sheet."));
                     }
+                }
+            } else if (type == ProbeReference.TYPE) {
+                try {
+                    var references = ProbeReference.parse(component.getParameterStrings());
+                    if (references.size() != component.getTerminalYLabels().length) {
+                        throw new IllegalArgumentException("Use one Probe output terminal per reference.");
+                    }
+                    for (var reference : references) {
+                        reference.resolve(topology);
+                    }
+                } catch (IllegalArgumentException error) {
+                    diagnostics.add(control("INVALID_PROBE_REFERENCE", Diagnostic.Category.REFERENCES, component,
+                            error.getMessage()));
                 }
             } else if (type == 2 || type == 6) {
                 checkElectricalReference(model, component, type == 6, diagnostics);

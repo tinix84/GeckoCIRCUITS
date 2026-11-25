@@ -123,6 +123,7 @@ public enum I18nKeys {
     GLOBAL_THERMAL_TERMINAL("Global Thermal Terminal"),
     CONTROL_MUX("Control MUX"),
     CONTROL_DEMUX("Control DEMUX"),
+    COMPONENT_PROBE("Probe"),
     MODEL_SAVED_OLD_VERSION("This Model file was created with an older version of GeckoCIRCUITS."),
     SAVE_MODEL_WARNING("When you save model files, please consider that you cannot open files"),
     MOSFET("MOSFET"),

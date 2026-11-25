@@ -20,8 +20,11 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Predicate;
 import gecko.rest.model.BatchSimulationRequest;
 import gecko.rest.model.BatchSimulationResponse;
 import gecko.rest.model.BatchJobStatus;
@@ -239,28 +242,23 @@ public class SimulationController {
 
         ListPage pagination = new ListPage(page, size, sort);
         Map<String, Object> response = new HashMap<>();
-        Map<String, SimulationResponse> allSimulations = simulationService.getAllSimulations();
-        Map<String, SimulationResponse> filtered = new HashMap<>();
-
-        if (status != null && !status.isEmpty()) {
-            allSimulations.forEach((key, value) -> {
-                if (value.getStatus().toString().equalsIgnoreCase(status)) {
-                    filtered.put(key, value);
-                }
-            });
-        } else {
-            filtered.putAll(allSimulations);
-        }
+        List<SimulationResponse> allSimulations = simulationService.getSimulationStatuses();
+        Predicate<SimulationResponse> matchesStatus = item ->
+                status == null || status.isEmpty() || item.getStatus().name().equalsIgnoreCase(status);
+        List<SimulationResponse> filtered = allSimulations.stream().filter(matchesStatus).toList();
 
         response.put("total", allSimulations.size());
         response.put("count", filtered.size());
         Comparator<SimulationResponse> byId = Comparator.comparing(SimulationResponse::getSimulationId);
-        List<SimulationResponse> selected = pagination.select(new ArrayList<>(filtered.values()), Map.of(
+        List<SimulationResponse> selected = pagination.select(filtered, Map.of(
                 "id", byId,
                 "createdAt", Comparator.comparing(SimulationResponse::getStartTime,
                         Comparator.nullsFirst(Comparator.naturalOrder())).thenComparing(byId)));
-        Map<String, SimulationResponse> items = new java.util.LinkedHashMap<>();
-        selected.forEach(item -> items.put(item.getSimulationId(), item));
+        Map<String, SimulationResponse> items = new LinkedHashMap<>();
+        // A retained job can finish or disappear between page selection and result retrieval.
+        selected.stream().map(item -> simulationService.getSimulation(item.getSimulationId()))
+                .filter(Objects::nonNull).filter(matchesStatus)
+                .forEach(item -> items.put(item.getSimulationId(), item));
         response.put("simulations", items);
         response.put("page", pagination.metadata(filtered.size()));
         response.put("statistics", simulationService.getStatistics());
