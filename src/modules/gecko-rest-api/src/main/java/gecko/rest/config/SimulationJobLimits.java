@@ -21,6 +21,28 @@ public class SimulationJobLimits {
         return value;
     }
 
+    public static final class TenantQuota {
+        private int maxConcurrent = Integer.MAX_VALUE;
+        private int maxCircuits = Integer.MAX_VALUE;
+
+        public int getMaxConcurrent() { return maxConcurrent; }
+        public void setMaxConcurrent(int value) { maxConcurrent = requireNonnegative(value); }
+        public int getMaxCircuits() { return maxCircuits; }
+        public void setMaxCircuits(int value) { maxCircuits = requireNonnegative(value); }
+
+        private static int requireNonnegative(int value) {
+            if (value < 0) throw new IllegalArgumentException("Tenant quotas cannot be negative.");
+            return value;
+        }
+    }
+
+    public static void requireTenantCapacity(long used, int requested, int limit) {
+        if (requested > limit - used) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.TOO_MANY_REQUESTS, "Tenant quota exceeded.");
+        }
+    }
+
     public int getWorkers() { return workers; }
     public void setWorkers(int value) { workers = positive(value); }
     public int getQueued() { return queued; }

@@ -44,7 +44,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
         registration.interceptors(new ApiKeyStompInterceptor(apiKeyProperties,
-                (id, owner) -> simulations.getObject().isOwnedBy(id, owner), tokens));
+                (id, owner, tenant) -> simulations.getObject().isOwnedBy(id, owner, tenant), tokens));
     }
 
     @Override

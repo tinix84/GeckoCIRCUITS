@@ -19,6 +19,8 @@ public class CircuitMetadata {
     private String name;
     @Column(columnDefinition = "text")
     private String owner;
+    @Column(columnDefinition = "text")
+    private String tenant;
     @Column(nullable = false)
     private Instant uploadedAt;
     @Column(length = 64, nullable = false)
@@ -28,10 +30,11 @@ public class CircuitMetadata {
 
     protected CircuitMetadata() { }
 
-    public CircuitMetadata(String id, String name, String owner, Instant uploadedAt, byte[] payload) {
+    public CircuitMetadata(String id, String name, String owner, String tenant, Instant uploadedAt, byte[] payload) {
         this.id = id;
         this.name = name;
         this.owner = owner;
+        this.tenant = tenant;
         this.uploadedAt = uploadedAt;
         replacePayload(payload);
     }
@@ -39,6 +42,7 @@ public class CircuitMetadata {
     public String id() { return id; }
     public String name() { return name; }
     public String owner() { return owner; }
+    public String tenant() { return tenant; }
     public Instant uploadedAt() { return uploadedAt; }
     public byte[] payload() { return payload.clone(); }
 

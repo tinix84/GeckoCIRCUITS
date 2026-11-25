@@ -15,6 +15,8 @@ import gecko.core.simulation.SimulationProgress;
 import gecko.core.simulation.SimulationResult;
 import gecko.core.simulation.SteadyStateReport;
 import gecko.core.signal.TimedSignal;
+import gecko.rest.config.ApiIdentity;
+import gecko.rest.config.ApiKeyProperties;
 import gecko.rest.config.SimulationJobLimits;
 import gecko.rest.model.BatchJobStatus;
 import gecko.rest.model.BatchSimulationRequest;
@@ -75,6 +77,7 @@ public class SimulationService {
     private final Object admissionMonitor = new Object();
     private final CircuitFileService circuitFiles;
     private PostgresPersistence persistence;
+    private ApiKeyProperties keys = new ApiKeyProperties();
     private final CircuitPreparation preparation = new CircuitPreparation();
 
     @Autowired(required = false)
@@ -94,9 +97,10 @@ public class SimulationService {
      */
     @Autowired
     public SimulationService(SimulationJobLimits limits, CircuitFileService circuitFiles,
-                             ObjectProvider<PostgresPersistence> persistence) {
+                             ObjectProvider<PostgresPersistence> persistence, ApiKeyProperties keys) {
         this(limits, circuitFiles);
         this.persistence = persistence.getIfAvailable();
+        this.keys = keys;
     }
 
     public SimulationService(SimulationJobLimits limits, CircuitFileService circuitFiles) {
@@ -154,7 +158,7 @@ public class SimulationService {
         synchronized (admissionMonitor) {
             requireCapacity(1, false);
             SimulationJob job = createJob(circuit, null, bundleInput, source.stored());
-            if (persistence != null) persistence.saveSimulation(metadata(job));
+            admitTenantJobs(List.of(job), job.tenant);
             jobs.put(job.response.getSimulationId(), job);
             if (!dispatch(job) && !executorService.isShutdown()) {
                 jobs.remove(job.response.getSimulationId(), job);
@@ -166,7 +170,7 @@ public class SimulationService {
     }
 
     BundleData bundleData(String simulationId, String owner, boolean administrator) throws IOException {
-        SimulationJob job = jobs.get(simulationId);
+        SimulationJob job = visibleJob(simulationId);
         if (job == null || (!administrator && (owner == null || !owner.equals(job.owner)))) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Simulation not found");
         }
@@ -260,11 +264,11 @@ public class SimulationService {
     private SimulationJob createJob(PreparedCircuit circuit, BatchJob batch, BundleInput bundleInput, boolean stored) {
         var principal = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         return new SimulationJob(circuit, batch, bundleInput, deliveryExecutor,
-                principal == null || !principal.isAuthenticated() ? null : principal.getName(), stored);
+                principal == null || !principal.isAuthenticated() ? null : principal.getName(), currentTenant(), stored);
     }
 
     private static SimulationMetadata metadata(SimulationJob job) {
-        return new SimulationMetadata(job.circuitId, job.owner, job.response);
+        return new SimulationMetadata(job.circuitId, job.owner, job.tenant, job.response);
     }
 
     private void persistTransition(SimulationJob job) {
@@ -279,16 +283,54 @@ public class SimulationService {
 
     private SimulationResponse loadMetadata(String id) {
         if (persistence == null) return null;
-        return persistence.simulation(id).map(SimulationMetadata::response).orElse(null);
+        return persistence.simulation(id, currentTenant()).map(SimulationMetadata::response).orElse(null);
     }
 
-    /** Checks the immutable owner captured before publication of a single or batch job. */
+    private String currentTenant() {
+        return ApiIdentity.requireTenant(keys.isTenantEnabled());
+    }
+
+    private static boolean visible(String ownerTenant, String currentTenant) {
+        return currentTenant == null || currentTenant.equals(ownerTenant);
+    }
+
+    private SimulationJob visibleJob(String id) {
+        String tenant = currentTenant();
+        SimulationJob job = jobs.get(id);
+        return job != null && visible(job.tenant, tenant) ? job : null;
+    }
+
+    private BatchJob visibleBatch(String id) {
+        String tenant = currentTenant();
+        BatchJob batch = batches.get(id);
+        return batch != null && visible(batch.tenant, tenant) ? batch : null;
+    }
+
+    /** Checks both credential owner and tenant for live progress subscriptions. */
     public boolean isOwnedBy(String simulationId, String owner) {
+        return isOwnedBy(simulationId, owner, null);
+    }
+
+    public boolean isOwnedBy(String simulationId, String owner, String tenant) {
+        if (owner == null || (keys.isTenantEnabled() && tenant == null)) return false;
         SimulationJob job = jobs.get(simulationId);
-        if (owner == null) return false;
-        if (job != null) return owner.equals(job.owner);
-        return persistence != null && persistence.simulation(simulationId)
-                .map(SimulationMetadata::owner).filter(owner::equals).isPresent();
+        return job != null && visible(job.tenant, tenant) && owner.equals(job.owner);
+    }
+
+    private void admitTenantJobs(java.util.Collection<SimulationJob> admissions, String tenant) {
+        int limit = tenant == null ? Integer.MAX_VALUE : keys.quotaFor(tenant).getMaxConcurrent();
+        if (persistence != null) {
+            persistence.admitSimulations(admissions.stream().map(SimulationService::metadata).toList(), tenant, limit);
+        } else if (tenant != null) {
+            SimulationJobLimits.requireTenantCapacity(activeJobs(tenant), admissions.size(), limit);
+        }
+    }
+
+    public long activeJobs(String tenant) {
+        if (persistence != null) return persistence.activeJobs(tenant);
+        return jobs.values().stream()
+                .filter(job -> tenant.equals(job.tenant) && !isTerminal(job.response))
+                .count();
     }
 
     private boolean dispatch(SimulationJob job) {
@@ -353,7 +395,7 @@ public class SimulationService {
     }
 
     public SimulationResponse getSimulation(String simulationId) {
-        SimulationJob job = jobs.get(simulationId);
+        SimulationJob job = visibleJob(simulationId);
         return job == null ? loadMetadata(simulationId) : snapshot(job);
     }
 
@@ -364,7 +406,7 @@ public class SimulationService {
      * @return metadata with empty results, or null when the job is absent.
      */
     public SimulationResponse getSimulationStatus(String simulationId) {
-        SimulationJob job = jobs.get(simulationId);
+        SimulationJob job = visibleJob(simulationId);
         return job == null ? loadMetadata(simulationId) : snapshot(job, false);
     }
 
@@ -402,19 +444,26 @@ public class SimulationService {
 
     public Map<String, SimulationResponse> getAllSimulations() {
         Map<String, SimulationResponse> result = new HashMap<>();
+        String tenant = currentTenant();
         if (persistence != null) {
-            persistence.simulations().forEach(row -> result.put(row.id(), row.response()));
+            persistence.simulations(tenant).forEach(row -> result.put(row.id(), row.response()));
         }
-        jobs.forEach((id, job) -> result.put(id, snapshot(job)));
+        jobs.forEach((id, job) -> {
+            if (visible(job.tenant, tenant)) result.put(id, snapshot(job));
+        });
         return result;
     }
 
     public SimulationResponse cancelSimulation(String simulationId) {
-        SimulationJob job = jobs.get(simulationId);
+        SimulationJob job = visibleJob(simulationId);
         if (job == null) {
             SimulationResponse stored = loadMetadata(simulationId);
             return stored != null && isTerminal(stored) ? stored : null;
         }
+        return cancelLiveJob(job);
+    }
+
+    private SimulationResponse cancelLiveJob(SimulationJob job) {
         synchronized (job) {
             if (markCancelled(job.response)) {
                 if (job.engine != null) {
@@ -427,7 +476,7 @@ public class SimulationService {
     }
 
     public double getSimulationProgress(String simulationId) {
-        SimulationJob job = jobs.get(simulationId);
+        SimulationJob job = visibleJob(simulationId);
         if (job == null) {
             return -1;
         }
@@ -443,7 +492,7 @@ public class SimulationService {
     }
 
     public double[] getSignalData(String simulationId, String signalName) {
-        SimulationJob job = jobs.get(simulationId);
+        SimulationJob job = visibleJob(simulationId);
         if (job == null) {
             return null;
         }
@@ -461,7 +510,7 @@ public class SimulationService {
      * @throws IllegalArgumentException if the retained signal has no valid matching clock.
      */
     public TimedSignal getTimedSignalData(String simulationId, String signalName) {
-        SimulationJob job = jobs.get(simulationId);
+        SimulationJob job = visibleJob(simulationId);
         if (job == null) return null;
         synchronized (job) {
             double[] values = job.response.getResult(signalName);
@@ -472,7 +521,7 @@ public class SimulationService {
 
     /** Updates a nonterminal job through the existing controller-facing interface. */
     public void updateStatus(String simulationId, SimulationStatus status) {
-        SimulationJob job = jobs.get(simulationId);
+        SimulationJob job = visibleJob(simulationId);
         if (job != null) {
             synchronized (job) {
                 if (!isTerminal(job.response)) {
@@ -489,7 +538,7 @@ public class SimulationService {
     }
 
     public void addResults(String simulationId, String signalName, double[] signalData) {
-        SimulationJob job = jobs.get(simulationId);
+        SimulationJob job = visibleJob(simulationId);
         if (job != null) {
             synchronized (job) {
                 job.response.addResult(signalName, signalData);
@@ -502,16 +551,19 @@ public class SimulationService {
         for (SimulationStatus status : SimulationStatus.values()) {
             result.put(status, 0L);
         }
-        for (SimulationJob job : jobs.values()) {
-            synchronized (job) {
-                result.merge(job.response.getStatus(), 1L, Long::sum);
-            }
+        String tenant = currentTenant();
+        if (persistence == null) {
+            jobs.values().forEach(job -> {
+                if (visible(job.tenant, tenant)) result.merge(job.response.getStatus(), 1L, Long::sum);
+            });
+        } else {
+            persistence.simulations(tenant).forEach(row -> result.merge(row.response().getStatus(), 1L, Long::sum));
         }
         return result;
     }
 
     public boolean isRunning(String simulationId) {
-        SimulationJob job = jobs.get(simulationId);
+        SimulationJob job = visibleJob(simulationId);
         if (job == null) {
             return false;
         }
@@ -521,7 +573,7 @@ public class SimulationService {
     }
 
     public SseEmitter registerProgressStream(String simulationId, long timeoutMs) {
-        SimulationJob job = jobs.get(simulationId);
+        SimulationJob job = visibleJob(simulationId);
         if (job == null) {
             return null;
         }
@@ -662,9 +714,7 @@ public class SimulationService {
                     batch.cancelled = true;
                 }
             }
-            for (String simulationId : jobs.keySet()) {
-                cancelSimulation(simulationId);
-            }
+            jobs.values().forEach(this::cancelLiveJob);
             jobs.clear();
             batches.clear();
         }
@@ -778,7 +828,7 @@ public class SimulationService {
             prepared.add(prepare(child, source));
             bundleInputs.add(new BundleInput(source.snapshot(), child));
         }
-        BatchJob batch = new BatchJob(requestedLimit);
+        BatchJob batch = new BatchJob(requestedLimit, currentTenant());
         synchronized (admissionMonitor) {
             requireCapacity(prepared.size(), true);
             List<String> ids = new ArrayList<>();
@@ -787,9 +837,7 @@ public class SimulationService {
                 batch.pending.add(job);
                 ids.add(job.response.getSimulationId());
             }
-            if (persistence != null) {
-                persistence.saveSimulations(batch.pending.stream().map(SimulationService::metadata).toList());
-            }
+            admitTenantJobs(batch.pending, batch.tenant);
             batch.pending.forEach(job -> jobs.put(job.response.getSimulationId(), job));
             batch.response = new BatchSimulationResponse(UUID.randomUUID().toString(), List.copyOf(ids), requestedLimit);
             batches.put(batch.response.getBatchId(), batch);
@@ -833,7 +881,7 @@ public class SimulationService {
     }
 
     public BatchJobStatus getBatchStatus(String batchId) {
-        BatchJob batch = batches.get(batchId);
+        BatchJob batch = visibleBatch(batchId);
         if (batch == null) {
             return null;
         }
@@ -876,7 +924,7 @@ public class SimulationService {
     }
 
     public BatchSimulationResponse getBatch(String batchId) {
-        BatchJob batch = batches.get(batchId);
+        BatchJob batch = visibleBatch(batchId);
         return batch == null ? null : batchSnapshot(batch);
     }
 
@@ -893,7 +941,7 @@ public class SimulationService {
     }
 
     public boolean cancelBatch(String batchId) {
-        BatchJob batch = batches.get(batchId);
+        BatchJob batch = visibleBatch(batchId);
         if (batch == null) {
             return false;
         }
@@ -906,6 +954,7 @@ public class SimulationService {
 
     private static final class SimulationJob {
         private final String owner;
+        private final String tenant;
         private final String circuitId;
         private final PreparedCircuit circuit;
         private final BundleInput bundleInput;
@@ -918,8 +967,9 @@ public class SimulationService {
         private final ProgressMailbox mailbox;
 
         private SimulationJob(PreparedCircuit circuit, BatchJob batch, BundleInput bundleInput,
-                              Executor deliveryExecutor, String owner, boolean stored) {
+                              Executor deliveryExecutor, String owner, String tenant, boolean stored) {
             this.owner = owner;
+            this.tenant = tenant;
             var request = bundleInput.request();
             this.circuitId = !stored ? null
                     : request.getCircuitId() == null ? request.getCircuitFile() : request.getCircuitId();
@@ -939,12 +989,14 @@ public class SimulationService {
 
     private static final class BatchJob {
         private final int limit;
+        private final String tenant;
         private final Queue<SimulationJob> pending = new ArrayDeque<>();
         private BatchSimulationResponse response;
         private int active;
         private boolean cancelled;
 
-        private BatchJob(int requestedLimit) {
+        private BatchJob(int requestedLimit, String tenant) {
+            this.tenant = tenant;
             limit = requestedLimit == 0 ? DEFAULT_BATCH_CONCURRENCY : Math.max(1, requestedLimit);
         }
     }
