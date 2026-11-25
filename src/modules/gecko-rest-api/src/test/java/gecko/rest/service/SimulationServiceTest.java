@@ -133,6 +133,31 @@ class SimulationServiceTest {
     }
 
     @Test
+    void paginationCopiesResultsOnlyForTheSelectedJobs() {
+        String first = submit().getSimulationId();
+        executor.runNext();
+        String second = submit().getSimulationId();
+        executor.runNext();
+        String selected = first.compareTo(second) < 0 ? first : second;
+        String excluded = selected.equals(first) ? second : first;
+        retainLargeSignals(excluded);
+
+        SimulationController controller = new SimulationController(service);
+        var page = new AtomicReference<ResponseEntity<Map<String, Object>>>();
+        long allocated = allocatedBytes(() -> page.set(controller.listSimulations("COMPLETED", 0, 1, "id,asc")));
+
+        assertEquals(200, page.get().getStatusCode().value());
+        Map<String, Object> body = page.get().getBody();
+        assertEquals(2, body.get("total"));
+        assertEquals(2, body.get("count"));
+        var results = assertInstanceOf(Map.class, body.get("simulations"));
+        assertEquals(Set.of(selected), results.keySet());
+        SimulationResponse response = assertInstanceOf(SimulationResponse.class, results.get(selected));
+        assertArrayEquals(new double[]{12.0, 18.0}, response.getResult("V_out"));
+        assertTrue(allocated < 256 * 1024, "A one-job page allocated " + allocated + " bytes");
+    }
+
+    @Test
     void singleSignalRetrievalCopiesOnlyTheSelectedWaveform() {
         String id = submit().getSimulationId();
         executor.runNext();
