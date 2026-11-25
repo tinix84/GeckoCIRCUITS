@@ -97,14 +97,14 @@ public final class IDStringDialog {
         if (oldName.equals(newName)) {
             return;
         }
-        setNewNameChecked(newName);
+        renameWithProbeReferences(newName);
 
         AbstractUndoGenericModel.undoManager.addEdit(new UndoableEdit() {
             @Override
             public void undo() throws CannotUndoException {
                 deleteIDString();
                 try {
-                    setNewNameChecked(oldName);
+                    renameWithProbeReferences(oldName);
                 } catch (NameAlreadyExistsException ex) {
                     Logger.getLogger(IDStringDialog.class.getName()).log(Level.SEVERE, null, ex);
                 }
@@ -120,7 +120,7 @@ public final class IDStringDialog {
             public void redo() throws CannotRedoException {
                 deleteIDString();
                 try {
-                    setNewNameChecked(newName);
+                    renameWithProbeReferences(newName);
                 } catch (NameAlreadyExistsException ex) {
                     Logger.getLogger(IDStringDialog.class.getName()).log(Level.SEVERE, null, ex);
                 }
@@ -168,6 +168,15 @@ public final class IDStringDialog {
             }
         });
 
+    }
+
+    private void renameWithProbeReferences(String newName) throws NameAlreadyExistsException {
+        String previous = _idString;
+        setNewNameChecked(newName);
+        if (_parent instanceof gecko.geckocircuits.circuit.circuitcomponents.AbstractCircuitBlockInterface
+                && _parent.getParentCircuitSheet() != null && SchematicEditor2.Singleton != null) {
+            SchematicEditor2.Singleton.updateProbeReferences(previous, newName);
+        }
     }
 
     public void setNewNameChecked(final String newName) throws NameAlreadyExistsException {

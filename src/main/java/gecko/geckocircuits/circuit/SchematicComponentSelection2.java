@@ -80,7 +80,7 @@ public class SchematicComponentSelection2 extends JTabbedPane {
         C_MIN, C_MAX, C_SIGN, C_TF
     };
     private ControlTyp[] _typMeasure = new ControlTyp[]{
-        C_SCOPE, C_VOLTMETER, C_AMPMETER, C_MMFMETER, C_FLUXMETER,
+        C_SCOPE, C_VOLTMETER, C_AMPMETER, C_PROBE, C_MMFMETER, C_FLUXMETER,
         C_TEMP, C_FLOW, C_VIEWMOT, C_CISPR16, C_SPACE_VECTOR,
         C_U_ZI//, C_SMALL_SIG
     };

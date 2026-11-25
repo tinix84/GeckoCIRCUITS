@@ -120,6 +120,7 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
         setDirtyFlag();
     }
 
+    private UUID clipboardCircuitId = UUID.randomUUID();
     public final CircuitSheet _circuitSheet = new CircuitSheet(this);
     private SchematicComponentSelection2 _sea;
     public MainWindow win;
@@ -807,6 +808,7 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
     }
 
     public void resetCircuitSheetsForNewFile() {
+        clipboardCircuitId = UUID.randomUUID();
         for (AbstractCircuitSheetComponent comp : _circuitSheet.getAllElements().toArray(new AbstractCircuitSheetComponent[0])) {
             comp.deleteComponent();
         }
@@ -1871,6 +1873,12 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
         }
     }
 
+    void updateProbeReferences(String previous, String current) {
+        for (var probe : _circuitSheet.getAllElements().getClassFromContainer(ReglerProbe.class)) {
+            probe.renameTarget(previous, current);
+        }
+    }
+
     public void verschiebeAllesImBearbeitungsModus() {
         _mouseMoveMode = MouseMoveMode.MOVE_COMPONENTS;
 
@@ -1906,9 +1914,14 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
         final List<TerminalInterface> allTerminals = new ArrayList<TerminalInterface>();
 
         final long shiftValue = IDStringDialog.rand.nextLong();
+        final Map<String, String> copiedProbeTargets = new HashMap<>();
 
         for (AbstractCircuitSheetComponent elem : _selectedComponents.toArray(new AbstractCircuitSheetComponent[0])) {
             final AbstractCircuitSheetComponent elementAKTUELL = elem.copyFabric(shiftValue);
+            if (elem instanceof AbstractCircuitBlockInterface original
+                    && elementAKTUELL instanceof AbstractCircuitBlockInterface copy) {
+                copiedProbeTargets.put(original.getStringID(), copy.getStringID());
+            }
             _selectedComponents.add(elementAKTUELL);
             elementAKTUELL.setParentCircuitSheet(_visibleCircuitSheet);
 
@@ -1927,6 +1940,9 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
         for (AbstractCircuitSheetComponent elem : exchangeNew) {
             if (elem instanceof ComponentCoupable) {
                 ((ComponentCoupable) elem).getComponentCoupling().trySetCopyReference(exchangeNew);
+            }
+            if (elem instanceof ReglerProbe probe) {
+                probe.remapTargets(copiedProbeTargets, true);
             }
         }
 
@@ -2016,6 +2032,9 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
             }
         }
 
+        if (allComponentsIncludingSubs.stream().anyMatch(ReglerProbe.class::isInstance)) {
+            stringBuffer.append("probeClipboardCircuit ").append(clipboardCircuitId).append('\n');
+        }
         for (AbstractCircuitSheetComponent elem : allComponentsIncludingSubs) {
             stringBuffer.append("\n" + elem.getExportImportCharacters() + " (" + kopLK + ")\n");
             //elem.getIdentifier().setExportIdentifier();
@@ -2050,14 +2069,23 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
     }
 
     public void readSelectedElementsFromASCIIString(final String[] ascii) {
-        final ProjectData datenSpeicher = new ProjectData(ascii, false, null);
+        String marker = "probeClipboardCircuit ";
+        boolean hasMarker = ascii.length != 0 && ascii[0].startsWith(marker);
+        boolean sameCircuit = hasMarker && ascii[0].equals(marker + clipboardCircuitId);
+        String[] elements = hasMarker ? Arrays.copyOfRange(ascii, 1, ascii.length) : ascii;
+        final ProjectData datenSpeicher = new ProjectData(elements, false, null);
         datenSpeicher.shiftComponentReferences();
 
         _elementsJustInitialized = true;
 
         final List<String> allOriginalLabels = _visibleCircuitSheet.getAllLocalSheetLabels();
         final List<String> copiedLabels = new ArrayList<String>();
-        processElements(datenSpeicher._allSheetComponents, copiedLabels);
+        Map<String, String> copiedProbeTargets = processElements(datenSpeicher._allSheetComponents, copiedLabels);
+        for (var element : datenSpeicher._allSheetComponents) {
+            if (element instanceof ReglerProbe probe) {
+                probe.remapTargets(copiedProbeTargets, sameCircuit);
+            }
+        }
 
         for (AbstractCircuitSheetComponent comp : datenSpeicher._allSheetComponents) {
             String nameOfRootSub = null;
@@ -2097,7 +2125,9 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
         _mouseMoveMode = MouseMoveMode.MOVE_COMPONENTS;
     }
 
-    private void processElements(final Collection<? extends AbstractCircuitSheetComponent> dsc, List<String> copiedLabelNames) {
+    private Map<String, String> processElements(final Collection<? extends AbstractCircuitSheetComponent> dsc,
+            List<String> copiedLabelNames) {
+        Map<String, String> copiedProbeTargets = new HashMap<>();
         for (AbstractCircuitSheetComponent importedElement : dsc) {
             if (importedElement instanceof AbstractBlockInterface) {
                 final AbstractBlockInterface block = (AbstractBlockInterface) importedElement;
@@ -2115,6 +2145,9 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
                         Logger.getLogger(SchematicEditor2.class.getName()).log(Level.SEVERE, null, ex1);
                     }
                 }
+                if (block instanceof AbstractCircuitBlockInterface) {
+                    copiedProbeTargets.put(originalName, block.getStringID());
+                }
             }
 
             _selectedComponents.add(importedElement);
@@ -2124,6 +2157,7 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
             }
             importedElement.setParentCircuitSheet(_visibleCircuitSheet);
         }
+        return copiedProbeTargets;
     }
 
     private void removeDuplicates(final List<String> copiedLabelsCONTROL) {
