@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Alert, Box, Button, Container, LinearProgress, Paper, Stack, TextField, Typography } from '@mui/material';
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -6,9 +6,8 @@ import { api, requireData } from './api/client';
 import type { components } from './api/schema';
 import { useSession } from './session';
 
-export function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'The request failed.';
-}
+import { errorMessage } from './errors';
+const Scope = lazy(() => import('./Scope').then(({ Scope }) => ({ default: Scope })));
 
 function Login() {
   const { signIn } = useSession();
@@ -184,13 +183,7 @@ function CircuitPlaceholder() {
   </Stack>;
 }
 
-function ResultsPlaceholder() {
-  const { id } = useParams();
-  return <Stack spacing={2}>
-    <Typography variant="h1">Simulation results</Typography>
-    <Typography className="route-row">{id}</Typography>
-  </Stack>;
-}
+
 
 export function App() {
   const { active, signOut } = useSession();
@@ -213,7 +206,7 @@ export function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/circuits" element={<Circuits />} />
         <Route path="/circuits/:id" element={<CircuitPlaceholder />} />
-        <Route path="/simulations/:id" element={<ResultsPlaceholder />} />
+        <Route path="/simulations/:id" element={<Suspense fallback={<LinearProgress aria-label="Loading scope" />}><Scope /></Suspense>} />
         <Route path="*" element={<Navigate replace to="/" />} />
       </Routes>
     </Container> : <main key={location.pathname}><Login /></main>}

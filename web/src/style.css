@@ -6,6 +6,7 @@ a { color: #116657; }
 .topbar nav a { color: #cbe0d6; text-decoration: none; white-space: nowrap; }
 .topbar nav a[aria-current="page"] { color: white; text-decoration: underline; text-underline-offset: 6px; }
 .content { padding-block: 34px; }
+.chart-host { inline-size: 100%; overflow-x: auto; }
 .login { max-width: 420px; margin: 9vh auto 0; }
 .route-row { overflow-wrap: anywhere; }
 @media (max-width: 560px) {
