@@ -23,27 +23,20 @@ import gecko.i18n.resources.I18nKeys;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.awt.Color;
 import java.awt.Container;
-import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.KeyEvent;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
-import java.io.IOException;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
-import javax.swing.AbstractAction;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
-import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.KeyStroke;
 
 @SuppressFBWarnings(value = {"CT_CONSTRUCTOR_THROW", "PA_PUBLIC_PRIMITIVE_ATTRIBUTE"},
         justification = "Abstract dialog class - subclasses handle initialization properly; public fields for subclass access")
@@ -150,33 +143,11 @@ abstract public class DialogCircuitComponent<T extends AbstractBlockInterface> e
         jPanelButtonOkCancel.add(jButtonOk);
         jPanelButtonOkCancel.add(jButtonCancel);
 
-        JButton helpButton = GuiFabric.getJButton(I18nKeys.HELP);
+        JButton helpButton = ComponentHelp.createButton(this, element);
         helpButton.setPreferredSize(OK_CANCEL_DIMENSION);
-        helpButton.addActionListener(event -> openComponentHelp());
         jPanelButtonOkCancel.add(helpButton);
-        getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
-                .put(KeyStroke.getKeyStroke(KeyEvent.VK_F1, 0), "componentHelp");
-        getRootPane().getActionMap().put("componentHelp", new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent event) {
-                openComponentHelp();
-            }
-        });
     }
 
-    private void openComponentHelp() {
-        URI url = ComponentHelp.urlFor(element.getTypeEnum());
-        try {
-            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                Desktop.getDesktop().browse(url);
-                return;
-            }
-        } catch (IOException | SecurityException ex) {
-            // Show the address if the desktop cannot open it.
-        }
-        JOptionPane.showMessageDialog(this, "Open this address in a browser:\n" + url,
-                I18nKeys.HELP.getTranslation(), JOptionPane.INFORMATION_MESSAGE);
-    }
     public final ActionListener okActionListener = new ActionListener() {
 
         @Override

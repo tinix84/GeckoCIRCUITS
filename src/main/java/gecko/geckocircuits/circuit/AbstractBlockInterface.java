@@ -1137,6 +1137,7 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
         }
         final Window dialog = (getAcComponent() != null || SchematicEditor2.Singleton.getAcSettings() != null)
                 && getAcComponentOrLiteral() != null ? AcEditorDialogs.componentDialog(this) : openDialogWindow();
+        ComponentHelp.install(dialog, this);
         dialog.setVisible(true);
         if (dialog instanceof Frame) {
             Frame frame = (Frame) dialog;

@@ -583,7 +583,7 @@ public final class CircuitTopology {
             if (saved == null || !component.getTerminalData().isEmpty()) continue;
             int type = component.getType();
             // RegelBlock and AbstractReglerVariableInputs use these standard terminal layouts.
-            if (!Set.of(1, 2, 3, 4, 5, 6, 7, 11, 12, 13, 14, 18, 19, 21, 25, 64).contains(type)) continue;
+            if (!Set.of(1, 2, 3, 4, 5, 6, 7, 11, 12, 13, 14, 18, 19, 21, 25, 64, 91).contains(type)) continue;
             var descriptor = ControlBlockDescriptor.find(type);
             for (Side side : Side.values()) {
                 String[] labels = portLabels(component, side);
@@ -595,6 +595,8 @@ public final class CircuitTopology {
                     if (!admitted.contains(terminal)) continue;
                     int dx = side == Side.INPUT ? -2 : type <= 4 ? 2 : 1;
                     int dy = -port;
+                    // Probe outputs extend upward from the saved anchor.
+                    if (type == 91) { dx = 2; dy = port; }
                     // Expanded SIGNAL inputs are below the source, as in ReglerSignalSource.setExpanded().
                     if (type == 4 && side == Side.INPUT) { dx = -1; dy = -port - 2; }
                     // Expanded HYS has one threshold input below its ordinary signal input.

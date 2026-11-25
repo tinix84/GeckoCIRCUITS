@@ -106,7 +106,7 @@ class ComponentProbeParityTest {
         throw new AssertionError("Missing block " + name);
     }
 
-    private static Path writeProbeBuck(boolean scopeProbe) throws Exception {
+    static Path writeProbeBuck(boolean scopeProbe) throws Exception {
         String source;
         try (var gzip = new GZIPInputStream(Files.newInputStream(BUCK))) {
             source = new String(gzip.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n");
@@ -124,6 +124,8 @@ class ComponentProbeParityTest {
                 uniqueObjectIdentifier 989123012
                 x 35
                 y 26
+                dxTxt 0
+                dyTxt 0
                 parameter[]\s
                 parameterString[] /L.1.i/C.1.v/D.1.state
                 nameOpt[] null
