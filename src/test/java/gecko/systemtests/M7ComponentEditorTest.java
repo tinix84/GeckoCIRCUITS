@@ -201,6 +201,11 @@ class M7ComponentEditorTest {
         assertEquals(3, probe.YOUT.size());
     }
 
+    private static AbstractBlockInterface block(String name) {
+        return MainWindow._se.getBlockInterfaceComponents().stream()
+                .filter(component -> name.equals(component.getStringID())).findFirst().orElseThrow();
+    }
+
     private static DialogCircuitComponent<?> probeDialog() {
         return (DialogCircuitComponent<?>) Arrays.stream(Window.getWindows())
                 .filter(Window::isShowing).filter(window -> window.getClass().getSimpleName().equals("ProbeDialog"))
