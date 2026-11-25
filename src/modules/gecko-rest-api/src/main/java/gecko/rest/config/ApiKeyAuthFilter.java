@@ -34,6 +34,10 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             "/ws",
             "/ws-raw"
     );
+    private static final Set<String> LTI_ROUTES = Set.of(
+            "/api/v1/lti/login", "/api/v1/lti/launch", "/api/v1/lti/jwks",
+            "/api/v1/lti/link", "/api/v1/lti/submit"
+    );
 
     private final ApiKeyProperties apiKeyProperties;
     private final JwtService tokens;
@@ -56,7 +60,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
         String path = requestPath(request);
 
         // Allow public paths
-        if (isPublicPath(path) || path.equals("/api/v1/auth/refresh")) {
+        if (isPublicPath(path) || path.equals("/api/v1/auth/refresh") || LTI_ROUTES.contains(path)) {
             filterChain.doFilter(request, response);
             return;
         }

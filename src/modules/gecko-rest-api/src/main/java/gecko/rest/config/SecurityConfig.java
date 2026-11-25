@@ -87,6 +87,11 @@ public class SecurityConfig {
             ApiKeyAuthFilter authenticationFilter) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
+            .headers(headers -> headers.frameOptions(frame -> frame.disable())
+                    .addHeaderWriter(new org.springframework.security.web.header.writers.DelegatingRequestMatcherHeaderWriter(
+                            new org.springframework.security.web.util.matcher.NegatedRequestMatcher(
+                                    new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/api/v1/lti/**")),
+                            new org.springframework.security.web.header.writers.frameoptions.XFrameOptionsHeaderWriter())))
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
