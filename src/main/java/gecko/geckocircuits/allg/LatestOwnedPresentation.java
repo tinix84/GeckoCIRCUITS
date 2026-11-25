@@ -10,10 +10,6 @@ public final class LatestOwnedPresentation {
 
     private record Request(BooleanSupplier stillCurrent, List<Runnable> changes) { }
 
-    /** Creates an idle presentation updater. */
-    public LatestOwnedPresentation() {
-    }
-
     /**
      * Applies ordered widget changes while their request owns the presentation.
      * Callers serialize requests on the Swing event dispatch thread.
