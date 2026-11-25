@@ -125,7 +125,7 @@ class CircuitImportContractTest {
 
     @Test void skipsSubcircuitBodiesAndInputAfterEnd() throws Exception {
         var model = convert("* SPICE title\nQload a b 0 NPN\n.param\tres=10\nV1 a 0 5\nR1 a 0 {res}\n"
-                + ".subckt hidden a 0\n.param res=20\n.tran 10u 2m\nRinner a 0 1\n.ends\n"
+                + ".subckt hidden a 0\n.param res=20\n.tran 10u 2m\n.ac dec 10 1 10\nRinner a 0 1\n.ends\n"
                 + ".tran\t2u 1m\n.end\n.param res=30\nRafter a 0 2");
         assertEquals(List.of("V1", "R1"), model.getCircuitComponents().stream().map(CircuitModel.ComponentData::getName).toList());
         assertEquals(10, model.getCircuitComponents().getLast().getNumericParameters()[0]);
@@ -133,6 +133,33 @@ class CircuitImportContractTest {
         assertEquals(1e-3, model.getSimulationDuration());
         assertEquals(List.of(".subckt", "Qload"), model.getConversionIssues().stream()
                 .map(gecko.core.io.ImportIssue::component).sorted().toList());
+    }
+
+    @Test void aSweepAfterEndDoesNotChangeTheTransientCircuit() throws Exception {
+        var model = roundTrip(convert("* RC fixture\nV1 in 0 1\nR1 in out 1k\nC1 out 0 1u\n"
+                + ".tran 1u 5m\n.end\n.ac dec 10 1 10\n"));
+        assertTrue(model.getImportIssues().isEmpty(), model.getImportIssues().toString());
+        assertNull(model.getAcSettings());
+        assertEquals(1e-6, model.getTimeStep());
+        assertEquals(5e-3, model.getSimulationDuration());
+        assertEquals(List.of("V1", "R1", "C1"),
+                model.getCircuitComponents().stream().map(CircuitModel.ComponentData::getName).toList());
+        assertTrue(model.getControlComponents().stream().anyMatch(block -> block.getName().equals("SCOPE.IMPORT")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "* No components\n.tran 1u 1m\n.end\n", ".end\nV1 in 0 1\nR1 in 0 1k\n"})
+    void cliReportsDecksWithoutComponentsAndRetainsTheDiagnostic(String text) throws Exception {
+        Path input = directory.resolve("empty.cir"), target = directory.resolve("empty.ipes");
+        Files.writeString(input, text);
+        var diagnostics = new ByteArrayOutputStream();
+        assertEquals(2, Main.run(new String[]{input.toString(), target.toString()},
+                new PrintStream(diagnostics), System.err));
+        assertTrue(diagnostics.toString(StandardCharsets.UTF_8).contains("\"code\":\"EMPTY_NETLIST\""));
+        var parsed = new CircuitFileParser().parse(target.toString());
+        assertTrue(parsed.getCircuitComponents().isEmpty());
+        assertEquals(List.of("EMPTY_NETLIST"),
+                parsed.getConversionIssues().stream().map(gecko.core.io.ImportIssue::code).toList());
     }
 
     @Test void retainsWaveformExpressionsAndReportsMalformedAndOversizedSources() {
