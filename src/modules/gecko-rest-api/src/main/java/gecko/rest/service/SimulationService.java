@@ -402,15 +402,19 @@ public class SimulationService {
 
     /** Returns detached job metadata without copying any retained waveforms. */
     public List<SimulationResponse> getSimulationStatuses() {
-        return jobs.values().stream().map(job -> snapshot(job, false)).toList();
+        return List.copyOf(simulationSnapshots(false).values());
     }
 
     public Map<String, SimulationResponse> getAllSimulations() {
+        return simulationSnapshots(true);
+    }
+
+    private Map<String, SimulationResponse> simulationSnapshots(boolean includeResults) {
         Map<String, SimulationResponse> result = new HashMap<>();
         if (persistence != null) {
             persistence.simulations().forEach(row -> result.put(row.id(), row.response()));
         }
-        jobs.forEach((id, job) -> result.put(id, snapshot(job)));
+        jobs.forEach((id, job) -> result.put(id, snapshot(job, includeResults)));
         return result;
     }
 
@@ -507,10 +511,10 @@ public class SimulationService {
         for (SimulationStatus status : SimulationStatus.values()) {
             result.put(status, 0L);
         }
-        for (SimulationJob job : jobs.values()) {
-            synchronized (job) {
-                result.merge(job.response.getStatus(), 1L, Long::sum);
-            }
+        if (persistence == null) {
+            jobs.values().forEach(job -> result.merge(job.response.getStatus(), 1L, Long::sum));
+        } else {
+            getSimulationStatuses().forEach(job -> result.merge(job.getStatus(), 1L, Long::sum));
         }
         return result;
     }
