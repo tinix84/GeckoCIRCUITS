@@ -7,7 +7,10 @@ import java.sql.SQLException;
 import javax.sql.DataSource;
 import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
 import org.springframework.context.annotation.Profile;
-import org.springframework.dao.DataAccessResourceFailureException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.stereotype.Component;
 
 /** Holds the PostgreSQL session that owns this process's active jobs. */
@@ -15,7 +18,10 @@ import org.springframework.stereotype.Component;
 @Profile("postgres")
 @DependsOnDatabaseInitialization
 final class PostgresReplica {
+    private static final Logger logger = LoggerFactory.getLogger(PostgresReplica.class);
     private final Connection session;
+    private final DataSource source;
+    private volatile boolean lost;
     private final int namespace;
     private final int id;
 
@@ -23,7 +29,14 @@ final class PostgresReplica {
         if (source instanceof HikariDataSource pool && pool.getMaximumPoolSize() == 1) {
             throw new IllegalStateException("PostgreSQL replica ownership requires at least two pool connections.");
         }
+        this.source = source;
         Connection connection = source.getConnection();
+        try {
+            connection.setAutoCommit(true);
+        } catch (SQLException e) {
+            connection.close();
+            throw e;
+        }
         try (var statement = connection.createStatement();
              var identity = statement.executeQuery("""
                      select oid::integer, nextval('simulation_replica_id')
@@ -50,17 +63,40 @@ final class PostgresReplica {
 
     int namespace() { return namespace; }
 
-    synchronized int liveId() {
+    boolean hasOwnership() { return !lost; }
+
+    synchronized boolean checkOwnership() {
+        if (lost) return false;
         try {
-            if (session.isValid(2)) return id;
+            if (session.isValid(2)) return true;
         } catch (SQLException e) {
-            throw new DataAccessResourceFailureException("PostgreSQL replica ownership session failed.", e);
+            logger.debug("PostgreSQL ownership validation failed.", e);
         }
-        throw new DataAccessResourceFailureException("PostgreSQL replica ownership session closed. Restart the API.");
+        lost = true;
+        logger.error("PostgreSQL replica ownership session lost. Restart the API.");
+        try (session) {
+            if (source instanceof HikariDataSource pool) pool.evictConnection(session);
+            else session.abort(Runnable::run);
+        } catch (SQLException | RuntimeException e) {
+            logger.warn("Could not release the lost PostgreSQL ownership session.", e);
+        }
+        return false;
     }
+
+    int liveId() {
+        if (!checkOwnership()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Simulation ownership lost. Restart the API.");
+        }
+        return id;
+    }
+
+    int id() { return id; }
 
     @PreDestroy
     synchronized void close() throws SQLException {
+        if (lost) return;
+        lost = true;
         try (session; var unlock = session.prepareStatement("select pg_advisory_unlock(?, ?)")) {
             unlock.setInt(1, namespace);
             unlock.setInt(2, id);

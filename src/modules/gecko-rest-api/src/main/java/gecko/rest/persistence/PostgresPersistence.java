@@ -79,13 +79,18 @@ public class PostgresPersistence {
         return tenant == null ? jobs.findAll() : jobs.findByTenant(tenant);
     }
 
+    public boolean checkOwnership() { return replica.checkOwnership(); }
+
+    public boolean hasOwnership() { return replica.hasOwnership(); }
+
     @Transactional
-    public void saveSimulation(SimulationMetadata simulation) {
-        var response = simulation.response();
-        if (jobs.updateActiveJob(simulation.id(), replica.liveId(), response.getStatus(), response.getEndTime(),
-                response.getErrorMessage(), ACTIVE) != 0) {
-            audit("simulation", simulation.id(), simulation.owner(), simulation.status());
+    public boolean saveSimulation(SimulationMetadata simulation) {
+        if (!replica.checkOwnership() || jobs.updateActiveJob(simulation.id(), replica.id(),
+                simulation.simulationStatus(), simulation.finishedAt(), simulation.error(), ACTIVE) == 0) {
+            return false;
         }
+        audit("simulation", simulation.id(), simulation.owner(), simulation.status());
+        return true;
     }
 
     @Transactional
@@ -102,8 +107,10 @@ public class PostgresPersistence {
 
     @Transactional
     public void rejectSimulation(SimulationMetadata simulation) {
-        jobs.deleteByIdAndReplicaId(simulation.id(), replica.liveId());
-        audit("simulation", simulation.id(), simulation.owner(), "REJECTED");
+        if (replica.checkOwnership()) {
+            jobs.deleteByIdAndReplicaId(simulation.id(), replica.id());
+            audit("simulation", simulation.id(), simulation.owner(), "REJECTED");
+        }
     }
 
     public long circuitCount(String tenant) {

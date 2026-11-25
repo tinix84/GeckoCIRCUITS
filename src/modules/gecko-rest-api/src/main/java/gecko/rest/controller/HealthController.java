@@ -5,7 +5,11 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import gecko.rest.persistence.PostgresPersistence;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,6 +25,12 @@ import java.util.Map;
 @Tag(name = "Health", description = "Health check and API information endpoints")
 public class HealthController {
 
+    private final ObjectProvider<PostgresPersistence> persistence;
+
+    public HealthController(ObjectProvider<PostgresPersistence> persistence) {
+        this.persistence = persistence;
+    }
+
     @Value("${app.version:1.0.0}")
     private String appVersion;
 
@@ -35,11 +45,12 @@ public class HealthController {
     @Operation(summary = "Health check", description = "Check API health status")
     @ApiResponse(responseCode = "200", description = "API is healthy",
             content = @Content(schema = @Schema(example = "{\"status\":\"UP\",\"version\":\"1.0.0\"}")))
-    public Map<String, String> health() {
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "UP");
-        response.put("version", appVersion);
-        return response;
+    @ApiResponse(responseCode = "503", description = "API lost PostgreSQL simulation ownership")
+    public ResponseEntity<Map<String, String>> health() {
+        var postgres = persistence.getIfAvailable();
+        boolean ready = postgres == null || postgres.checkOwnership();
+        return ResponseEntity.status(ready ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("status", ready ? "UP" : "DOWN", "version", appVersion));
     }
 
     /**

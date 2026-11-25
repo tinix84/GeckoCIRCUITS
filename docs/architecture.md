@@ -101,4 +101,4 @@ PostgreSQL serializes quota admission across API replicas. When PostgreSQL relea
 
 Drain and stop all older API replicas before the first startup that applies Flyway migration V3. The migration marks remaining pending and running jobs from older versions failed because those jobs have no replica owner. Jobs with a terminal status keep that status.
 
-Use a direct PostgreSQL connection or session pooling. Each API replica reserves one pool connection for its session lock. Set the pool size to at least two. Restart a replica if it loses its ownership session.
+Use a direct PostgreSQL connection or session pooling. Each API replica reserves one pool connection for its session lock. Set the pool size to at least two. A replica that loses its ownership session cancels its local jobs. Its health endpoint and simulation submissions return HTTP 503. Restart that replica to establish a fresh ownership session.

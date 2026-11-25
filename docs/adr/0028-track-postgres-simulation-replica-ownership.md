@@ -24,7 +24,7 @@ Each replica takes a unique lock before it admits jobs. Job admission, quota loo
 
 ## Consequences
 
-A replica can recover quota as soon as PostgreSQL detects the session loss. The operator must restart a replica that loses its ownership session. See the [deployment requirements](../architecture.md#tenant-isolation) for the initial migration.
+A peer can recover quota as soon as PostgreSQL detects the session loss. Each replica monitors its own session and cancels its local jobs if the session fails. A replica returns HTTP 503 from its health endpoint and refuses new simulation work after session loss. Restart the affected replica to establish fresh ownership. See the [deployment requirements](../architecture.md#tenant-isolation) for the initial migration.
 
 ## Status
 
