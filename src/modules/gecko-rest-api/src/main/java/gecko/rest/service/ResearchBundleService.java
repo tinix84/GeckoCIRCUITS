@@ -125,7 +125,7 @@ public class ResearchBundleService {
             }
             for (int index = 0; index < names.size(); index++) required(entries, csvPath(index));
             byte[] circuit = unpackCircuit(required(entries, CIRCUIT));
-            Map<String, double[]> replay = simulations.replayBundle(circuit, request);
+            Map<String, double[]> replay = simulations.runEmbeddedCircuit(circuit, request);
             var deviations = new LinkedHashMap<String, Double>();
             boolean passed = replay.keySet().equals(new TreeSet<>(names));
             for (int index = 0; index < names.size(); index++) {
@@ -205,7 +205,7 @@ public class ResearchBundleService {
         return entries;
     }
 
-    private static byte[] unpackCircuit(byte[] bytes) throws IOException {
+    static byte[] unpackCircuit(byte[] bytes) throws IOException {
         if (!gzip(bytes)) return bytes;
         try (var gzip = new GZIPInputStream(new ByteArrayInputStream(bytes))) {
             byte[] unpacked = gzip.readNBytes(MAX_BYTES + 1);

@@ -182,13 +182,13 @@ public class SimulationService {
         return new BundleData(ipes, job.bundleInput.request(), result.getResults());
     }
 
-    Map<String, double[]> replayBundle(byte[] circuit, SimulationRequest request) {
+    Map<String, double[]> runEmbeddedCircuit(byte[] circuit, SimulationRequest request) {
         var parser = new CircuitFileParser();
         CircuitSnapshot source;
         try {
             source = preparation.capture(parser.parse(new ByteArrayInputStream(circuit), "circuit.ipes"));
         } catch (CircuitFileParser.CircuitParseException | IOException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot parse the bundle circuit", e);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot parse the submitted circuit", e);
         }
         PreparedCircuit prepared = prepare(request, new CircuitFileService.ResolvedSource(source, true));
         var replay = new FutureTask<>(() ->
@@ -202,18 +202,18 @@ public class SimulationService {
         try {
             SimulationResult result = replay.get(60, TimeUnit.SECONDS);
             if (!result.isSuccess()) {
-                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Bundle simulation failed");
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Submitted circuit simulation failed");
             }
             SimulationResponse response = new SimulationResponse("replay");
             applySuccessfulResult(response, result);
             return response.getResults();
         } catch (TimeoutException e) {
-            throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "Bundle simulation timed out", e);
+            throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "Submitted circuit simulation timed out", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Bundle simulation was interrupted", e);
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Submitted circuit simulation was interrupted", e);
         } catch (ExecutionException e) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Bundle simulation failed", e);
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Submitted circuit simulation failed", e);
         } finally {
             if (replay.cancel(true) && executorService instanceof ThreadPoolExecutor pool) {
                 pool.remove(replay);
