@@ -13,14 +13,7 @@ import { Waveform } from './Waveform';
 
 type FourierResponse = components['schemas']['FourierResponse'];
 
-function save(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = name;
-  anchor.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+import { downloadBlob } from './download';
 
 export function Scope() {
   const { id } = useParams();
@@ -172,11 +165,11 @@ function SimulationScope({ id }: { id: string }) {
               {/^[uv]/i.test(activeTrace.name) ? 'ΔV' : /^i/i.test(activeTrace.name) ? 'ΔI' : 'Δ'} ({activeTrace.name}) {deltaValue.toPrecision(6)}
             </Typography>}
             <Button disabled={!visible.length}
-              onClick={() => save(new Blob([chartCsv(time, visible)], { type: 'text/csv' }), 'waveforms.csv')}>
+              onClick={() => downloadBlob(new Blob([chartCsv(time, visible)], { type: 'text/csv' }), 'waveforms.csv')}>
               Export CSV
             </Button>
             <Button disabled={!visible.length} onClick={() => chart.current?.ctx.canvas.toBlob((blob) => {
-              if (blob) save(blob, 'waveforms.png');
+              if (blob) downloadBlob(blob, 'waveforms.png');
             })}>Export PNG</Button>
           </Stack>
         </Stack> : <Stack spacing={2}>

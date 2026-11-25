@@ -6,6 +6,7 @@ import { api, requireData } from './api/client';
 import type { components } from './api/schema';
 import { errorMessage } from './errors';
 import { CircuitSchematic } from './CircuitSchematic';
+import { downloadBlob } from './download';
 
 type Model = components['schemas']['ComponentListResponse'];
 type Component = components['schemas']['ComponentInfo'];
@@ -82,6 +83,22 @@ function LoadedCircuit({ id }: { id: string }) {
     }
   }
 
+  async function downloadCircuit() {
+    setBusy(true);
+    setActionError('');
+    try {
+      const result = await api.GET('/api/v1/circuits/{circuitId}/ipes', {
+        params: { path: { circuitId: id } },
+        parseAs: 'blob',
+      });
+      downloadBlob(requireData(result, 'Could not export the circuit'), name || 'circuit.ipes');
+    } catch (cause) {
+      setActionError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const selected = selection === undefined ? undefined : model?.components?.[selection];
 
   return <Stack spacing={2.5}>
@@ -90,7 +107,10 @@ function LoadedCircuit({ id }: { id: string }) {
         <Typography variant="h1">Circuit editor</Typography>
         {name && <Typography color="text.secondary">{name}</Typography>}
       </Stack>
-      <Button variant="contained" disabled={!model || busy} onClick={() => void run()}>Run simulation</Button>
+      <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1 }}>
+        <Button variant="outlined" disabled={!model || busy} onClick={() => void downloadCircuit()}>Download .ipes</Button>
+        <Button variant="contained" disabled={!model || busy} onClick={() => void run()}>Run simulation</Button>
+      </Stack>
     </Stack>
     {error && <Alert severity="error">{error}</Alert>}
     {actionError && <Alert severity="error">{actionError}</Alert>}
