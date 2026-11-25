@@ -7,6 +7,38 @@ import type { CursorPair, Trace } from './scopeData';
 import 'uplot/dist/uPlot.min.css';
 
 const colors = ['#007663', '#335ab0', '#b35217', '#a34282', '#6a7224'];
+const linear = uPlot.paths.linear!();
+
+function envelope(instance: uPlot, series: number, first: number, last: number, fill: string): uPlot.Series.Paths | null {
+  const time = instance.data[0];
+  const values = instance.data[series];
+  const columns: { x: number; top: number; bottom: number }[] = [];
+  const scale = instance.series[series].scale ?? 'y';
+  for (let index = first; index <= last; index += 1) {
+    const value = values[index];
+    if (value === null || value === undefined) continue;
+    const x = Math.round(instance.valToPos(time[index], 'x', true) / 2) * 2;
+    const y = instance.valToPos(value, scale, true);
+    const column = columns.at(-1);
+    if (column?.x === x) {
+      column.top = Math.min(column.top, y);
+      column.bottom = Math.max(column.bottom, y);
+    } else {
+      columns.push({ x, top: y, bottom: y });
+    }
+  }
+  if (!columns.length) return null;
+
+  const path = new Path2D();
+  path.moveTo(columns[0].x, columns[0].top - 0.5);
+  for (const { x, top } of columns) path.lineTo(x, top - 0.5);
+  for (let index = columns.length - 1; index >= 0; index -= 1) {
+    const { x, bottom } = columns[index];
+    path.lineTo(x, bottom + 0.5);
+  }
+  path.closePath();
+  return { fill: path, _fill: fill };
+}
 
 export function Waveform({ time, traces, cursors, onCursor, frequency = false, chartRef }: {
   time: number[];
@@ -57,7 +89,17 @@ export function Waveform({ time, traces, cursors, onCursor, frequency = false, c
       cursor: { drag: { x: true, y: false } },
       series: [
         { label: frequency ? 'Frequency' : 'Time' },
-        ...traces.map(({ name }, index) => ({ label: name, stroke: colors[index % colors.length], width: 1.4 })),
+        ...traces.map(({ name }, index): uPlot.Series => {
+          const color = colors[index % colors.length];
+          return {
+            label: name,
+            stroke: color,
+            width: 1.4,
+            paths: (chart, series, first, last) => bucket === 1
+              ? linear(chart, series, first, last)
+              : envelope(chart, series, first, last, color + '99'),
+          };
+        }),
       ],
       hooks: {
         setScale: [(instance, key) => { if (key === 'x') setResolution(instance); }],
