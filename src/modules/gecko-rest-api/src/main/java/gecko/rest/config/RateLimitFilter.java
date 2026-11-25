@@ -6,9 +6,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Clock;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
+import org.springframework.dao.DataAccessException;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /** Applies general and submission budgets in one atomic fixed-window admission. */
@@ -17,9 +16,14 @@ public final class RateLimitFilter extends OncePerRequestFilter {
             "/api-docs", "/v3/api-docs", "/swagger-ui", "/swagger-ui.html", "/ws", "/ws-raw");
     private final RateLimitProperties properties;
     private final Clock clock;
-    private final Map<String, Budget> clients = new HashMap<>();
+    private final RateLimitStore store;
 
     public RateLimitFilter(RateLimitProperties properties, Clock clock) {
+        this(properties, clock, new RateLimitStore.InMemory());
+    }
+
+    RateLimitFilter(RateLimitProperties properties, Clock clock, RateLimitStore store) {
+        this.store = store;
         this.properties = properties;
         this.clock = clock;
     }
@@ -38,7 +42,16 @@ public final class RateLimitFilter extends OncePerRequestFilter {
         String path = ApiKeyAuthFilter.requestPath(request);
         boolean submission = request.getMethod().equals("POST")
                 && (path.equals("/api/v1/simulations") || path.equals("/api/v1/simulations/batch"));
-        Decision decision = admit(client, submission);
+        Decision decision;
+        try {
+            decision = admit(client, submission);
+        } catch (DataAccessException e) {
+            logger.warn("Rate limit store unavailable", e);
+            response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\":\"Service Unavailable\",\"message\":\"Rate limit store unavailable.\"}");
+            return;
+        }
         response.setHeader("X-RateLimit-Limit", Integer.toString(decision.limit()));
         response.setHeader("X-RateLimit-Remaining", Integer.toString(decision.remaining()));
         response.setHeader("X-RateLimit-Reset", Long.toString(decision.reset()));
@@ -52,31 +65,20 @@ public final class RateLimitFilter extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 
-    private synchronized Decision admit(String client, boolean submission) {
+    private Decision admit(String client, boolean submission) {
         long now = clock.instant().getEpochSecond();
         long window = Math.floorDiv(now, 60);
-        // Expired clients do not retain memory after their window ends.
-        clients.values().removeIf(budget -> budget.window != window);
-        Budget budget = clients.computeIfAbsent(client, ignored -> new Budget(window));
+        long reset = (window + 1) * 60;
+        long retryAfter = Math.max(reset - now, 1);
         int generalLimit = properties.getRateLimit();
         int simulationLimit = properties.getRateLimitSimulation();
-        boolean allowed = budget.general < generalLimit && (!submission || budget.simulations < simulationLimit);
-        if (allowed) {
-            budget.general++;
-            if (submission) budget.simulations++;
-        }
+        RateLimitStore.Admission admission = store.admit(client, window, retryAfter, submission,
+                generalLimit, simulationLimit);
         int limit = submission ? simulationLimit : generalLimit;
-        int remaining = submission ? Math.min(generalLimit - budget.general, simulationLimit - budget.simulations)
-                : generalLimit - budget.general;
-        long reset = (window + 1) * 60;
-        return new Decision(allowed, limit, Math.max(remaining, 0), reset, Math.max(reset - now, 1));
-    }
-
-    private static final class Budget {
-        private final long window;
-        private int general;
-        private int simulations;
-        Budget(long window) { this.window = window; }
+        int generalRemaining = generalLimit - admission.general();
+        int remaining = submission ? Math.min(generalRemaining, simulationLimit - admission.simulations())
+                : generalRemaining;
+        return new Decision(admission.allowed(), limit, Math.max(remaining, 0), reset, retryAfter);
     }
 
     private record Decision(boolean allowed, int limit, int remaining, long reset, long retryAfter) { }

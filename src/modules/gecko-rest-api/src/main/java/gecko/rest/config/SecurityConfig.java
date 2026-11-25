@@ -63,8 +63,9 @@ public class SecurityConfig {
     }
 
     @Bean
-    public RateLimitFilter rateLimitFilter(RateLimitProperties properties, Clock clock) {
-        return new RateLimitFilter(properties, clock);
+    public RateLimitFilter rateLimitFilter(RateLimitProperties properties, Clock clock,
+                                           org.springframework.beans.factory.ObjectProvider<RateLimitStore> stores) {
+        return new RateLimitFilter(properties, clock, stores.getIfAvailable(RateLimitStore.InMemory::new));
     }
 
     @Bean

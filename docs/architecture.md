@@ -66,3 +66,25 @@ The OpenAPI snapshot is [`docs/api/openapi.json`](api/openapi.json) (`scripts/sn
 | `resources/` | Tutorial, example and article sources, copied into `docs/` by `scripts/sync-docs.py` |
 | `scripts/generate-api-docs.py` | Generates `docs/api/core/` from the core module |
 | `docs/releases/` | Release notes, one page per tag |
+
+## REST persistence profiles
+
+The REST API stores circuits, jobs and request budgets in memory by default.
+Enable the optional backends with the standard Spring Boot configuration.
+
+| Profile | Configuration | Stored data |
+|---------|---------------|-------------|
+| `postgres` | `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` | Circuit uploads, circuit metadata, simulation job status and audit entries |
+| `redis` | `SPRING_DATA_REDIS_HOST`, `SPRING_DATA_REDIS_PORT`, and `SPRING_DATA_REDIS_PASSWORD` when required | General and simulation submission budgets shared by API instances |
+
+Set `SPRING_PROFILES_ACTIVE=postgres,redis` to enable both profiles. Give the PostgreSQL role permission to run the Flyway migrations. API instances that share a Redis database and deployment should use the same `GECKO_API_RATE_LIMIT_NAMESPACE`. Assign a different namespace to each independent deployment.
+
+Waveforms, active executors, progress subscriptions and research bundle inputs are local to the instance that runs the job. After restart, the API can read the last recorded job status. A restart does not resume an active simulation. Use the original instance to access live progress and results.
+
+For native integration tests in WSL, start PostgreSQL and Redis in Ubuntu. Set the Spring connection variables above and use a PostgreSQL test role that can create schemas. The test creates a separate schema per run.
+
+```bash
+GECKO_TEST_POSTGRES=true GECKO_TEST_REDIS=true \
+  mvn -f pom-reactor.xml -pl :gecko-rest-api -am test \
+    -Dtest=NativePersistenceTest -Dsurefire.failIfNoSpecifiedTests=false
+```
