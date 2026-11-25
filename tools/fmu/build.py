@@ -28,15 +28,15 @@ def compile_runtime(work):
     mvn = shutil.which("mvn")
     if mvn is None:
         raise RuntimeError("Install Maven before building the FMU.")
+    artifact_file = work / "core-artifact.txt"
     subprocess.run([
         mvn, "-B", "-f", str(ROOT / "pom-reactor.xml"), "-pl", CORE, "package",
-        "dependency:copy-dependencies", "-Dmaven.test.skip=true", "-DincludeScope=runtime",
-        f"-DoutputDirectory={libraries}",
+        "dependency:copy-dependencies", "org.apache.maven.plugins:maven-help-plugin:3.5.2:evaluate",
+        "-Dmaven.test.skip=true", "-DincludeScope=runtime", f"-DoutputDirectory={libraries}",
+        "-Dexpression=project.artifact.file", f"-Doutput={artifact_file}",
     ], cwd=ROOT, check=True)
-    for jar in (ROOT / CORE / "target").glob("gecko-simulation-core-*.jar"):
-        if jar.name.endswith(("-sources.jar", "-javadoc.jar", "-tests.jar")):
-            continue
-        shutil.copyfile(jar, libraries / jar.name)
+    jar = Path(artifact_file.read_text(encoding="utf-8").strip())
+    shutil.copyfile(jar, libraries / jar.name)
     subprocess.run([
         os.environ.get("GECKO_FMU_JAVAC", "javac"), "--release", "21",
         "-classpath", str(libraries / "*"), "-d", str(classes), str(HERE / "GeckoFmiWorker.java"),
