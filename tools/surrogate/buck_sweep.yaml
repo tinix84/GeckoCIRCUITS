@@ -1,0 +1,34 @@
+circuit_file: ../../src/modules/gecko-simulation-core/src/test/resources/ipes/buck_simple.ipes
+duration: 0.005
+time_step: 0.0000002
+measure_from: 0.004
+batch_size: 12
+concurrency: 4
+timeout: 180
+seed: 52
+parameters:
+  Vin: {path: U.1.dcValue, min: 40.0, max: 56.0}
+  L: {path: L.1.inductance, min: 0.00010, max: 0.00024}
+  C: {path: C.1.capacitance, min: 0.000075, max: 0.00018}
+  fsw: {path: SIGNAL.1.frequency, min: 18000.0, max: 35000.0}
+  D: {path: SIGNAL.1.duty, min: 0.25, max: 0.45}
+  Rload: {path: R.1.resistance, min: 1.15, max: 2.0}
+metrics:
+  vout: {kind: analysis, signal: u2, field: average}
+  ripple: {kind: analysis, signal: u2, field: peak_to_peak}
+  i_rms: {kind: analysis, signal: iL, field: rms}
+  i_peak: {kind: analysis, signal: iL, field: max}
+  conduction_loss:
+    kind: conduction
+    inputs: {current: i_rms, on_resistance: 0.010, threshold_voltage: 0.0}
+    scale: D
+  switching_loss:
+    kind: switching
+    inputs:
+      current: i_peak
+      voltage: Vin
+      reference_voltage: 400.0
+      temperature: 25.0
+      turn_on_energy: 0.000030
+      turn_off_energy: 0.000015
+    frequency: fsw

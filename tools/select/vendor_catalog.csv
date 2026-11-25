@@ -1,0 +1,4 @@
+name,voltage_rating_v,current_rating_a,rds_on_ohm,vce_sat_v,qg_c,package,price,rth_c_per_w,tj_max_c,curve_file
+C3M0065090D,900,36,0.065,,3.3e-8,TO-247-3,,6,150,../../src/main/resources/devices/C3M0065090D.csv
+IKW40N65H5,650,46,,1.65,9.5e-8,TO-247-3,,5.6,175,../../src/main/resources/devices/IKW40N65H5.csv
+STIPQ5M60T-HZ,600,5,1.0,,,N2DIP-26L,,14.2,150,../../src/main/resources/devices/STIPQ5M60T-HZ.csv

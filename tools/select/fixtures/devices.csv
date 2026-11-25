@@ -1,0 +1,11 @@
+name,voltage_rating_v,current_rating_a,rds_on_ohm,vce_sat_v,qg_c,package,price,rth_c_per_w,tj_max_c,curve_file
+A,100,35,0.01,,3e-8,TO-220,2.0,4,150,
+B,100,35,0.01,,3e-8,TO-220,3.0,4,150,
+C,100,40,0.02,,3e-8,TO-247,2.5,4,150,
+D,150,40,,0.2,3e-8,TO-247,1.5,4,150,
+E,100,30,0.022,,6e-8,TO-220,1.2,5,175,
+low_voltage,55,35,0.01,,3e-8,TO-220,1,4,150,
+low_current,100,14,0.01,,3e-8,TO-220,1,4,150,
+hot,100,25,0.02,,3e-8,TO-220,2,100,150,
+over_budget,100,25,0.08,,3e-8,TO-220,2,3,175,
+low_both,40,8,0.01,,3e-8,TO-220,1,4,150,

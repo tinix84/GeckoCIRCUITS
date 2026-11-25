@@ -1,0 +1,16 @@
+circuit_file: ../../src/modules/gecko-simulation-core/src/test/resources/ipes/buck_simple.ipes
+duration: 0.005
+time_step: 0.00000005
+measure_from: 0.003
+trials: 60
+batch_size: 4
+concurrency: 4
+seed: 18
+parameters:
+  D: {path: SIGNAL.1.duty, min: 0.20, max: 0.31}
+  fsw: {path: SIGNAL.1.frequency, min: 20000, max: 20000}
+  C: {path: C.1.capacitance, min: 0.0001, max: 0.0001}
+metrics:
+  vout: {kind: analysis, signal: u2, field: average}
+objectives:
+  - {metric: vout, target: 12}
