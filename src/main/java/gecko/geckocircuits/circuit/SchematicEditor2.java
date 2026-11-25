@@ -126,6 +126,20 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
     public MainWindow win;
     //
     private boolean simulatorAktiviert = false;
+    private AbstractCircuitBlockInterface probeDragSource;
+
+    public boolean canEditProbeComponent(AbstractBlockInterface component) {
+        return simulatorAktiviert && getBlockInterfaceComponents().contains(component);
+    }
+
+    ReglerProbe probeAt(java.awt.Point location) {
+        for (var component : _visibleCircuitSheet.getLocalSheetComponents()) {
+            if (component instanceof ReglerProbe probe && probe.istAngeklickt(location.x, location.y) == 1) {
+                return probe;
+            }
+        }
+        return null;
+    }
     static boolean zustandGeaendert = false;  // MS_PKGPROTECT: only used within package - zeigt an, ob 'QuitWithoutSaving' aktiviert werden muss
     //
     private static final double CLICK_RADIUS_RELATIVE = 0.5;  // [0...1]
@@ -1060,6 +1074,18 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
 
     @Override
     public void mousePressed(final MouseEvent me) {
+        probeDragSource = null;
+        if (simulatorAktiviert && _mouseMoveMode == MouseMoveMode.NONE && me.isControlDown()
+                && SwingUtilities.isLeftMouseButton(me)) {
+            for (var component : _visibleCircuitSheet.getLocalSheetComponents()) {
+                if (component instanceof AbstractCircuitBlockInterface source
+                        && source.istAngeklickt(me.getX(), me.getY()) == 1
+                        && !ProbeTransferHandler.quantities(source).isEmpty()) {
+                    probeDragSource = source;
+                    return;
+                }
+            }
+        }
 
         if (me.getClickCount() < 2 && System.currentTimeMillis() - _lastMouseClickTime < 350
                 && me.getModifiersEx() != MouseEvent.BUTTON3_DOWN_MASK && _mouseMoveMode != MouseMoveMode.DRAW_CONNECTION) {
@@ -1652,6 +1678,15 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
 
     @Override
     public void mouseDragged(final MouseEvent mouseEvent) {
+        if (probeDragSource != null) {
+            var source = probeDragSource;
+            probeDragSource = null;
+            if (canEditProbeComponent(source)) {
+                var handler = (ProbeTransferHandler) _visibleCircuitSheet.getTransferHandler();
+                handler.drag(_visibleCircuitSheet, mouseEvent, source);
+            }
+            return;
+        }
 
         if (_mouseMoveMode == MouseMoveMode.MOVE_COMPONENTS) {
             _singleComponentMouseDrag = true;
@@ -1688,6 +1723,10 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
 
     @Override
     public void mouseReleased(final MouseEvent me) {
+        if (probeDragSource != null) {
+            probeDragSource = null;
+            return;
+        }
         if (!simulatorAktiviert) {
             return;
         }
