@@ -283,6 +283,15 @@ public class ControlCalculatorFactory {
         // Step 4: Build probe/gate/scope mappings
         for (CalculatorEntry entry : entries) {
             int type = entry.component.getType();
+            if (type == ProbeReference.TYPE) {
+                var references = ProbeReference.parse(entry.component.getParameterStrings());
+                for (int port = 0; port < references.size(); port++) {
+                    var reference = references.get(port);
+                    int element = reference.resolve(electricalNetlist);
+                    mapping.addComponentProbe(entry.calculator, port, element, reference.quantity());
+                }
+                continue;
+            }
             if (type == TEMP_TYPE) {
                 addTemperatureProbe(model, topology, thermalNetlist, entry, mapping);
                 continue;

@@ -51,9 +51,9 @@ public final class TraceEquivalence {
             double[] a = actual.get(step);
             assertEquals(e.length, a.length, "vector length, step " + step);
             for (int i = from; i < Math.min(to, e.length); i++) {
+                if (!Double.isFinite(e[i]) || !Double.isFinite(a[i])) return new Norm(Double.NaN, Double.NaN);
                 scale = Math.max(scale, Math.abs(e[i]));
                 difference = Math.max(difference, Math.abs(e[i] - a[i]));
-                if (Double.isNaN(e[i]) || Double.isNaN(a[i])) difference = Double.NaN;
             }
         }
         return new Norm(scale, difference);

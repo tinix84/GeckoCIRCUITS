@@ -74,6 +74,9 @@ public class CircuitSheet extends JPanel {
         _worksheetSize = new WorksheetSize(this);
         setLayout(null);
         setOpaque(false);
+        if (se != null) {
+            setTransferHandler(new gecko.geckocircuits.control.ProbeTransferHandler(se::probeAt));
+        }
     }
 
     /**

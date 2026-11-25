@@ -22,6 +22,9 @@ import gecko.geckocircuits.allg.SolverType;
 import gecko.geckocircuits.allg.LegacySimulationFrontend;
 import gecko.geckocircuits.circuit.circuitcomponents.ReluctanceInductor;
 import gecko.core.circuit.SourceType;
+import gecko.core.circuit.circuitcomponents.CircuitTypCore;
+import gecko.core.simulation.ProbeReference;
+import gecko.geckocircuits.circuit.circuitcomponents.Diode;
 import gecko.geckocircuits.control.*;
 import gecko.geckocircuits.control.calculators.AbstractControlCalculatable;
 import gecko.geckocircuits.datacontainer.CompressorIntMatrix;
@@ -85,6 +88,10 @@ public class SimulationsKern implements ISimulationEngine {
     //-------------------------------
     // Kopplung [ Leistungskreis - Regelkreis - thermischer Kreis ]
     //
+    private record ComponentProbe(int control, int output, int electrical, ProbeReference.Quantity quantity) { }
+
+    private List<ComponentProbe> componentProbes = List.of();
+
     private int[] interessanteKnotenLK;   // zum Aufnehmen der ZV-Spannungs-Kurven zwischen LK-Knoten mittels VOLT
     private int[] interessanteKnotenTHERM;   // zum Aufnehmen der ZV-Temperatur-Kurven zwischen THERM-Knoten mittels TEMP
     private int[] zeigerAufControlElement;  // Interaktion LK - CONTROL
@@ -379,6 +386,15 @@ public class SimulationsKern implements ISimulationEngine {
         }
 
         //------------------
+        for (var probe : componentProbes) {
+            int element = probe.electrical();
+            sortedCalculators[probe.control()]._outputSignal[probe.output()][0] = switch (probe.quantity()) {
+                case CURRENT -> nl.eLKneu[element]._currentInAmps;
+                case VOLTAGE -> lkmLK.p[nl.knotenX[element]] - lkmLK.p[nl.knotenY[element]];
+                case STATE -> ProbeReference.diodeState(nl.parameter[element]);
+            };
+        }
+
         // den in VIEWMOT gewaehlten internen Maschinenparameter an den CONTROL-Ausgang von C_VIEWMOT legen:
         for (int[] mapping : zeiger_VIEWMOT_MaschineLK) {
             AbstractCircuitBlockInterface lkBlock = nl.elements[mapping[1]];
@@ -733,6 +749,7 @@ public class SimulationsKern implements ISimulationEngine {
         //***************************
         // Einrichtung der Kopplungen zwischen [ LK - CONTROL - THERM ]  -->
         //
+        componentProbes = bindComponentProbes();
         definiereInteraktion_VOLT_AMP_LK();  // wie messe ich Stroeme und Spannungen im LK mit CONTROL-AMP bzw. CONTROL-VOLT?
         definiereInteraktion_MaschineLK_VIEWMOT();  // zur Messung von Maschinen-internen Parametern
         //
@@ -934,6 +951,46 @@ public class SimulationsKern implements ISimulationEngine {
         }
         zeiger_VIEWMOT_MaschineLK = new int[jjZeiger][3];
         System.arraycopy(zeiger_VIEWMOT_MaschineLK_temp, 0, zeiger_VIEWMOT_MaschineLK, 0, jjZeiger);
+    }
+
+    private List<ComponentProbe> bindComponentProbes() {
+        List<ComponentProbe> bindings = new ArrayList<>();
+        for (int control = 0; control < c.length; control++) {
+            if (c[control] instanceof ReglerProbe probe) {
+                var references = probe.references();
+                if (references.size() != probe.YOUT.size()) {
+                    throw new IllegalArgumentException("Use one Probe output terminal per reference.");
+                }
+                for (int output = 0; output < references.size(); output++) {
+                    var reference = references.get(output);
+                    bindings.add(new ComponentProbe(control, output, findProbeElement(reference), reference.quantity()));
+                }
+            }
+        }
+        return bindings;
+    }
+
+    private int findProbeElement(ProbeReference reference) {
+        int found = -1;
+        for (int element = 0; element < nl.eLKneu.length; element++) {
+            var component = nl.eLKneu[element];
+            if (reference.component().equals(component.getStringID())) {
+                int type = component.getCircuitTyp().getTypeNumber();
+                if (found >= 0 || !CircuitTypCore.isValidTypeNumber(type)
+                        || !reference.quantity().supports(CircuitTypCore.fromTypeNumber(type))
+                        || (reference.quantity() == ProbeReference.Quantity.STATE && component instanceof Diode diode
+                                && diode.useNonlinearChar.getValue())) {
+                    found = -1;
+                    break;
+                }
+                found = element;
+            }
+        }
+        if (found >= 0) {
+            return found;
+        }
+        throw new IllegalArgumentException("Select a unique, supported electrical component for Probe reference "
+                + reference + ".");
     }
 
     private void definiereInteraktion_VOLT_AMP_LK() {

@@ -215,15 +215,12 @@ class SimulationControllerTest {
 
     @Test
     void listSimulations_returnsAllSimulations() throws Exception {
-        Map<String, SimulationResponse> allSimulations = new HashMap<>();
-        allSimulations.put(testSimulationId, testResponse);
-
         Map<SimulationResponse.SimulationStatus, Long> stats = new HashMap<>();
         stats.put(SimulationResponse.SimulationStatus.PENDING, 1L);
         stats.put(SimulationResponse.SimulationStatus.COMPLETED, 0L);
 
-        when(simulationService.getAllSimulations())
-                .thenReturn(allSimulations);
+        when(simulationService.getSimulationStatuses()).thenReturn(List.of(testResponse));
+        when(simulationService.getSimulation(testSimulationId)).thenReturn(testResponse);
         when(simulationService.getStatistics())
                 .thenReturn(stats);
 
@@ -238,14 +235,11 @@ class SimulationControllerTest {
 
     @Test
     void listSimulations_withStatusFilter_returnsFilteredResults() throws Exception {
-        Map<String, SimulationResponse> allSimulations = new HashMap<>();
-        allSimulations.put(testSimulationId, testResponse);
-
         Map<SimulationResponse.SimulationStatus, Long> stats = new HashMap<>();
         stats.put(SimulationResponse.SimulationStatus.PENDING, 1L);
 
-        when(simulationService.getAllSimulations())
-                .thenReturn(allSimulations);
+        when(simulationService.getSimulationStatuses()).thenReturn(List.of(testResponse));
+        when(simulationService.getSimulation(testSimulationId)).thenReturn(testResponse);
         when(simulationService.getStatistics())
                 .thenReturn(stats);
 
