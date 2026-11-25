@@ -78,6 +78,12 @@ public final class ReglerProbe extends RegelBlock implements VariableTerminalNum
     }
 
     @Override
+    public int getYShift() {
+        // Keep the saved terminal positions and grow the body toward the upper outputs.
+        return -Math.max(0, YOUT.size() - 1);
+    }
+
+    @Override
     public int getBlockHeight() {
         return Math.max(dpix, super.getBlockHeight());
     }

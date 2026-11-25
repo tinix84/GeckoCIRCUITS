@@ -49,11 +49,17 @@ final class ProbeDialog extends DialogElementCONTROL<ReglerProbe> {
     @Override
     protected boolean canApplyChanges() {
         var editor = SchematicEditor2.Singleton;
-        if (editor != null && editor.canEditProbeComponent(element)) {
-            return true;
+        if (editor == null || !editor.canEditProbeComponent(element)) {
+            JOptionPane.showMessageDialog(this, "The Probe is unavailable for editing.", "Probe", JOptionPane.WARNING_MESSAGE);
+            return false;
         }
-        JOptionPane.showMessageDialog(this, "The Probe is unavailable for editing.", "Probe", JOptionPane.WARNING_MESSAGE);
-        return false;
+        try {
+            ProbeReference.parseText(references.getText());
+            return true;
+        } catch (IllegalArgumentException error) {
+            JOptionPane.showMessageDialog(this, error.getMessage(), "Probe", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
     }
 
     void chooseQuantities(AbstractCircuitBlockInterface source) {
@@ -116,11 +122,6 @@ final class ProbeDialog extends DialogElementCONTROL<ReglerProbe> {
 
     @Override
     public void processInputIndividual() {
-        try {
-            element.setReferenceText(references.getText());
-        } catch (IllegalArgumentException error) {
-            JOptionPane.showMessageDialog(this, error.getMessage(), "Probe", JOptionPane.ERROR_MESSAGE);
-            throw error;
-        }
+        element.setReferenceText(references.getText());
     }
 }

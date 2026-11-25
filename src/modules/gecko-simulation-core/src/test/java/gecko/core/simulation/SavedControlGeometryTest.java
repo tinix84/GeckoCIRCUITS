@@ -21,6 +21,33 @@ class SavedControlGeometryTest {
         assertEquals(6, sample(text), 1e-6);
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1})
+    void savedAnonymousProbeWireConnectsToTheSelectedOutput(int port) throws Exception {
+        int wireY = 10 - port;
+        var model = parse(block(91, "PROBE.1", 10, 10, 503, "", "NIX_NIX_NIX/NIX_NIX_NIX", "")
+                        .replace("parameterString[] /", "parameterString[] /L.1.i/C.1.v")
+                + block(7, "GAIN.1", 20, wireY, 503, "NIX_NIX_NIX", "result", "3")
+                + """
+                verbindungCONTROL
+                <Verbindung>
+                x[] 12 18
+                y[] %d %d
+                label NIX_NIX_NIX
+                parentSheetIdentifier 0
+                enabledShorted 1
+                <\\Verbindung>
+                """.formatted(wireY, wireY));
+        var topology = CircuitTopology.resolve(model);
+        var probe = model.getControlComponents().get(0);
+        var gain = model.getControlComponents().get(1);
+        var input = topology.group(gain, CircuitTopology.Side.INPUT, 0);
+
+        assertNotNull(input);
+        assertEquals(input, topology.group(probe, CircuitTopology.Side.OUTPUT, port));
+        assertNotEquals(input, topology.group(probe, CircuitTopology.Side.OUTPUT, 1 - port));
+    }
+
     @Test
     void anExpandedSignalUsesItsSavedAmplitudeTerminalPosition() throws Exception {
         String text = block(3, "source", 5, 12, 503, "", "NIX_NIX_NIX", "2")

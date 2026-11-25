@@ -21,11 +21,13 @@ import gecko.geckocircuits.newscope.GeckoDialog;
 import gecko.i18n.GuiFabric;
 import gecko.i18n.resources.I18nKeys;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Container;
 import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.GridLayout;
+import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
@@ -43,7 +45,9 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JRootPane;
 import javax.swing.KeyStroke;
+import javax.swing.RootPaneContainer;
 
 @SuppressFBWarnings(value = {"CT_CONSTRUCTOR_THROW", "PA_PUBLIC_PRIMITIVE_ATTRIBUTE"},
         justification = "Abstract dialog class - subclasses handle initialization properly; public fields for subclass access")
@@ -65,6 +69,7 @@ abstract public class DialogCircuitComponent<T extends AbstractBlockInterface> e
     public final JButton jButtonCancel = GuiFabric.getJButton(I18nKeys.CANCEL);
     public JPanel jPanelButtonOkCancel;
     public Container con;
+    private static final String HELP_ACTION = "componentHelp";
     private static final int BUTTON_WIDTH = 90;
     private static final int BUTTON_HEIGHT = 25;
     private static final Dimension OK_CANCEL_DIMENSION = new Dimension(BUTTON_WIDTH, BUTTON_HEIGHT);
@@ -150,22 +155,45 @@ abstract public class DialogCircuitComponent<T extends AbstractBlockInterface> e
         jPanelButtonOkCancel.add(jButtonOk);
         jPanelButtonOkCancel.add(jButtonCancel);
 
-        JButton helpButton = GuiFabric.getJButton(I18nKeys.HELP);
+        JButton helpButton = createHelpButton(this, getRootPane(), element);
         helpButton.setPreferredSize(OK_CANCEL_DIMENSION);
-        helpButton.addActionListener(event -> openComponentHelp());
         jPanelButtonOkCancel.add(helpButton);
-        getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
-                .put(KeyStroke.getKeyStroke(KeyEvent.VK_F1, 0), "componentHelp");
-        getRootPane().getActionMap().put("componentHelp", new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent event) {
-                openComponentHelp();
-            }
-        });
     }
 
-    private void openComponentHelp() {
-        URI url = ComponentHelp.urlFor(element.getTypeEnum());
+    static void installHelp(Window window, AbstractBlockInterface block) {
+        if (!(window instanceof RootPaneContainer container)
+                || container.getRootPane().getActionMap().get(HELP_ACTION) != null) {
+            return;
+        }
+
+        var content = container.getContentPane();
+        var panel = new JPanel(new BorderLayout());
+        var footer = new JPanel();
+        footer.add(createHelpButton(window, container.getRootPane(), block));
+        container.setContentPane(panel);
+        panel.add(content, BorderLayout.CENTER);
+        panel.add(footer, BorderLayout.SOUTH);
+        if (window.isDisplayable()) {
+            window.pack();
+        }
+    }
+
+    private static JButton createHelpButton(Window window, JRootPane root, AbstractBlockInterface block) {
+        var openHelp = new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent event) {
+                openComponentHelp(window, ComponentHelp.urlFor(block.getTypeEnum()));
+            }
+        };
+        root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                .put(KeyStroke.getKeyStroke(KeyEvent.VK_F1, 0), HELP_ACTION);
+        root.getActionMap().put(HELP_ACTION, openHelp);
+        var button = GuiFabric.getJButton(I18nKeys.HELP);
+        button.addActionListener(openHelp);
+        return button;
+    }
+
+    private static void openComponentHelp(Window window, URI url) {
         try {
             if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
                 Desktop.getDesktop().browse(url);
@@ -174,9 +202,10 @@ abstract public class DialogCircuitComponent<T extends AbstractBlockInterface> e
         } catch (IOException | SecurityException ex) {
             // Show the address if the desktop cannot open it.
         }
-        JOptionPane.showMessageDialog(this, "Open this address in a browser:\n" + url,
+        JOptionPane.showMessageDialog(window, "Open this address in a browser:\n" + url,
                 I18nKeys.HELP.getTranslation(), JOptionPane.INFORMATION_MESSAGE);
     }
+
     public final ActionListener okActionListener = new ActionListener() {
 
         @Override

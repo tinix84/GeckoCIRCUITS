@@ -1913,8 +1913,10 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
     }
 
     void updateProbeReferences(String previous, String current) {
-        for (var probe : _circuitSheet.getAllElements().getClassFromContainer(ReglerProbe.class)) {
-            probe.renameTarget(previous, current);
+        for (var block : _circuitSheet.getAllElements().getClassFromContainer(RegelBlock.class)) {
+            if (block instanceof ReglerProbe probe) {
+                probe.renameTarget(previous, current);
+            }
         }
     }
 
