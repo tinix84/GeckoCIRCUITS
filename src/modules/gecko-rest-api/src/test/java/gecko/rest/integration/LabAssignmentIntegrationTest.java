@@ -16,6 +16,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -26,8 +27,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
     "gecko.education.enabled=true", "gecko.api.auth-enabled=true",
-    "gecko.api.keys=instructor,learner,other-instructor"
+    "gecko.api.keys=instructor,learner,other-instructor",
+    "gecko.api.jwt.enabled=true", "gecko.api.jwt.secret=lab-grading-test-signing-key-123456"
 })
+@ActiveProfiles("tenant")
 @AutoConfigureMockMvc
 class LabAssignmentIntegrationTest {
     @TempDir static Path storage;
@@ -74,7 +77,10 @@ class LabAssignmentIntegrationTest {
             assertNotEquals(original, variant);
             changed = variant.getBytes(StandardCharsets.UTF_8);
         }
-        mvc.perform(multipart(endpoint).file(circuit(changed)).header("X-API-Key", "learner"))
+        var pair = mvc.perform(post("/api/v1/auth/token").header("X-API-Key", "learner"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        String access = json.readTree(pair).path("accessToken").asText();
+        mvc.perform(multipart(endpoint).file(circuit(changed)).header("Authorization", "Bearer " + access))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.checks[1].passed").value(false))
                 .andExpect(jsonPath("$.checks[1].score").value(0));
 
