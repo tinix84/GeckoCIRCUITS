@@ -25,7 +25,11 @@ import gecko.rest.model.SimulationResponse.SimulationStatus;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import gecko.rest.persistence.PostgresPersistence;
+import gecko.rest.persistence.SimulationMetadata;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -70,6 +74,7 @@ public class SimulationService {
     private final Executor deliveryExecutor;
     private final Object admissionMonitor = new Object();
     private final CircuitFileService circuitFiles;
+    private PostgresPersistence persistence;
     private final CircuitPreparation preparation = new CircuitPreparation();
 
     @Autowired(required = false)
@@ -88,6 +93,12 @@ public class SimulationService {
      * @param circuitFiles the source adapter used to capture input before job publication.
      */
     @Autowired
+    public SimulationService(SimulationJobLimits limits, CircuitFileService circuitFiles,
+                             ObjectProvider<PostgresPersistence> persistence) {
+        this(limits, circuitFiles);
+        this.persistence = persistence.getIfAvailable();
+    }
+
     public SimulationService(SimulationJobLimits limits, CircuitFileService circuitFiles) {
         this(new ThreadPoolExecutor(limits.getWorkers(), limits.getWorkers(), 0, TimeUnit.MILLISECONDS,
                         new ArrayBlockingQueue<>(limits.getQueued())), HeadlessSimulationEngine::new,
@@ -142,9 +153,12 @@ public class SimulationService {
         var bundleInput = new BundleInput(source.snapshot(), request);
         synchronized (admissionMonitor) {
             requireCapacity(1, false);
-            SimulationJob job = createJob(circuit, null, bundleInput);
+            SimulationJob job = createJob(circuit, null, bundleInput, source.stored());
+            if (persistence != null) persistence.saveSimulation(metadata(job));
+            jobs.put(job.response.getSimulationId(), job);
             if (!dispatch(job) && !executorService.isShutdown()) {
                 jobs.remove(job.response.getSimulationId(), job);
+                if (persistence != null) persistence.rejectSimulation(metadata(job));
                 throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Simulation queue is full");
             }
             return snapshot(job);
@@ -243,18 +257,38 @@ public class SimulationService {
                 Double.isFinite(report.residual()) ? report.residual() : null, report.startTime());
     }
 
-    private SimulationJob createJob(PreparedCircuit circuit, BatchJob batch, BundleInput bundleInput) {
+    private SimulationJob createJob(PreparedCircuit circuit, BatchJob batch, BundleInput bundleInput, boolean stored) {
         var principal = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        SimulationJob job = new SimulationJob(circuit, batch, bundleInput, deliveryExecutor,
-                principal == null || !principal.isAuthenticated() ? null : principal.getName());
-        jobs.put(job.response.getSimulationId(), job);
-        return job;
+        return new SimulationJob(circuit, batch, bundleInput, deliveryExecutor,
+                principal == null || !principal.isAuthenticated() ? null : principal.getName(), stored);
+    }
+
+    private static SimulationMetadata metadata(SimulationJob job) {
+        return new SimulationMetadata(job.circuitId, job.owner, job.response);
+    }
+
+    private void persistTransition(SimulationJob job) {
+        if (persistence == null) return;
+        try {
+            persistence.saveSimulation(metadata(job));
+        } catch (DataAccessException e) {
+            logger.error("Could not persist {} state of simulation {}", job.response.getStatus(),
+                    job.response.getSimulationId(), e);
+        }
+    }
+
+    private SimulationResponse loadMetadata(String id) {
+        if (persistence == null) return null;
+        return persistence.simulation(id).map(SimulationMetadata::response).orElse(null);
     }
 
     /** Checks the immutable owner captured before publication of a single or batch job. */
     public boolean isOwnedBy(String simulationId, String owner) {
         SimulationJob job = jobs.get(simulationId);
-        return job != null && owner != null && owner.equals(job.owner);
+        if (owner == null) return false;
+        if (job != null) return owner.equals(job.owner);
+        return persistence != null && persistence.simulation(simulationId)
+                .map(SimulationMetadata::owner).filter(owner::equals).isPresent();
     }
 
     private boolean dispatch(SimulationJob job) {
@@ -289,7 +323,7 @@ public class SimulationService {
                     return;
                 }
                 job.engine = engine;
-                markRunning(job.response);
+                if (markRunning(job.response)) persistTransition(job);
             }
             // The durable signal also covers cancellation before the engine starts.
             SimulationResult result = engine.runSimulation(job.circuit, job.options, job::isCancelled);
@@ -320,7 +354,7 @@ public class SimulationService {
 
     public SimulationResponse getSimulation(String simulationId) {
         SimulationJob job = jobs.get(simulationId);
-        return job == null ? null : snapshot(job);
+        return job == null ? loadMetadata(simulationId) : snapshot(job);
     }
 
     /**
@@ -331,7 +365,7 @@ public class SimulationService {
      */
     public SimulationResponse getSimulationStatus(String simulationId) {
         SimulationJob job = jobs.get(simulationId);
-        return job == null ? null : snapshot(job, false);
+        return job == null ? loadMetadata(simulationId) : snapshot(job, false);
     }
 
     private SimulationResponse snapshot(SimulationJob job) {
@@ -368,19 +402,27 @@ public class SimulationService {
 
     /** Returns detached job metadata without copying any retained waveforms. */
     public List<SimulationResponse> getSimulationStatuses() {
-        return jobs.values().stream().map(job -> snapshot(job, false)).toList();
+        return List.copyOf(simulationSnapshots(false).values());
     }
 
     public Map<String, SimulationResponse> getAllSimulations() {
+        return simulationSnapshots(true);
+    }
+
+    private Map<String, SimulationResponse> simulationSnapshots(boolean includeResults) {
         Map<String, SimulationResponse> result = new HashMap<>();
-        jobs.forEach((id, job) -> result.put(id, snapshot(job)));
+        if (persistence != null) {
+            persistence.simulations().forEach(row -> result.put(row.id(), row.response()));
+        }
+        jobs.forEach((id, job) -> result.put(id, snapshot(job, includeResults)));
         return result;
     }
 
     public SimulationResponse cancelSimulation(String simulationId) {
         SimulationJob job = jobs.get(simulationId);
         if (job == null) {
-            return null;
+            SimulationResponse stored = loadMetadata(simulationId);
+            return stored != null && isTerminal(stored) ? stored : null;
         }
         synchronized (job) {
             if (markCancelled(job.response)) {
@@ -447,6 +489,8 @@ public class SimulationService {
                     if (isTerminal(job.response)) {
                         job.response.setEndTime(Instant.now());
                         publishTerminal(job);
+                    } else {
+                        persistTransition(job);
                     }
                 }
             }
@@ -467,10 +511,10 @@ public class SimulationService {
         for (SimulationStatus status : SimulationStatus.values()) {
             result.put(status, 0L);
         }
-        for (SimulationJob job : jobs.values()) {
-            synchronized (job) {
-                result.merge(job.response.getStatus(), 1L, Long::sum);
-            }
+        if (persistence == null) {
+            jobs.values().forEach(job -> result.merge(job.response.getStatus(), 1L, Long::sum));
+        } else {
+            getSimulationStatuses().forEach(job -> result.merge(job.getStatus(), 1L, Long::sum));
         }
         return result;
     }
@@ -584,6 +628,7 @@ public class SimulationService {
         if (!isTerminal(job.response) || job.terminalPublished) {
             return;
         }
+        persistTransition(job);
         job.terminalPublished = true;
         boolean success = job.response.getStatus() == SimulationStatus.COMPLETED;
         String simulationId = job.response.getSimulationId();
@@ -747,10 +792,14 @@ public class SimulationService {
             requireCapacity(prepared.size(), true);
             List<String> ids = new ArrayList<>();
             for (int index = 0; index < prepared.size(); index++) {
-                SimulationJob job = createJob(prepared.get(index), batch, bundleInputs.get(index));
+                SimulationJob job = createJob(prepared.get(index), batch, bundleInputs.get(index), source.stored());
                 batch.pending.add(job);
                 ids.add(job.response.getSimulationId());
             }
+            if (persistence != null) {
+                persistence.saveSimulations(batch.pending.stream().map(SimulationService::metadata).toList());
+            }
+            batch.pending.forEach(job -> jobs.put(job.response.getSimulationId(), job));
             batch.response = new BatchSimulationResponse(UUID.randomUUID().toString(), List.copyOf(ids), requestedLimit);
             batches.put(batch.response.getBatchId(), batch);
         }
@@ -866,6 +915,7 @@ public class SimulationService {
 
     private static final class SimulationJob {
         private final String owner;
+        private final String circuitId;
         private final PreparedCircuit circuit;
         private final BundleInput bundleInput;
         private final ExecutionOptions options = ExecutionOptions.defaults();
@@ -877,8 +927,11 @@ public class SimulationService {
         private final ProgressMailbox mailbox;
 
         private SimulationJob(PreparedCircuit circuit, BatchJob batch, BundleInput bundleInput,
-                              Executor deliveryExecutor, String owner) {
+                              Executor deliveryExecutor, String owner, boolean stored) {
             this.owner = owner;
+            var request = bundleInput.request();
+            this.circuitId = !stored ? null
+                    : request.getCircuitId() == null ? request.getCircuitFile() : request.getCircuitId();
             this.bundleInput = bundleInput;
             mailbox = new ProgressMailbox(deliveryExecutor);
             this.circuit = circuit;
