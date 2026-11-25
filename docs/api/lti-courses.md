@@ -6,7 +6,7 @@ An instructor can link an assignment. A learner can submit a circuit and send it
 
 ## Configure the tool
 
-1. Enable the assignments API.
+1. Enable the `tenant` Spring profile and API key authentication. Enable the assignments API with `gecko.education.enabled=true`.
 2. Generate a private RSA JSON Web Key (JWK) with at least 2048 bits.
 3. Give it a key ID.
 4. Save it where only the API process can read it.

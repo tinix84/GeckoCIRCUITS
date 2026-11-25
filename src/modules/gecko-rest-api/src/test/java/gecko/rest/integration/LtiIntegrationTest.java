@@ -37,6 +37,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -50,6 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "gecko.education.enabled=true", "gecko.education.lti.enabled=true", "gecko.education.lti.allow-loopback-http=true",
     "gecko.api.auth-enabled=true", "gecko.api.keys=instructor"
 })
+@ActiveProfiles("tenant")
 @AutoConfigureMockMvc
 class LtiIntegrationTest {
     private static final String PATH = "/api/v1/lti";
