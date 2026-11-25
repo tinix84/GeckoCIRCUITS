@@ -24,10 +24,39 @@ public class ApiKeyProperties {
 
     /** Whether API key authentication is enforced. Default true. Set false to disable for testing. */
     private boolean authEnabled = true;
+    private boolean tenantEnabled;
+    private java.util.Map<String, String> tenants = new java.util.HashMap<>();
+    private java.util.Map<String, SimulationJobLimits.TenantQuota> quota = new java.util.HashMap<>();
+
+    public java.util.Map<String, SimulationJobLimits.TenantQuota> getQuota() { return quota; }
+    public void setQuota(java.util.Map<String, SimulationJobLimits.TenantQuota> value) { quota = value; }
+
+    public SimulationJobLimits.TenantQuota quotaFor(String tenant) {
+        return quota.getOrDefault(tenant, new SimulationJobLimits.TenantQuota());
+    }
     private java.util.Map<String, Role> roles = new java.util.HashMap<>();
     private Role defaultRole = Role.ADMIN;
 
     public enum Role { ADMIN, USER, READONLY }
+
+    public boolean isTenantEnabled() { return tenantEnabled; }
+    public void setTenantEnabled(boolean value) { tenantEnabled = value; }
+    public java.util.Map<String, String> getTenants() { return tenants; }
+    public void setTenants(java.util.Map<String, String> value) { tenants = value; }
+
+    public String tenantFor(String subject) {
+        if (!tenantEnabled) return null;
+        String tenant = tenants.get(subject);
+        return tenant == null || tenant.isBlank() ? null : tenant;
+    }
+
+    @jakarta.annotation.PostConstruct
+    void validateTenantCredentials() {
+        if (tenantEnabled && (!authEnabled || keys.isEmpty()
+                || keys.stream().anyMatch(key -> tenantFor(ApiIdentity.keyId(key)) == null))) {
+            throw new IllegalStateException("Tenant mode requires authentication and a tenant for every API key.");
+        }
+    }
 
     public java.util.Map<String, Role> getRoles() { return roles; }
     public void setRoles(java.util.Map<String, Role> value) { roles = value; }

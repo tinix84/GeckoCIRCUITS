@@ -88,3 +88,13 @@ GECKO_TEST_POSTGRES=true GECKO_TEST_REDIS=true \
   mvn -f pom-reactor.xml -pl :gecko-rest-api -am test \
     -Dtest=NativePersistenceTest -Dsurefire.failIfNoSpecifiedTests=false
 ```
+
+### Tenant isolation
+
+Add `tenant` to `SPRING_PROFILES_ACTIVE` and enable API key authentication. Assign every configured key to a tenant by setting `gecko.api.tenants.<keyId>`. The key ID is the SHA-256 digest of the API key. Access and refresh tokens use the current assignment.
+
+Set `gecko.api.quota.<tenant>.max-circuits` and `gecko.api.quota.<tenant>.max-concurrent` to limit circuit uploads and outstanding simulation jobs. Pending jobs count towards the simulation quota. A batch reserves capacity for each simulation when the API accepts it. The `ADMIN` role can read usage and limits at `GET /api/v1/admin/tenants`.
+
+Upload a circuit and use its ID to submit simulations in tenant mode. The API returns 404 for circuit, simulation and batch IDs from another tenant. Circuit and simulation records created before tenant mode have no tenant assignment.
+
+PostgreSQL serializes quota admission across API instances. If an instance stops abruptly, its pending and running jobs retain their last recorded status. An administrator must resolve those job records before their quota can be reused.

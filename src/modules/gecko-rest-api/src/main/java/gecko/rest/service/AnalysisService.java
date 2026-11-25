@@ -61,36 +61,7 @@ public class AnalysisService {
      */
     public CharacteristicsResponse computeCharacteristics(SignalAnalysisRequest request) {
         try {
-            TimedSignal signal = resolveInput(request);
-            var container = signal.toContainer();
-            double duration = signal.duration();
-
-            // Calculate characteristics using gecko-core
-            try {
-                CharacteristicsCalculator calc = CharacteristicsCalculator.calculateFabric(
-                    container,
-                    0.0,  // start time
-                    duration  // end time
-                );
-
-                // Extract metrics for signal 0
-                double[] metrics = calc.getChannelCharacteristics(0);
-
-                // Build response
-                CharacteristicsResponse response = CharacteristicsResponse.of(
-                    metrics,
-                    signal.sampleCount(),
-                    request.getSignalName()
-                );
-
-                return response;
-            } catch (GeckoInvalidArgumentException e) {
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Characteristics calculation failed: " + e.getMessage(),
-                    e
-                );
-            }
+            return computeCharacteristics(resolveInput(request), request.getSignalName());
 
         } catch (ResponseStatusException e) {
             throw e;
@@ -101,6 +72,16 @@ public class AnalysisService {
                 "Analysis failed: " + e.getMessage(),
                 e
             );
+        }
+    }
+
+    CharacteristicsResponse computeCharacteristics(TimedSignal signal, String name) {
+        try {
+            var calculator = CharacteristicsCalculator.calculateFabric(signal.toContainer(), 0, signal.duration());
+            return CharacteristicsResponse.of(calculator.getChannelCharacteristics(0), signal.sampleCount(), name);
+        } catch (GeckoInvalidArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Characteristics calculation failed: " + e.getMessage(), e);
         }
     }
 

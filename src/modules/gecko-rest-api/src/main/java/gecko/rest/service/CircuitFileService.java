@@ -6,6 +6,9 @@ import gecko.core.io.CircuitModel;
 import gecko.core.preparation.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import gecko.rest.config.ApiIdentity;
+import gecko.rest.config.ApiKeyProperties;
+import gecko.rest.config.SimulationJobLimits;
 import gecko.rest.model.circuit.*;
 import gecko.rest.persistence.CircuitMetadata;
 import gecko.rest.persistence.PostgresPersistence;
@@ -35,15 +38,18 @@ public class CircuitFileService {
     private final CircuitPreparation preparation = new CircuitPreparation();
 
     private final PostgresPersistence persistence;
+    private final ApiKeyProperties keys;
     private final CircuitFileWriter writer = new CircuitFileWriter();
 
     public CircuitFileService() {
         persistence = null;
+        keys = new ApiKeyProperties();
     }
 
     @Autowired
-    public CircuitFileService(ObjectProvider<PostgresPersistence> persistence) {
+    public CircuitFileService(ObjectProvider<PostgresPersistence> persistence, ApiKeyProperties keys) {
         this.persistence = persistence.getIfAvailable();
+        this.keys = keys;
     }
 
     // Default storage keeps parsed snapshots in memory.
@@ -189,17 +195,20 @@ public class CircuitFileService {
      * Delete circuit from memory.
      */
     public boolean deleteCircuit(String circuitId) {
-        return persistence == null
-                ? circuits.remove(circuitId) != null
-                : persistence.deleteCircuit(circuitId, currentOwner());
+        String tenant = currentTenant();
+        if (persistence != null) return persistence.deleteCircuit(circuitId, currentOwner(), tenant);
+        ParsedCircuit circuit = circuits.get(circuitId);
+        return circuit != null && visible(circuit, tenant) && circuits.remove(circuitId, circuit);
     }
 
     /**
      * Get all loaded circuits.
      */
     public CircuitListResponse getAllCircuits() {
-        List<CircuitListResponse.CircuitSummary> summaries = (persistence == null ? circuits.entrySet().stream()
-                : persistence.circuits().stream().map(row -> Map.entry(row.id(), parseStored(row))))
+        String tenant = currentTenant();
+        List<CircuitListResponse.CircuitSummary> summaries = (persistence == null
+                ? circuits.entrySet().stream().filter(entry -> visible(entry.getValue(), tenant))
+                : persistence.circuits(tenant).stream().map(row -> Map.entry(row.id(), parseStored(row))))
             .map(entry -> {
                 String id = entry.getKey();
                 ParsedCircuit parsed = entry.getValue();
@@ -237,9 +246,8 @@ public class CircuitFileService {
                 new PreparationRequest(SolverOverrides.none(), overrides == null ? Map.of() : overrides));
         CircuitSnapshot snapshot = effectiveSnapshot(result);
         String newCircuitId = UUID.randomUUID().toString();
-        ParsedCircuit clone = new ParsedCircuit(sourceParsed.filename, snapshot, Instant.now());
-        if (persistence == null) circuits.put(newCircuitId, clone);
-        else saveCircuit(newCircuitId, clone, encode(snapshot));
+        ParsedCircuit clone = new ParsedCircuit(sourceParsed.filename, snapshot, Instant.now(), currentTenant());
+        saveCircuit(newCircuitId, clone, persistence == null ? null : encode(snapshot));
         return CircuitLoadResponse.success(newCircuitId, sourceParsed.filename, snapshot.toModel().getTotalComponentCount());
     }
 
@@ -253,9 +261,13 @@ public class CircuitFileService {
      * @throws ResponseStatusException 404 if circuit not found
      */
     public CircuitInfo updateCircuitParameters(String circuitId, CircuitParameterUpdate update) {
+        String tenant = currentTenant();
         if (persistence == null) {
-            circuits.compute(circuitId, (id, current) -> applyParameterUpdate(id, current, update));
-        } else if (!persistence.updateCircuit(circuitId, currentOwner(), row -> {
+            circuits.compute(circuitId, (id, current) -> {
+                if (current == null || !visible(current, tenant)) throw missingCircuit(id);
+                return applyParameterUpdate(id, current, update);
+            });
+        } else if (!persistence.updateCircuit(circuitId, currentOwner(), tenant, row -> {
             row.replacePayload(encode(applyParameterUpdate(circuitId, parseStored(row), update).snapshot));
             return row;
         })) {
@@ -269,7 +281,7 @@ public class CircuitFileService {
         PreparationResult result = preparation.prepare(current.snapshot, new PreparationRequest(
                 new SolverOverrides(update.getSolverType() == null ? null : parseSolverType(update.getSolverType()),
                         update.getTimeStep(), update.getSimulationDuration()), Map.of()));
-        return new ParsedCircuit(current.filename, effectiveSnapshot(result), current.loadedAt);
+        return new ParsedCircuit(current.filename, effectiveSnapshot(result), current.loadedAt, current.tenant);
     }
 
     private static CircuitPreparationException missingCircuit(String id) {
@@ -278,13 +290,23 @@ public class CircuitFileService {
     }
 
     private ParsedCircuit findCircuit(String id) {
-        if (persistence == null) return circuits.get(id);
-        return persistence.circuit(id).map(this::parseStored).orElse(null);
+        String tenant = currentTenant();
+        if (persistence != null) return persistence.circuit(id, tenant).map(this::parseStored).orElse(null);
+        ParsedCircuit circuit = circuits.get(id);
+        return circuit != null && visible(circuit, tenant) ? circuit : null;
+    }
+
+    private static boolean visible(ParsedCircuit circuit, String tenant) {
+        return tenant == null || tenant.equals(circuit.tenant);
+    }
+
+    private String currentTenant() {
+        return ApiIdentity.requireTenant(keys.isTenantEnabled());
     }
 
     private ParsedCircuit parseStored(CircuitMetadata row) {
         try (var input = new ByteArrayInputStream(row.payload())) {
-            return new ParsedCircuit(row.name(), capture(parser.parse(input, row.name())), row.uploadedAt());
+            return new ParsedCircuit(row.name(), capture(parser.parse(input, row.name())), row.uploadedAt(), row.tenant());
         } catch (CircuitFileParser.CircuitParseException | IOException e) {
             throw new IllegalStateException("Cannot read stored circuit " + row.id(), e);
         }
@@ -307,7 +329,23 @@ public class CircuitFileService {
     }
 
     private void saveCircuit(String id, ParsedCircuit circuit, byte[] payload) {
-        persistence.addCircuit(new CircuitMetadata(id, circuit.filename, currentOwner(), circuit.loadedAt, payload));
+        int limit = circuit.tenant == null ? Integer.MAX_VALUE : keys.quotaFor(circuit.tenant).getMaxCircuits();
+        if (persistence != null) {
+            persistence.addCircuit(new CircuitMetadata(id, circuit.filename, currentOwner(),
+                    circuit.tenant, circuit.loadedAt, payload), limit);
+        } else {
+            synchronized (circuits) {
+                if (circuit.tenant != null) {
+                    SimulationJobLimits.requireTenantCapacity(circuitCount(circuit.tenant), 1, limit);
+                }
+                circuits.put(id, circuit);
+            }
+        }
+    }
+
+    public long circuitCount(String tenant) {
+        if (persistence != null) return persistence.circuitCount(tenant);
+        return circuits.values().stream().filter(circuit -> tenant.equals(circuit.tenant)).count();
     }
 
     private static String currentOwner() {
@@ -334,11 +372,11 @@ public class CircuitFileService {
             ParsedCircuit parsed = new ParsedCircuit(
                 filename,
                 snapshot,
-                Instant.now()
+                Instant.now(),
+                currentTenant()
             );
 
-            if (persistence == null) circuits.put(circuitId, parsed);
-            else saveCircuit(circuitId, parsed, content);
+            saveCircuit(circuitId, parsed, content);
 
             return CircuitLoadResponse.success(circuitId, filename, model.getTotalComponentCount());
 
@@ -348,7 +386,9 @@ public class CircuitFileService {
         } catch (IOException e) {
             return CircuitLoadResponse.failure(filename,
                     "Failed to read file: " + e.getMessage());
-        } catch (Exception e) {
+        } catch (ResponseStatusException | org.springframework.dao.DataAccessException e) {
+            throw e;
+        } catch (RuntimeException e) {
             return CircuitLoadResponse.failure(filename,
                     "Unexpected error: " + e.getMessage());
         }
@@ -389,8 +429,10 @@ public class CircuitFileService {
         }
         ParsedCircuit stored = findCircuit(circuitId == null ? circuitFile : circuitId);
         if (stored != null) return new ResolvedSource(stored.snapshot, true);
-        if (circuitId != null) throw CircuitPreparationException.failure(HttpStatus.NOT_FOUND, "SOURCE_NOT_FOUND",
-                Diagnostic.Category.PARSING, "Circuit not found: " + circuitId, "circuitId");
+        if (keys.isTenantEnabled() || circuitId != null) {
+            String id = circuitId == null ? circuitFile : circuitId;
+            throw missingCircuit(id);
+        }
         byte[] content;
         try {
             content = Files.readAllBytes(Path.of(circuitFile));
@@ -453,6 +495,7 @@ public class CircuitFileService {
     private record ParsedCircuit(
         String filename,
         CircuitSnapshot snapshot,
-        Instant loadedAt
+        Instant loadedAt,
+        String tenant
     ) {}
 }

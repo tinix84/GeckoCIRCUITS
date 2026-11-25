@@ -11,7 +11,7 @@ import org.springframework.security.access.AccessDeniedException;
 /** Authenticates STOMP before a client can subscribe to simulation progress. */
 public final class ApiKeyStompInterceptor implements ChannelInterceptor {
     private final ApiKeyProperties properties;
-    private final java.util.function.BiPredicate<String, String> ownsSimulation;
+    private final TopicAccess ownsSimulation;
     private final JwtService tokens;
 
     public ApiKeyStompInterceptor(ApiKeyProperties properties) {
@@ -25,9 +25,18 @@ public final class ApiKeyStompInterceptor implements ChannelInterceptor {
 
     public ApiKeyStompInterceptor(ApiKeyProperties properties,
             java.util.function.BiPredicate<String, String> ownsSimulation, JwtService tokens) {
+        this(properties, (id, owner, tenant) -> ownsSimulation.test(id, owner), tokens);
+    }
+
+    ApiKeyStompInterceptor(ApiKeyProperties properties, TopicAccess ownsSimulation, JwtService tokens) {
         this.properties = properties;
         this.ownsSimulation = ownsSimulation;
         this.tokens = tokens;
+    }
+
+    @FunctionalInterface
+    interface TopicAccess {
+        boolean allows(String simulationId, String owner, String tenant);
     }
 
     @Override
@@ -50,7 +59,11 @@ public final class ApiKeyStompInterceptor implements ChannelInterceptor {
                 }
             } else {
                 if (!properties.isValidKey(key)) throw new AccessDeniedException("Valid X-API-Key CONNECT header required");
-                accessor.setUser(ApiIdentity.forKey(key, properties));
+                var identity = ApiIdentity.forKey(key, properties);
+                if (properties.isTenantEnabled() && ApiIdentity.tenant(identity) == null) {
+                    throw new AccessDeniedException("Tenant identity required.");
+                }
+                accessor.setUser(identity);
             }
             accessor.removeNativeHeader(ApiKeyAuthFilter.API_KEY_HEADER);
             accessor.removeNativeHeader("Authorization");
@@ -66,7 +79,9 @@ public final class ApiKeyStompInterceptor implements ChannelInterceptor {
                 String prefix = "/topic/simulations/";
                 if (destination == null || !destination.startsWith(prefix)
                         || accessor.getUser() == null
-                        || !ownsSimulation.test(destination.substring(prefix.length()), accessor.getUser().getName())) {
+                        || !ownsSimulation.allows(destination.substring(prefix.length()), accessor.getUser().getName(),
+                                accessor.getUser() instanceof org.springframework.security.core.Authentication identity
+                                        ? ApiIdentity.tenant(identity) : null)) {
                     throw new AccessDeniedException("Subscribe to your own simulation topic.");
                 }
             }

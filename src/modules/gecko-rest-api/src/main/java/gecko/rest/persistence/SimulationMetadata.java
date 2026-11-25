@@ -19,6 +19,8 @@ public class SimulationMetadata {
     private String circuitId;
     @Column(columnDefinition = "text")
     private String owner;
+    @Column(columnDefinition = "text")
+    private String tenant;
     @Column(columnDefinition = "text", nullable = false)
     @Enumerated(EnumType.STRING)
     private SimulationResponse.SimulationStatus status;
@@ -30,10 +32,11 @@ public class SimulationMetadata {
 
     protected SimulationMetadata() { }
 
-    public SimulationMetadata(String circuitId, String owner, SimulationResponse response) {
+    public SimulationMetadata(String circuitId, String owner, String tenant, SimulationResponse response) {
         id = response.getSimulationId();
         this.circuitId = circuitId;
         this.owner = owner;
+        this.tenant = tenant;
         submittedAt = response.getStartTime();
         status = response.getStatus();
         finishedAt = response.getEndTime();
@@ -42,6 +45,7 @@ public class SimulationMetadata {
 
     public String id() { return id; }
     public String owner() { return owner; }
+    public String tenant() { return tenant; }
     public String status() { return status.name(); }
 
     public SimulationResponse response() {
