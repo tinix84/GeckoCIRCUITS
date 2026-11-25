@@ -79,23 +79,32 @@ test('pans a 500,000-sample trace and measures frame time', async ({ page }) => 
   await page.mouse.down();
   await page.mouse.move(bounds.x + bounds.width * 0.95, y, { steps: 4 });
   await page.mouse.up();
-  const samplesMs = await page.evaluate(async () => {
+  const benchmark = await page.evaluate(async () => {
     const buttons = [...document.querySelectorAll<HTMLButtonElement>('button')];
     const pan = [buttons.find((button) => button.textContent === 'Pan right'),
       buttons.find((button) => button.textContent === 'Pan left')];
     const frame = () => new Promise<number>((resolve) => requestAnimationFrame(resolve));
-    const measurements = [];
+    const canvas = document.querySelector<HTMLCanvasElement>('.uplot canvas')!;
+    const pixels = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+    const traceVisible = pixels.some((red, index) => index % 4 === 0 && pixels[index + 3] > 0 &&
+      pixels[index + 1] > red + 25 && pixels[index + 2] > red + 20);
+    const idle = [];
+    const panning = [];
     for (let index = 0; index < 10; index += 1) {
+      const inactive = await frame();
+      idle.push((await frame()) - inactive);
       const start = await frame();
       pan[index % 2]!.click();
-      measurements.push((await frame()) - start);
+      panning.push((await frame()) - start);
     }
-    return measurements;
+    return { idle, panning, traceVisible };
   });
-  const sorted = samplesMs.slice().sort((a, b) => a - b);
+  const sorted = benchmark.panning.slice().sort((a, b) => a - b);
+  const idle = benchmark.idle.slice().sort((a, b) => a - b);
   const message = '500k-sample pan frame time: median ' + sorted[5].toFixed(1)
-    + ' ms, max ' + sorted.at(-1)!.toFixed(1) + ' ms';
+    + ' ms, max ' + sorted.at(-1)!.toFixed(1) + ' ms; idle median ' + idle[5].toFixed(1) + ' ms';
   await test.info().attach('Pan frame time', { body: message, contentType: 'text/plain' });
   console.log(message);
-  expect(samplesMs).toHaveLength(10);
+  expect(benchmark.traceVisible).toBeTruthy();
+  expect(benchmark.panning).toHaveLength(10);
 });
