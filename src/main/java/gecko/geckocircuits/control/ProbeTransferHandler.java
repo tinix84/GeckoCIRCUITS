@@ -24,7 +24,7 @@ public final class ProbeTransferHandler extends TransferHandler {
             DataFlavor.javaJVMLocalObjectMimeType + ";class=" + AbstractCircuitBlockInterface.class.getName(),
             "GeckoCIRCUITS electrical component");
     private final transient Function<Point, ReglerProbe> targetAt;
-    private transient AbstractCircuitBlockInterface dragSource;
+    private transient ComponentTransfer dragPayload;
 
     public ProbeTransferHandler(Function<Point, ReglerProbe> targetAt) {
         this.targetAt = targetAt;
@@ -44,11 +44,11 @@ public final class ProbeTransferHandler extends TransferHandler {
     }
 
     public void drag(JComponent sheet, MouseEvent event, AbstractCircuitBlockInterface source) {
-        dragSource = source;
+        dragPayload = new ComponentTransfer(source);
         try {
             exportAsDrag(sheet, event, COPY);
         } finally {
-            dragSource = null;
+            dragPayload = null;
         }
     }
 
@@ -59,7 +59,7 @@ public final class ProbeTransferHandler extends TransferHandler {
 
     @Override
     protected Transferable createTransferable(JComponent component) {
-        return dragSource == null ? null : new ComponentTransfer(dragSource);
+        return dragPayload;
     }
 
     @Override
