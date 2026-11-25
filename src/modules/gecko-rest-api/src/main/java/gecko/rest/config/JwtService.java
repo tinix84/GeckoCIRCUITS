@@ -83,7 +83,8 @@ public class JwtService {
         }
         if (keys.isTenantEnabled()) {
             String assignedTenant = keys.tenantFor(jwt.getSubject());
-            if (assignedTenant == null || !assignedTenant.equals(jwt.getClaims().get("tenant"))) {
+            if (assignedTenant == null || !assignedTenant.equals(jwt.getClaims().get("tenant"))
+                    || keys.getKeys().stream().map(ApiIdentity::keyId).noneMatch(jwt.getSubject()::equals)) {
                 throw new BadJwtException("Token tenant does not match the subject.");
             }
         }
