@@ -17,7 +17,7 @@ from gecko_client.models.switching_loss_request import SwitchingLossRequest
 
 
 class SimulationFailed(RuntimeError):
-    """A simulation job finished without results."""
+    """A simulation job has no usable results."""
 
 
 @contextmanager
@@ -76,7 +76,10 @@ class BatchEvaluator:
                 job = self.simulations.get_simulation(job_id, _request_timeout=p.timeout)
                 results.append(SimulationFailed(f"{job_id}: {job.status}. {job.error_message}"))
             else:
-                results.append(self.metrics(job_id, sample))
+                try:
+                    results.append(self.metrics(job_id, sample))
+                except SimulationFailed as error:
+                    results.append(error)
         return results
 
     def metrics(self, job_id, sample):
@@ -118,9 +121,12 @@ class BatchEvaluator:
                 case "sum":
                     value = sum(map(resolve, metric.terms))
                 case "ratio":
-                    value = resolve(metric.terms[0]) / abs(resolve(metric.terms[1]))
+                    denominator = abs(resolve(metric.terms[1]))
+                    if denominator == 0:
+                        raise SimulationFailed(f"{job_id}: Metric {name} has a zero denominator.")
+                    value = resolve(metric.terms[0]) / denominator
             value *= resolve(metric.scale)
             if not math.isfinite(value):
-                raise ValueError(f"Metric {name} is not finite for simulation {job_id}.")
+                raise SimulationFailed(f"{job_id}: Metric {name} is not finite.")
             values[name] = value
         return {name: values[name] for name in p.metrics}
