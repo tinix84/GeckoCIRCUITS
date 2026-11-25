@@ -1,6 +1,7 @@
 """Sample buck-converter designs through the GeckoCIRCUITS batch API."""
 
 import argparse
+import json
 from pathlib import Path
 import time
 
@@ -48,6 +49,9 @@ def sweep(problem, count, output):
         "simulation_seconds": repr(elapsed),
         "grid_step": repr(problem.time_step),
         "seed": str(problem.seed),
+        "parameter_bounds": json.dumps({
+            name: [bound.min, bound.max] for name, bound in zip(FEATURES, bounds, strict=True)
+        }),
     })
     pq.write_table(table, output)
     print(f"Wrote {output} ({output.stat().st_size} bytes) in {elapsed:.3f} s.")

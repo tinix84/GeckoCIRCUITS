@@ -1,6 +1,7 @@
 """Train and evaluate a buck-converter surrogate on a fixed held-out split."""
 
 import argparse
+import json
 from pathlib import Path
 import time
 
@@ -24,6 +25,11 @@ def train(dataset, output):
     elapsed = float(metadata[b"simulation_seconds"])
     inputs = np.column_stack([table[name].to_numpy() for name in FEATURES])
     targets = np.column_stack([table[name].to_numpy() for name in OUTPUTS])
+    if bounds := metadata.get(b"parameter_bounds"):
+        configured_bounds = json.loads(bounds)
+        minimum, maximum = np.array([configured_bounds[name] for name in FEATURES], dtype=float).T
+    else:
+        minimum, maximum = inputs.min(axis=0), inputs.max(axis=0)
     if not np.all(np.isfinite(targets)) or np.any(targets <= 0):
         raise ValueError("Train on finite, positive simulation outputs.")
     x_train, x_test, y_train, y_test = train_test_split(
@@ -40,7 +46,7 @@ def train(dataset, output):
     estimator.fit(design_terms(x_train, grid_step), y_train)
     model = {
         "estimator": estimator, "grid_step": grid_step, "inputs": FEATURES, "outputs": OUTPUTS,
-        "minimum": x_train.min(axis=0), "maximum": x_train.max(axis=0),
+        "minimum": minimum, "maximum": maximum,
     }
     start = time.perf_counter()
     prediction = predict(model, x_test)

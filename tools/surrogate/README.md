@@ -27,7 +27,7 @@ java -Xmx5500m -jar src/modules/gecko-rest-api/target/gecko-rest-api-1.0.0.jar \
 conda run -n ntbees2 python tools/surrogate/acceptance.py --output surrogate-output
 ```
 
-5. Use the model with an operating point inside the training bounds.
+5. Use the model with an operating point inside the configured sweep bounds.
 
 ```bash
 conda run -n ntbees2 python -m tools.surrogate.predict surrogate-output/buck_surrogate.joblib \
@@ -36,7 +36,9 @@ conda run -n ntbees2 python -m tools.surrogate.predict surrogate-output/buck_sur
 
 Set `GECKO_API_BASE_URL`, `GECKO_API_KEY`, or `GECKO_ACCESS_TOKEN` as applicable.
 The sweep uses [buck_sweep.yaml](buck_sweep.yaml) for the bounds, sample seed, and measurement window.
-The Parquet file stores the six inputs and four outputs, with the seed, simulation grid step, and sweep duration in its metadata.
+The Parquet file stores the six inputs and four outputs.
+Its metadata records the configured bounds, seed, simulation grid step, and sweep duration.
+When training from an earlier file without configured bounds, the model uses the range of all recorded input points.
 The training command prints the data set and model sizes and the error and speed measurements for the fixed 20 % holdout.
 
 Use `python -m tools.surrogate.sweep` and `python -m tools.surrogate.train` to run the steps independently.
