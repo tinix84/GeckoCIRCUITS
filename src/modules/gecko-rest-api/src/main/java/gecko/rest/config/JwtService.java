@@ -17,12 +17,19 @@ import org.springframework.stereotype.Service;
 @Service
 public class JwtService {
     private final JwtProperties properties;
+    private final ApiKeyProperties keys;
     private final Clock clock;
     private final JwtEncoder encoder;
     private final JwtDecoder decoder;
 
     public JwtService(JwtProperties properties, Clock clock) {
+        this(properties, clock, new ApiKeyProperties());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public JwtService(JwtProperties properties, Clock clock, ApiKeyProperties keys) {
         this.properties = properties;
+        this.keys = keys;
         this.clock = clock;
         if (!properties.isEnabled()) {
             encoder = null;
@@ -54,10 +61,16 @@ public class JwtService {
 
     private String encode(String subject, List<String> roles, String purpose, Duration lifetime) {
         var now = clock.instant();
-        JwtClaimsSet claims = JwtClaimsSet.builder().issuer("geckocircuits").subject(subject).issuedAt(now)
+        var claims = JwtClaimsSet.builder().issuer("geckocircuits").subject(subject).issuedAt(now)
                 .expiresAt(now.plus(lifetime)).id(UUID.randomUUID().toString())
-                .claim("roles", roles).claim("token_use", purpose).build();
-        return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
+                .claim("roles", roles).claim("token_use", purpose);
+        String tenant = keys.tenantFor(subject);
+        if (keys.isTenantEnabled()) {
+            if (tenant == null) throw new BadJwtException("Token subject has no tenant.");
+            claims.claim("tenant", tenant);
+        }
+        return encoder.encode(
+                JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims.build())).getTokenValue();
     }
 
     public Jwt decode(String token, String purpose) {
@@ -67,6 +80,13 @@ public class JwtService {
                 || jwt.getSubject().isBlank() || jwt.getExpiresAt() == null
                 || !clock.instant().isBefore(jwt.getExpiresAt())) {
             throw new BadJwtException("Token purpose, subject, or expiry is invalid.");
+        }
+        if (keys.isTenantEnabled()) {
+            String assignedTenant = keys.tenantFor(jwt.getSubject());
+            if (assignedTenant == null || !assignedTenant.equals(jwt.getClaims().get("tenant"))
+                    || keys.getKeys().stream().map(ApiIdentity::keyId).noneMatch(jwt.getSubject()::equals)) {
+                throw new BadJwtException("Token tenant does not match the subject.");
+            }
         }
         return jwt;
     }
@@ -79,7 +99,7 @@ public class JwtService {
                     : roles.stream().map(ApiKeyProperties.Role::valueOf)
                     .map(role -> (org.springframework.security.core.GrantedAuthority)
                             new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + role.name())).toList();
-            return UsernamePasswordAuthenticationToken.authenticated(jwt.getSubject(), null, authorities);
+            return ApiIdentity.authenticate(jwt.getSubject(), keys.tenantFor(jwt.getSubject()), authorities);
         } catch (IllegalArgumentException invalidRole) {
             throw new BadJwtException("Token roles are invalid.");
         }

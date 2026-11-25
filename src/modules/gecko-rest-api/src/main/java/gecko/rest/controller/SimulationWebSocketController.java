@@ -1,5 +1,7 @@
 package gecko.rest.controller;
 
+import gecko.rest.config.ApiKeyProperties;
+import gecko.rest.service.SimulationService;
 import gecko.rest.service.WebSocketProgressService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,9 +27,15 @@ public class SimulationWebSocketController {
 
     private final WebSocketProgressService webSocketProgressService;
 
+    private final ApiKeyProperties keys;
+    private final SimulationService simulations;
+
     @Autowired
-    public SimulationWebSocketController(WebSocketProgressService webSocketProgressService) {
+    public SimulationWebSocketController(WebSocketProgressService webSocketProgressService, ApiKeyProperties keys,
+                                         SimulationService simulations) {
         this.webSocketProgressService = webSocketProgressService;
+        this.keys = keys;
+        this.simulations = simulations;
     }
 
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'USER', 'READONLY')")
@@ -36,6 +44,9 @@ public class SimulationWebSocketController {
                description = "Returns the STOMP topic destination to subscribe to for real-time updates")
     public ResponseEntity<Map<String, String>> getWebSocketInfo(
             @PathVariable String simulationId) {
+        if (keys.isTenantEnabled() && simulations.getSimulationStatus(simulationId) == null) {
+            return ResponseEntity.notFound().build();
+        }
         String destination = webSocketProgressService.getTopicDestination(simulationId);
         return ResponseEntity.ok(Map.of(
                 "stompEndpoint", "/ws",

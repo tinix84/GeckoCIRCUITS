@@ -1,5 +1,7 @@
 package gecko.rest.controller;
 
+import gecko.rest.config.ApiKeyProperties;
+import gecko.rest.service.SimulationService;
 import gecko.rest.service.WebSocketProgressService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +25,9 @@ class SimulationWebSocketControllerTest {
 
     @MockBean
     private WebSocketProgressService webSocketProgressService;
+
+    @MockBean private ApiKeyProperties keys;
+    @MockBean private SimulationService simulations;
 
     @Test
     void testGetWebSocketInfoReturns200() throws Exception {
