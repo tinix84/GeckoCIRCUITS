@@ -165,7 +165,10 @@ public class CircuitFileService {
             components.add(componentDataToInfo(comp, "thermal", fields));
         }
 
-        return new ComponentListResponse(circuitId, components);
+        List<ConnectionInfo> connections = model.getConnections().stream()
+                .map(wire -> new ConnectionInfo(null, null, wire.getLabel(), wire.getType(), wire.getPoints()))
+                .toList();
+        return new ComponentListResponse(circuitId, components, connections);
     }
 
     /**
@@ -252,7 +255,7 @@ public class CircuitFileService {
     }
 
     /**
-     * Update simulation parameters of a loaded circuit.
+     * Update solver settings and numeric component parameters of a loaded circuit.
      * Only provided parameters are updated; null values are ignored.
      *
      * @param circuitId the circuit ID to update
@@ -280,7 +283,8 @@ public class CircuitFileService {
         if (current == null) throw missingCircuit(id);
         PreparationResult result = preparation.prepare(current.snapshot, new PreparationRequest(
                 new SolverOverrides(update.getSolverType() == null ? null : parseSolverType(update.getSolverType()),
-                        update.getTimeStep(), update.getSimulationDuration()), Map.of()));
+                        update.getTimeStep(), update.getSimulationDuration()),
+                update.getComponentParameters() == null ? Map.of() : update.getComponentParameters()));
         return new ParsedCircuit(current.filename, effectiveSnapshot(result), current.loadedAt, current.tenant);
     }
 

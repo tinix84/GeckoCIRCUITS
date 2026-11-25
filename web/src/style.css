@@ -7,6 +7,11 @@ a { color: #116657; }
 .topbar nav a[aria-current="page"] { color: white; text-decoration: underline; text-underline-offset: 6px; }
 .content { padding-block: 34px; }
 .chart-host { inline-size: 100%; overflow-x: auto; }
+.editor-layout { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(235px, 300px); }
+.circuit-schematic { display: block; width: 100%; height: clamp(290px, 55vh, 620px); background: #f6faf8; border-radius: 7px; touch-action: none; }
+.schematic-component { cursor: pointer; }
+.schematic-component:focus-visible > rect { stroke: #116657; stroke-width: .12; }
+@media (max-width: 850px) { .editor-layout { grid-template-columns: minmax(0, 1fr); } }
 .login { max-width: 420px; margin: 9vh auto 0; }
 .route-row { overflow-wrap: anywhere; }
 @media (max-width: 560px) {
