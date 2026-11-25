@@ -29,7 +29,11 @@ public final class SpiceImporter {
     private static final Pattern ASSIGNMENT = Pattern.compile("([a-zA-Z_][a-zA-Z_0-9]*)\\s*=\\s*(\\{[^}]*}|[^\\s,=]+)");
 
     public CircuitModel convert(String source, String sourceName) {
-        return convert(sourceName, source.hashCode(), lines(source), new LinkedHashMap<>(), Map.of());
+        CircuitModel model = convert(sourceName, source.hashCode(), lines(source), new LinkedHashMap<>(), Map.of());
+        if (model.getCircuitComponents().isEmpty() && model.getConversionIssues().isEmpty()) {
+            issue(model, new Line(1, ""), "EMPTY_NETLIST", null, "The SPICE netlist has no circuit components.");
+        }
+        return model;
     }
 
     CircuitModel convert(String sourceName, int sourceId, List<Line> statements, Map<String, String> nodes,
@@ -42,9 +46,9 @@ public final class SpiceImporter {
         model.setTimeStep(1e-6);
         var parameters = new HashMap<String, String>();
         var orderedParameters = new ArrayList<ParameterDefinition>();
-        boolean ac = statements.stream().anyMatch(line -> keyword(line.text()).equals(".ac"));
-        var definitions = new HashMap<String, String>();
         List<Line> lines = rootLines(statements, model);
+        boolean ac = lines.stream().anyMatch(line -> keyword(line.text()).equals(".ac"));
+        var definitions = new HashMap<String, String>();
         for (var line : lines) {
             String directive = keyword(line.text());
             if (directive.equals(".param")) {

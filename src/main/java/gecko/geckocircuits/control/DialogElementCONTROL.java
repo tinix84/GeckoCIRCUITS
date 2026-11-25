@@ -29,8 +29,11 @@ public abstract class DialogElementCONTROL<T extends RegelBlock> extends DialogC
     JPanel jpM = new JPanel();
 
     public DialogElementCONTROL(final T element) {
-        super(GeckoSim._win, true, element);
+        this(element, true);
+    }
 
+    protected DialogElementCONTROL(final T element, boolean modal) {
+        super(GeckoSim._win, modal, element);
     }
 
 

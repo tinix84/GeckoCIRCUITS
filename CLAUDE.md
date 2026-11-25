@@ -141,3 +141,4 @@ Never run `python -m venv`, `uv venv`, or `virtualenv`.
 | 2026-11-24 | [ADR-0024: Run CONTROL subsystems on their own sample clocks](docs/adr/0024-control-subsystem-sample-clocks.md) |
 | 2026-11-24 | [ADR-0025: Run FMI co-simulation in a private Java process](docs/adr/0025-fmi-co-simulation-process.md) |
 | 2026-11-25 | [ADR-0026: Use registered LTI platforms and course-scoped identities](docs/adr/0026-lti-registration-and-course-identity.md) |
+| 2026-11-25 | [ADR-0027: Bind Probe outputs to electrical components](docs/adr/0027-bind-probe-outputs-to-electrical-components.md) |

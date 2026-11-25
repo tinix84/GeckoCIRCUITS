@@ -113,7 +113,8 @@ public enum ControlTyp implements AbstractComponentTyp {
             return C_SIGNALSOURCE.getTypeNumber();
         }
 
-    },;
+    },
+    C_PROBE(gecko.core.simulation.ProbeReference.TYPE, ReglerProbe.TYPE_INFO);
     private int _intValue;
     private AbstractTypeInfo _typeInfo;
 

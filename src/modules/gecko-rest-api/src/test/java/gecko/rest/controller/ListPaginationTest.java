@@ -43,7 +43,9 @@ class ListPaginationTest {
                     : SimulationResponse.SimulationStatus.PENDING);
             jobs.put(job.getSimulationId(), job);
         });
-        when(simulations.getAllSimulations()).thenReturn(jobs);
+        when(simulations.getSimulationStatuses()).thenReturn(List.copyOf(jobs.values()));
+        when(simulations.getSimulation(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(invocation -> jobs.get(invocation.getArgument(0)));
         when(simulations.getStatistics()).thenReturn(Map.of());
     }
 

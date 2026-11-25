@@ -83,6 +83,9 @@ abstract public class DialogCircuitComponent<T extends AbstractBlockInterface> e
         tfNam.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(final ActionEvent actionEvent) {
+                if (!canApplyChanges()) {
+                    return;
+                }
                 try {
                     setNewElementName();
                 } catch (NameAlreadyExistsException ex) {
@@ -178,6 +181,9 @@ abstract public class DialogCircuitComponent<T extends AbstractBlockInterface> e
 
         @Override
         public void actionPerformed(final ActionEvent actionEvent) {
+            if (!canApplyChanges()) {
+                return;
+            }
             try {
                 setNewElementName();
             } catch (NameAlreadyExistsException ex) {
@@ -247,6 +253,10 @@ abstract public class DialogCircuitComponent<T extends AbstractBlockInterface> e
     }
 
     public abstract void baueGUI();
+
+    protected boolean canApplyChanges() {
+        return true;
+    }
 
     public final void setNewElementName() throws NameAlreadyExistsException {
         _originalName = element.getStringID();

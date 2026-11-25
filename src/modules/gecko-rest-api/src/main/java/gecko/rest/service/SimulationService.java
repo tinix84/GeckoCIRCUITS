@@ -442,6 +442,11 @@ public class SimulationService {
         }
     }
 
+    /** Returns detached job metadata without copying any retained waveforms. */
+    public List<SimulationResponse> getSimulationStatuses() {
+        return jobs.values().stream().map(job -> snapshot(job, false)).toList();
+    }
+
     public Map<String, SimulationResponse> getAllSimulations() {
         Map<String, SimulationResponse> result = new HashMap<>();
         String tenant = currentTenant();
