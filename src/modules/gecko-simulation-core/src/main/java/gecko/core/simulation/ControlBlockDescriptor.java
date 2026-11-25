@@ -163,6 +163,7 @@ public record ControlBlockDescriptor(int type, int inputPorts, int outputPorts, 
         simple(result, 77, PmsmModulatorCalculator::new);
         add(result, 84, -1, 1, data -> new MUXControlCalculatable(data.getTerminalXLabels().length));
         add(result, 85, 1, -1, data -> new DEMUXCalculator(data.getTerminalYLabels().length));
+        add(result, ProbeReference.TYPE, 0, -1, data -> new NothingToDoCalculator(0, data.getTerminalYLabels().length));
         return Map.copyOf(result);
     }
 

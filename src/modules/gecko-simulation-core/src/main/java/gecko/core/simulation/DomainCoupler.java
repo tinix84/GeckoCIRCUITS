@@ -271,6 +271,16 @@ public class DomainCoupler {
             probe.getCalculator()._outputSignal[0][0] = vA - vB;
         }
 
+        for (var probe : controlBlockMapping.componentProbes()) {
+            int element = probe.element();
+            probe.calculator()._outputSignal[probe.output()][0] = switch (probe.quantity()) {
+                case CURRENT -> componentCurrents[element];
+                case VOLTAGE -> nodeVoltages[circuitNetlist.getNodeX(element)]
+                        - nodeVoltages[circuitNetlist.getNodeY(element)];
+                case STATE -> ProbeReference.diodeState(circuitNetlist.getParameter(element));
+            };
+        }
+
         // AMP probes: I = iALT[elementIndex]
         for (ControlBlockMapping.AmpProbeMapping probe : controlBlockMapping.getAmpProbeMappings()) {
             String compName = probe.getComponentName();
