@@ -217,7 +217,7 @@
               <rulesets>
                 <ruleset>pmd-ruleset.xml</ruleset>
               </rulesets>
-              <maxAllowedViolations>400</maxAllowedViolations>
+              <maxAllowedViolations>399</maxAllowedViolations>
               <failOnViolation>true</failOnViolation>
               <printFailingErrors>true</printFailingErrors>
             </configuration>
