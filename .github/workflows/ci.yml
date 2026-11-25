@@ -25,6 +25,22 @@ jobs:
           mvn -f pom-reactor.xml clean install -DskipTests --no-transfer-progress
           mvn package assembly:single -DskipTests --no-transfer-progress
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Verify web application
+        working-directory: web
+        run: npm ci && npm run build && npm test
+
+      - name: Verify web browser flows
+        working-directory: web
+        run: |
+          npx playwright install --with-deps chromium
+          npx playwright test
+
       - name: SpotBugs (zero bugs)
         run: mvn spotbugs:check --no-transfer-progress
 
