@@ -75,6 +75,9 @@ class NativePersistenceTest {
             assertThat(previous.getEndTime()).isNotNull();
             assertThat(previous.getResults()).isEmpty();
             assertThat(service.getAllSimulations()).containsKey(jobId);
+            assertThat(service.getSimulationStatuses()).extracting(result -> result.getSimulationId())
+                    .contains(jobId);
+            assertThat(service.getStatistics().get(SimulationStatus.COMPLETED)).isEqualTo(1L);
         }
     }
 
