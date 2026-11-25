@@ -24,12 +24,13 @@ if curl -sS --max-time 2 "$GECKO_API_BASE_URL/api-docs" >/dev/null 2>&1; then
     exit 1
 fi
 
+# The optimizer and surrogate submit 2,300 jobs in total.
 mkdir "$output/api"
 (
     cd "$output/api"
     exec java -Xmx5500m -jar "${api_jars[0]}" --server.address=127.0.0.1 \
         "--server.port=$port" --gecko.api.auth-enabled=false \
-        --gecko.jobs.retained=2250 --gecko.jobs.batches=220 \
+        --gecko.jobs.retained=2500 --gecko.jobs.batches=220 \
         --logging.level.root=WARN --logging.level.org.springframework.security=WARN \
         --gecko.api.rate-limit=24000 --gecko.api.rate-limit-simulation=12000 \
         --logging.level.org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration=OFF
