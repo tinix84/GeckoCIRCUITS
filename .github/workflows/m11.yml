@@ -1,0 +1,63 @@
+name: M11 acceptance
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/m11.yml'
+      - 'docs/api/openapi.json'
+      - 'pom-reactor.xml'
+      - 'scripts/generate-sdks.sh'
+      - 'scripts/verify-m11.sh'
+      - 'src/main/resources/devices/**'
+      - 'src/modules/gecko-rest-api/**'
+      - 'src/modules/gecko-simulation-core/**'
+      - 'tools/fmu/**'
+      - 'tools/optimize/**'
+      - 'tools/select/**'
+      - 'tools/surrogate/**'
+  push:
+    branches: [main, dev]
+    paths:
+      - '.github/workflows/m11.yml'
+      - 'docs/api/openapi.json'
+      - 'pom-reactor.xml'
+      - 'scripts/generate-sdks.sh'
+      - 'scripts/verify-m11.sh'
+      - 'src/main/resources/devices/**'
+      - 'src/modules/gecko-rest-api/**'
+      - 'src/modules/gecko-simulation-core/**'
+      - 'tools/fmu/**'
+      - 'tools/optimize/**'
+      - 'tools/select/**'
+      - 'tools/surrogate/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  m11-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Build the REST API
+        run: mvn -f pom-reactor.xml -pl :gecko-rest-api -am package -DskipTests --no-transfer-progress
+      - name: Generate the client and install Python dependencies
+        run: |
+          bash scripts/generate-sdks.sh --dry-run
+          bash scripts/generate-sdks.sh
+          python -m pip install ./clients/python -r tools/surrogate/requirements.txt -r tools/select/requirements.txt -r tools/fmu/requirements.txt
+      - name: Run M11 regressions and acceptance scripts
+        run: bash scripts/verify-m11.sh
