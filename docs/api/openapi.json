@@ -339,8 +339,20 @@
         }
       },
       "CircuitParameterUpdate": {
-        "description": "Partial update of circuit simulation parameters",
+        "description": "Partial update of solver settings and numeric component parameters",
         "properties": {
+          "componentParameters": {
+            "additionalProperties": {
+              "description": "Numeric component parameters by component name and field name",
+              "format": "double",
+              "type": "number"
+            },
+            "description": "Numeric component parameters by component name and field name",
+            "example": {
+              "L.1.inductance": 0.0006
+            },
+            "type": "object"
+          },
           "simulationDuration": {
             "description": "Simulation duration in seconds",
             "example": 0.05,
@@ -492,6 +504,13 @@
               "$ref": "#/components/schemas/ComponentInfo"
             },
             "type": "array"
+          },
+          "connections": {
+            "description": "Saved wire paths in schematic coordinates",
+            "items": {
+              "$ref": "#/components/schemas/ConnectionInfo"
+            },
+            "type": "array"
           }
         }
       },
@@ -541,6 +560,63 @@
             "type": "string"
           },
           "name": {
+            "type": "string"
+          }
+        }
+      },
+      "ConnectionInfo": {
+        "description": "Connection between circuit components",
+        "properties": {
+          "domain": {
+            "description": "Connection domain",
+            "type": "string"
+          },
+          "from": {
+            "description": "Source component terminal",
+            "example": "Q1.drain",
+            "type": "string"
+          },
+          "label": {
+            "description": "Wire label/name",
+            "example": "switch_node",
+            "type": "string"
+          },
+          "points": {
+            "description": "Ordered schematic grid points",
+            "example": [
+              [
+                4,
+                8
+              ],
+              [
+                6,
+                8
+              ]
+            ],
+            "items": {
+              "description": "Ordered schematic grid points",
+              "example": [
+                [
+                  4,
+                  8
+                ],
+                [
+                  6,
+                  8
+                ]
+              ],
+              "items": {
+                "description": "Ordered schematic grid points",
+                "format": "int32",
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "to": {
+            "description": "Destination component terminal",
+            "example": "L1.in",
             "type": "string"
           }
         }

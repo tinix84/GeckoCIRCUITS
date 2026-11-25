@@ -12,5 +12,12 @@ public record ComponentListResponse(
     String circuitId,
 
     @Schema(description = "List of all components in the circuit")
-    List<ComponentInfo> components
-) {}
+    List<ComponentInfo> components,
+
+    @Schema(description = "Saved wire paths in schematic coordinates")
+    List<ConnectionInfo> connections
+) {
+    public ComponentListResponse(String circuitId, List<ComponentInfo> components) {
+        this(circuitId, components, List.of());
+    }
+}

@@ -1,13 +1,14 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Alert, Box, Button, Container, LinearProgress, Paper, Stack, TextField, Typography } from '@mui/material';
-import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { api, requireData } from './api/client';
 import type { components } from './api/schema';
 import { useSession } from './session';
 
 import { errorMessage } from './errors';
 const Scope = lazy(() => import('./Scope').then(({ Scope }) => ({ default: Scope })));
+const CircuitEditor = lazy(() => import('./CircuitEditor').then(({ CircuitEditor }) => ({ default: CircuitEditor })));
 
 function Login() {
   const { signIn } = useSession();
@@ -175,13 +176,7 @@ function Dashboard() {
   </Stack>;
 }
 
-function CircuitPlaceholder() {
-  const { id } = useParams();
-  return <Stack spacing={2}>
-    <Typography variant="h1">Circuit editor</Typography>
-    <Typography className="route-row">{id}</Typography>
-  </Stack>;
-}
+
 
 
 
@@ -205,7 +200,7 @@ export function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/circuits" element={<Circuits />} />
-        <Route path="/circuits/:id" element={<CircuitPlaceholder />} />
+        <Route path="/circuits/:id" element={<Suspense fallback={<LinearProgress aria-label="Loading circuit editor" />}><CircuitEditor /></Suspense>} />
         <Route path="/simulations/:id" element={<Suspense fallback={<LinearProgress aria-label="Loading scope" />}><Scope /></Suspense>} />
         <Route path="*" element={<Navigate replace to="/" />} />
       </Routes>
