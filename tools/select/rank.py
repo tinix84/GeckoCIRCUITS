@@ -87,9 +87,14 @@ def rank(spec, devices):
     candidates = []
     with ExitStack() as stack:
         api = None
+        ambient_survivors = 0
         thermal_survivors = 0
         loss_survivors = 0
         for part in survivors:
+            if spec.ambient_c >= part.tj_max_c:
+                rejected.append((part.name, f"thermal limit (ambient reaches or exceeds {part.tj_max_c:g} deg C)"))
+                continue
+            ambient_survivors += 1
             static = fallback(part, spec)
             curves = (VendorCurves(part.curve_file, spec.vin_max_v).at_current(spec.iout_a)
                       if part.curve_file else {"conduction": [], "switching": []})
@@ -106,9 +111,6 @@ def rank(spec, devices):
             )
             if api is None and any(curves.values()):
                 api = stack.enter_context(loss_client())
-            if spec.ambient_c >= part.tj_max_c:
-                rejected.append((part.name, f"thermal limit (ambient reaches or exceeds {part.tj_max_c:g} deg C)"))
-                continue
             try:
                 junction, conduction, switching = temperature_and_losses(
                     part, spec, lambda temperature: estimate_at(api, spec, temperature, curves, static),
@@ -137,7 +139,7 @@ def rank(spec, devices):
             if thermal_survivors:
                 eliminated_by = "efficiency budget"
             else:
-                eliminated_by = "thermal limit" if loss_survivors else "loss data"
+                eliminated_by = "loss data" if ambient_survivors and not loss_survivors else "thermal limit"
 
     def sort_key(item):
         price = item.device.price

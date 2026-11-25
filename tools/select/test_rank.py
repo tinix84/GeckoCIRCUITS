@@ -39,6 +39,25 @@ def test_empty_result_reports_the_constraint_that_eliminated_the_last_devices(tm
     assert "No candidates. current derating eliminated the last candidates." in run(spec)
 
 
+@pytest.mark.parametrize("include_valid_device", [True, False])
+def test_filters_overheated_device_before_opening_its_curve(tmp_path, include_valid_device):
+    header, valid, *_ = CATALOG.read_text(encoding="utf-8").splitlines()
+    hot = "too_hot,100,40,0.01,,3e-8,TO-247,,4,30,missing.csv"
+    catalog = tmp_path / "devices.csv"
+    rows = [header, hot]
+    if include_valid_device:
+        rows.append(valid)
+    catalog.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+    output = run(SPEC, catalog)
+
+    assert "too_hot. thermal limit" in output
+    if include_valid_device:
+        assert "1. A (TO-220)" in output
+    else:
+        assert "No candidates. thermal limit eliminated the last candidates." in output
+
+
 @pytest.mark.skipif(not os.getenv("GECKO_SELECT_TEST_API"), reason="Requires the GeckoCIRCUITS API")
 def test_preserves_the_vendor_conduction_curve_when_switching_points_are_out_of_range(tmp_path):
     loss_file = tmp_path / "curve.csv"
