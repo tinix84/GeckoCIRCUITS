@@ -42,6 +42,7 @@ public final class SchematicDraft {
     public record Part(Kind kind, String name, int x, int y, double value) { }
     public record Terminal(String part, int port) { }
     public record Wire(Terminal from, Terminal to) { }
+    private record GridPoint(int x, int y) { }
 
     public static CircuitModel build(List<Part> parts, List<Wire> wires, double duration, double step) {
         if (parts == null || parts.isEmpty() || parts.size() > MAX_PARTS
@@ -88,6 +89,12 @@ public final class SchematicDraft {
             if (!nodes.containsKey(root)) nodes.put(root, "n" + nextNode++);
         }
 
+        Map<GridPoint, String> layout = new HashMap<>();
+        for (Terminal terminal : roots.keySet()) {
+            Part part = namedParts.get(terminal.part);
+            claimPoint(layout, part.kind.position(part, terminal.port), nodes.get(root(roots, terminal)));
+        }
+
         CircuitModel model = new CircuitModel();
         model.setSimulationDuration(duration);
         model.setTimeStep(step);
@@ -107,6 +114,7 @@ public final class SchematicDraft {
             int[][] points = from[0] == to[0] || from[1] == to[1]
                     ? new int[][]{from, to}
                     : new int[][]{from, new int[]{to[0], from[1]}, to};
+            for (int[] point : points) claimPoint(layout, point, label);
             model.addConnection(new ConnectionData("LK", points, label));
         }
 
@@ -116,6 +124,13 @@ public final class SchematicDraft {
         model.setDataContainerSignals(probeNodes.keySet().stream().filter(node -> !node.equals("0"))
                 .map(node -> "V_" + node).toArray(String[]::new));
         return model;
+    }
+
+    private static void claimPoint(Map<GridPoint, String> layout, int[] point, String node) {
+        String previous = layout.putIfAbsent(new GridPoint(point[0], point[1]), node);
+        if (previous != null && !previous.equals(node)) {
+            throw new IllegalArgumentException("Move a part to separate wires or terminals that share a grid point.");
+        }
     }
 
     private static Terminal root(Map<Terminal, Terminal> parents, Terminal start) {
