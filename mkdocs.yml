@@ -250,6 +250,7 @@ nav:
       - Control Calculators: api/core/calculators.md
     - Remote Interface: api/remote-interface.md
     - Research Bundles: api/research-bundles.md
+    - LTI Courses: api/lti-courses.md
     - REST API: api/rest-api.md
     - GeckoSCRIPT Reference: api/geckoscript-ref.md
 
