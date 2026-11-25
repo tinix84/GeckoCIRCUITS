@@ -45,7 +45,7 @@ public class DialogGlobalTerminal extends javax.swing.JDialog {
         readAllGlobalsIntoComboBoxes();
         _initDone = true;
         setTitle("Set global terminal");
-        ComponentHelp.install(this, globalTerminal);
+        DialogCircuitComponent.installHelp(this, globalTerminal);
     }
 
     private void readAllGlobalsIntoComboBoxes() {
