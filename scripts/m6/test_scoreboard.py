@@ -1,6 +1,8 @@
 from unittest import TestCase, main
+from unittest.mock import patch
+from pathlib import Path
 
-from scoreboard import capability, summarize
+from scoreboard import capability, summarize, verify_inventory
 
 
 def case(issues=(), status='partial_import', parsed=True):
@@ -43,6 +45,21 @@ class ScoreboardTest(TestCase):
         report = summarize([circuit], [])
         self.assertEqual(len(report['analyses']), 2)
         self.assertEqual(report['by_analysis']['.ac']['declared'], 1)
+
+    def test_explicit_averaged_transient_is_tier_a(self):
+        circuit = case()
+        circuit['archive_path'] = '3-phase PFC averaged models - dq0.asc'
+        self.assertEqual(summarize([circuit], [])['analyses'][0]['tier'], 'A')
+
+    def test_unindexed_metadata_cannot_label_replay_as_fresh(self):
+        names = {'preview.json', 'prior-qualification.json'}
+        for folder in ('', 'unselected/', 'legacy-non-ac/'):
+            names.update(folder + name for name in ('results.json', 'input-provenance-before.json',
+                                                    'input-provenance-after.json'))
+        with patch('scoreboard.digest', return_value='seal'), patch('scoreboard.read', return_value=dict.fromkeys(names)):
+            with patch('scoreboard.Path.exists', return_value=True):
+                with self.assertRaisesRegex(ValueError, 'run-metadata.json'):
+                    verify_inventory(Path(r'D:\unused-sealed-audit'), 'seal')
 
 
 if __name__ == '__main__':

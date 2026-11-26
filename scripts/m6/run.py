@@ -7,13 +7,33 @@ from pathlib import Path
 import subprocess
 import sys
 
-from batch import CORE, DESKTOP, EXPECTED, JAVA, digest, read, write
-from storage_guard import CASE_RESERVE, require_free_space
+from batch import BUDGET, CORE, DESKTOP, EXPECTED, JAVA, digest, read, write
+from storage_guard import CASE_RESERVE, directory_bytes, require_free_space
 
 
 def invoke(arguments, env=None, log=None):
     require_free_space(CASE_RESERVE)
     subprocess.run(arguments, env=env, check=True, stdout=log, stderr=log)
+
+
+def validate_destinations(output, qualification):
+    output, qualification = output.resolve(), qualification.resolve()
+    report = output.with_name(output.name + '-scoreboard')
+    temp_root = (Path(r'D:\codex-temp\gecko-m6') / output.name).resolve()
+    if output.exists() or report.exists() or temp_root.exists():
+        raise ValueError('Run, report and temporary destinations must all be new folders')
+    if output.is_relative_to(qualification):
+        raise ValueError('Run output must stay outside the sealed qualification audit')
+    if output.drive.upper() != 'D:' or temp_root.drive.upper() != 'D:':
+        raise ValueError('Run outputs and temporary files must be on D: to avoid occupying C:')
+    return output, report, temp_root
+
+
+def completion_storage(output, report, temp_root):
+    total = sum(directory_bytes(path) for path in (output, report, temp_root))
+    if total > BUDGET:
+        raise RuntimeError(f'Whole-run storage guard: evidence, report and temporary files use {total} bytes; limit {BUDGET}')
+    return total
 
 
 def main():
@@ -27,11 +47,7 @@ def main():
     from scoreboard import verify_inventory
     require_free_space(CASE_RESERVE)
     verify_inventory(args.qualification_audit, args.qualification_inventory_sha256)
-    output = args.output_dir.resolve()
-    if output.exists():
-        raise ValueError('Run output must be a new folder')
-    if output.drive.upper() != 'D:':
-        raise ValueError('Run outputs must be on D: to avoid occupying C:')
+    output, report, temp_root = validate_destinations(args.output_dir, args.qualification_audit)
     scripts = Path(__file__).resolve().parent
     harness = output / 'harness'
     runtime = read(args.runtime_manifest) if args.runtime_manifest else {
@@ -55,7 +71,7 @@ def main():
     runtime_file = output / 'runtime.json'
     write(runtime_file, runtime)
     javac = Path(runtime['java']['path']).with_name('javac.exe')
-    compiler_temp = Path(r'D:\codex-temp\gecko-m6') / output.name / 'compiler'
+    compiler_temp = temp_root / 'compiler'
     compiler_temp.mkdir(parents=True)
     classpath = os.pathsep.join(runtime[name]['path'] for name in ('core', 'desktop'))
     with (output / 'harness-compile.log').open('x', encoding='utf-8') as log:
@@ -65,8 +81,9 @@ def main():
         folder = output if mode == 'selected_profile' else output / mode
         folder.mkdir(exist_ok=mode == 'selected_profile')
         env = dict(os.environ, GECKO_M6_RUN_DIR=str(folder), GECKO_M6_MODE=mode,
+                   GECKO_M6_RUN_ROOT=str(output), GECKO_M6_TEMP_ROOT=str(temp_root),
                    GECKO_M6_HARNESS_DIR=str(harness), GECKO_M6_RUNTIME_MANIFEST=str(runtime_file),
-                   GECKO_M6_TEMP_DIR=str(Path(r'D:\codex-temp\gecko-m6') / output.name / mode))
+                   GECKO_M6_TEMP_DIR=str(temp_root / mode))
         for operation in ('--preview', '--execute'):
             with (output / f'{mode}-{operation[2:]}.log').open('x', encoding='utf-8') as log:
                 print(f'{mode} {operation}', flush=True)
@@ -86,9 +103,10 @@ def main():
              for path in sorted(output.rglob('*')) if path.is_file()}
     write(output / 'artifact-sha256.json', index)
     inventory_sha = digest(output / 'artifact-sha256.json')
-    report = output.with_name(output.name + '-scoreboard')
     invoke([sys.executable, '-B', str(scripts / 'scoreboard.py'), '--audit-dir', str(output),
             '--inventory-sha256', inventory_sha, '--output-dir', str(report)])
+    print(json.dumps({'whole_run_bytes': completion_storage(output, report, temp_root),
+                      'whole_run_budget_bytes': BUDGET}), flush=True)
 
 
 if __name__ == '__main__':

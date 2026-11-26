@@ -3,6 +3,7 @@
 from collections import namedtuple
 from unittest import TestCase, main
 from unittest.mock import Mock, patch
+from pathlib import Path
 
 import batch
 from storage_guard import CASE_RESERVE, FLOOR, require_free_space
@@ -79,6 +80,24 @@ class StorageAdmissionTest(TestCase):
                 result = batch.monitor_case(process, 0, 'unused-output', 'unused-temp')
         self.assertEqual(result, (-1, False, True, None))
         process.kill.assert_called_once_with()
+
+    def test_fast_exit_still_checks_final_output_and_temporary_bytes(self):
+        process = Mock()
+        process.poll.return_value = 0
+        process.wait.return_value = 0
+        with patch('batch.directory_bytes', side_effect=[batch.CASE_LIMIT, 1]), patch('batch.storage'):
+            result = batch.monitor_case(process, 0, 'unused-output', 'unused-temp')
+        self.assertEqual(result, (0, False, True, None))
+        process.kill.assert_not_called()
+
+    def test_later_mode_cannot_forget_previous_modes_storage(self):
+        run_root, temp_root = Path(r'D:\unused-run-root'), Path(r'D:\unused-temp-root')
+        with patch.multiple(batch, RUN_ROOT=run_root, OUT=run_root / 'unselected',
+                            TEMP_ROOT=temp_root, TEMP=temp_root / 'unselected'):
+            with patch('batch.require_free_space', return_value={'C:/': 10 * FLOOR, 'D:/': 10 * FLOOR}):
+                with patch('batch.directory_bytes', side_effect=lambda path: batch.BUDGET if path == run_root else 0):
+                    with self.assertRaisesRegex(RuntimeError, 'Storage guard'):
+                        batch.storage()
 
 
 if __name__ == '__main__':

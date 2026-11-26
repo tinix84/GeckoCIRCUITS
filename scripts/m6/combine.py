@@ -58,9 +58,9 @@ for key, table in indexed.items():
         stats[family][row['status']] += 1
         parse = row['parse']
         parsers[parse['ipes_parse'] if parse else 'not attempted'] += 1
-        if row['output_bytes'] > CASE_LIMIT or any('OutOfMemoryError' in line for line in row['other_output']):
+        if row['status'] in ('output_limit_incomplete', 'storage_guard_incomplete', 'timeout_incomplete') or row['output_bytes'] > CASE_LIMIT or any('OutOfMemoryError' in line for line in row['other_output']):
             resource_anomalies.append({'archive_path': row['archive_path'], 'id': row['id'],
-                                       'condition': 'output cap exceeded' if row['output_bytes'] > CASE_LIMIT else 'JVM heap exhaustion',
+                                       'condition': row['status'] if row['status'].endswith('_incomplete') else 'output cap exceeded' if row['output_bytes'] > CASE_LIMIT else 'JVM heap exhaustion',
                                        'output_bytes': row['output_bytes'], 'status': row['status']})
         if row['output']:
             output = Path(row['output'])

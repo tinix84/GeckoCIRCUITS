@@ -59,12 +59,30 @@ def verify_inventory(audit, expected_sha):
     if digest(index_path) != expected_sha:
         raise ValueError('Audit inventory hash differs from the supplied seal')
     index = read(index_path)
+    required = {'preview.json', 'prior-qualification.json'}
+    for folder in ('', 'unselected/', 'legacy-non-ac/'):
+        required.update(folder + name for name in ('results.json', 'input-provenance-before.json',
+                                                   'input-provenance-after.json'))
+    if (audit / 'run-metadata.json').exists():
+        required.add('run-metadata.json')
+    if required - index.keys():
+        raise ValueError(f'Consumed audit files are missing from the inventory: {sorted(required - index.keys())}')
     for relative, pin in index.items():
         path = (audit / relative).resolve()
         if not path.is_relative_to(audit.resolve()):
             raise ValueError(f'Inventory escapes audit: {relative}')
         if path.stat().st_size != pin['bytes'] or digest(path) != pin['sha256']:
             raise ValueError(f'Audit file differs: {relative}')
+    for name in ('results.json', 'unselected/results.json', 'legacy-non-ac/results.json'):
+        for row in read(audit / name):
+            if row['output']:
+                output = Path(row['output']).resolve()
+                if not output.is_relative_to(audit.resolve()):
+                    raise ValueError('Indexed result output escapes the audit')
+                required.add(output.relative_to(audit.resolve()).as_posix())
+                required.add((output.parent / 'result.json').relative_to(audit.resolve()).as_posix())
+    if required - index.keys():
+        raise ValueError(f'Consumed output files are missing from the inventory: {sorted(required - index.keys())}')
     return len(index)
 
 
@@ -100,7 +118,7 @@ def summarize(cases, prior):
             else:
                 counters['runs_to_completion'] += 0
                 counters['numerically_accepted'] += 0
-            tier = 'A' if family == '.ac' or re.search(r'\bavg\b', path.lower()) else 'B'
+            tier = 'A' if family == '.ac' or re.search(r'\b(?:avg|averaged)\b', path.lower()) else 'B'
             solver_issues = []
             if 'exponential diode' in observed:
                 solver_issues.append(163)

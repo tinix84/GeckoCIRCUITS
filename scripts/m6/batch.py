@@ -16,6 +16,8 @@ MODE = os.environ.get('GECKO_M6_MODE', 'selected_profile')
 if MODE not in ('selected_profile', 'unselected', 'legacy-non-ac'):
     raise ValueError(f'Unknown audit mode: {MODE}')
 TEMP = Path(os.environ.get('GECKO_M6_TEMP_DIR', str(Path(r'D:\codex-temp\gecko-m6') / OUT.name)))
+RUN_ROOT = Path(os.environ.get('GECKO_M6_RUN_ROOT', str(OUT)))
+TEMP_ROOT = Path(os.environ.get('GECKO_M6_TEMP_ROOT', str(TEMP)))
 AUTHOR = BASE / 'author-source'
 STOCK = Path(r'C:\Users\tinix\AppData\Local\LTspice\lib\sym')
 JAVA = Path(r'D:\codex-tools\gecko-m6\jdk21\jdk-21.0.13.1+2\bin\java.exe')
@@ -54,9 +56,11 @@ def write(path, data):
 
 def storage(reserve=CASE_RESERVE):
     drives = require_free_space(reserve)
-    if TEMP.resolve().is_relative_to(BASE.resolve()) or TEMP.resolve().is_relative_to(OUT.resolve()):
+    if not OUT.resolve().is_relative_to(RUN_ROOT.resolve()) or not TEMP.resolve().is_relative_to(TEMP_ROOT.resolve()):
+        raise RuntimeError('Mode directories must stay within the aggregate run and temporary roots')
+    if TEMP_ROOT.resolve().is_relative_to(BASE.resolve()) or TEMP_ROOT.resolve().is_relative_to(RUN_ROOT.resolve()):
         raise RuntimeError('Test temporary files must be outside the evidence folders')
-    total = directory_bytes(OUT) + directory_bytes(TEMP)
+    total = directory_bytes(RUN_ROOT) + directory_bytes(TEMP_ROOT)
     if total >= BUDGET - CASE_LIMIT:
         raise RuntimeError(f'Storage guard: {drives}, evidence bytes {total}')
     return drives
@@ -122,7 +126,13 @@ def monitor_case(process, start, output, temp):
             process.kill()
             break
         time.sleep(.035)
-    return process.wait(timeout=5), timed_out, limit, storage_error
+    code = process.wait(timeout=5)
+    try:
+        limit = limit or directory_bytes(output) + directory_bytes(temp) > CASE_LIMIT
+        storage(reserve=DIRTY_RESERVE)
+    except (RuntimeError, OSError) as failure:
+        storage_error = str(failure)
+    return code, timed_out, limit, storage_error
 
 
 def run_case(case):
@@ -149,7 +159,7 @@ def run_case(case):
     issues = []
     parser = None
     extra = []
-    for path in (stdout_path, stderr_path):
+    for path in (() if timed_out or limit or storage_error else (stdout_path, stderr_path)):
         for line in path.read_text(encoding='utf-8', errors='replace').splitlines():
             try:
                 data = json.loads(line)
@@ -161,7 +171,7 @@ def run_case(case):
                 extra.append(line)
     states = {0: 'complete_import', 1: 'conversion_failed', 2: 'partial_import'}
     status = 'timeout_incomplete' if timed_out else 'output_limit_incomplete' if limit else states.get(code, 'process_failure')
-    if code == 1 and not any(i.get('code') == 'CONVERSION_FAILED' for i in issues):
+    if code == 1 and not timed_out and not limit and not storage_error and not any(i.get('code') == 'CONVERSION_FAILED' for i in issues):
         status = 'process_failure'
     if storage_error:
         status = 'storage_guard_incomplete'
