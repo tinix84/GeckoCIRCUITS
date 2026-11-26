@@ -2,7 +2,7 @@
 
 from collections import namedtuple
 from unittest import TestCase, main
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import batch
 from storage_guard import FLOOR, require_free_space
@@ -42,6 +42,38 @@ class StorageAdmissionTest(TestCase):
                 with self.assertRaisesRegex(RuntimeError, 'Storage guard'):
                     batch.execute()
                 read.assert_not_called()
+
+    def test_low_disk_during_case_stops_owned_process(self):
+        process = Mock()
+        process.poll.return_value = None
+        process.wait.return_value = -1
+        with patch('batch.directory_bytes', return_value=0), patch('batch.time.monotonic', return_value=1):
+            with patch('batch.storage', side_effect=RuntimeError('Storage guard: low disk')):
+                result = batch.monitor_case(process, 0, 'unused-output', 'unused-temp')
+        self.assertEqual(result, (-1, False, False, 'Storage guard: low disk'))
+        process.kill.assert_called_once_with()
+        process.wait.assert_called_once_with(timeout=5)
+
+    def test_unreadable_output_during_case_stops_owned_process(self):
+        process = Mock()
+        process.poll.return_value = None
+        process.wait.return_value = -1
+        with patch('batch.directory_bytes', side_effect=OSError('output unavailable')):
+            with patch('batch.time.monotonic', return_value=1):
+                result = batch.monitor_case(process, 0, 'unused-output', 'unused-temp')
+        self.assertEqual(result, (-1, False, False, 'output unavailable'))
+        process.kill.assert_called_once_with()
+        process.wait.assert_called_once_with(timeout=5)
+
+    def test_case_cap_includes_temporary_bytes(self):
+        process = Mock()
+        process.poll.return_value = None
+        process.wait.return_value = -1
+        with patch('batch.directory_bytes', side_effect=[batch.CASE_LIMIT, 1]):
+            with patch('batch.time.monotonic', return_value=1), patch('batch.storage'):
+                result = batch.monitor_case(process, 0, 'unused-output', 'unused-temp')
+        self.assertEqual(result, (-1, False, True, None))
+        process.kill.assert_called_once_with()
 
 
 if __name__ == '__main__':

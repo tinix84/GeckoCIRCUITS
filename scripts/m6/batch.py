@@ -91,6 +91,27 @@ def preview():
                                'storage_floor_bytes': FLOOR, 'temp_directory': str(TEMP)})
     print(f'Preview: {len(cases)} unique inputs and new output paths, {len(inputs["archive_and_local_author_files"])} author files and {len(inputs["stock_asy"])} stock symbols', flush=True)
 
+def monitor_case(process, start, output, temp):
+    timed_out = False
+    limit = False
+    storage_error = None
+    next_storage_check = 0
+    while process.poll() is None:
+        timed_out = time.monotonic() - start > 25
+        try:
+            limit = directory_bytes(output) + directory_bytes(temp) > CASE_LIMIT
+            if time.monotonic() >= next_storage_check:
+                storage()
+                next_storage_check = time.monotonic() + 1
+        except (RuntimeError, OSError) as failure:
+            storage_error = str(failure)
+        if timed_out or limit or storage_error:
+            process.kill()
+            break
+        time.sleep(.035)
+    return process.wait(timeout=5), timed_out, limit, storage_error
+
+
 def run_case(case):
     drives = storage()
     start = time.monotonic()
@@ -102,28 +123,11 @@ def run_case(case):
             f'-Djava.io.tmpdir={temp}',
             '-cp', os.pathsep.join(map(str, (HARNESS, CORE, DESKTOP))), 'ImportAndParse', case['source'],
             str(model), '--symbols', str(STOCK), '--source-root', str(AUTHOR), '--source-root', str(AUTHOR / 'Tof'), '--source-root', str(AUTHOR / 'Tof' / 'Subcircuits'), '--profile', PROFILE]
-    timed_out = False
-    limit = False
-    storage_error = None
     stdout_path = model.parent / 'stdout.txt'
     stderr_path = model.parent / 'stderr.txt'
     with stdout_path.open('xb') as stdout, stderr_path.open('xb') as stderr:
         with subprocess.Popen(args, cwd=temp, stdout=stdout, stderr=stderr) as process:
-            next_storage_check = 0
-            while process.poll() is None:
-                timed_out = time.monotonic() - start > 25
-                limit = directory_bytes(model.parent) + directory_bytes(temp) > CASE_LIMIT
-                if time.monotonic() >= next_storage_check:
-                    try:
-                        storage()
-                    except (RuntimeError, OSError) as failure:
-                        storage_error = str(failure)
-                    next_storage_check = time.monotonic() + 1
-                if timed_out or limit or storage_error:
-                    process.kill()
-                    break
-                time.sleep(.035)
-            code = process.wait(timeout=5)
+            code, timed_out, limit, storage_error = monitor_case(process, start, model.parent, temp)
     issues = []
     parser = None
     extra = []
