@@ -14,6 +14,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SourcePreparationTest {
@@ -107,6 +108,49 @@ class SourcePreparationTest {
         assertEquals(9.0, source.get("dcValue"));
         assertEquals(40.0, source.get("amplitude"));
         assertEquals(90.0, source.get("phaseDegrees"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void savingPreservesControlSignalPhaseAndOffset(boolean named) throws Exception {
+        String tokens = named ? "phase 60\nanteilDC 3\nanteilDC$ParameterName midpoint" : "";
+        var model = parse(element("LK", 4, "source", "401 6", "/1", "/0", "amplitude 2\nphase 30")
+                + element("LK", 1, "R.1", "10", "/1", "/0", "nameOpt[] null")
+                + element("CONTROL", 4, "drive", "401 5 35 4 1.5707963267948966 0.5 0 0", "", "/drive", tokens));
+        model.getOptimizerParameters().put("midpoint", 8.0);
+        var preparation = new CircuitPreparation();
+        var result = preparation.prepareForSave(preparation.capture(model),
+                new PreparationRequest(SolverOverrides.none(), Map.of("R.1.resistance", 12.0, "drive.useExternal", 0.0)));
+        var edited = assertInstanceOf(PreparationResult.Ready.class, result, () -> result.report().diagnostics().toString());
+        byte[] bytes = new CircuitFileWriter().write(edited.circuit().toModel());
+        var reopened = new CircuitFileParser().parse(new ByteArrayInputStream(bytes), "control.ipes");
+        reopened.getOptimizerParameters().put("midpoint", 11.0);
+        var prepared = assertInstanceOf(PreparationResult.Ready.class,
+                preparation.prepare(preparation.capture(reopened), PreparationRequest.defaults()));
+        var drive = prepared.circuit().toModel().getControlComponents().getFirst();
+        assertEquals(named ? 60.0 : 90.0, ((Number) drive.getParameters().get("phaseDegrees")).doubleValue(), 1e-12);
+        assertEquals(named ? 11.0 : 4.0, drive.getParameters().get("offset"));
+        assertEquals("false", drive.getImportTokens().get("useExternal"));
+    }
+
+    @org.junit.jupiter.api.Test
+    void savedNamedEditDetachesItsBindingAndRejectsInvalidChanges() throws Exception {
+        var model = parse(element("LK", 4, "source", "401 6", "/1", "/0", "")
+                + element("LK", 1, "R.1", "10", "/1", "/0",
+                        "nameOpt[] resistorValue\nresistance 30\nresistance$ParameterName resistorValue"));
+        model.getOptimizerParameters().put("resistorValue", 20.0);
+        var preparation = new CircuitPreparation();
+        var base = preparation.capture(model);
+        assertInstanceOf(PreparationResult.Rejected.class, preparation.prepareForSave(base,
+                new PreparationRequest(SolverOverrides.none(), Map.of("R.1.resistance", -1.0))));
+        var edited = assertInstanceOf(PreparationResult.Ready.class, preparation.prepareForSave(base,
+                new PreparationRequest(SolverOverrides.none(), Map.of("R.1.resistance", 60.0))));
+        byte[] bytes = new CircuitFileWriter().write(edited.circuit().toModel());
+        var reopened = new CircuitFileParser().parse(new ByteArrayInputStream(bytes), "named.ipes");
+        var prepared = assertInstanceOf(PreparationResult.Ready.class,
+                preparation.prepare(preparation.capture(reopened), PreparationRequest.defaults()));
+        assertEquals(60.0, prepared.circuit().toModel().getCircuitComponents().get(1).getParameters().get("resistance"));
+        assertEquals(20.0, reopened.getOptimizerParameters().get("resistorValue"));
     }
 
     @org.junit.jupiter.api.Test
