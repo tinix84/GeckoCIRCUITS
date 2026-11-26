@@ -55,7 +55,7 @@ public final class ProjectData implements Serializable {
     private transient AcProvenance acProvenance;
 
     public AcDocumentSettings getAcSettings() { return acSettings; }
-    public List<ParameterDefinition> getRootParameterDefinitions() { return rootParameterDefinitions; }
+    public List<ParameterDefinition> getRootParameterDefinitions() { return List.copyOf(rootParameterDefinitions); }
     public AcProvenance getAcProvenance() { return acProvenance; }
     private static final long serialVersionUID = 1L;
     private transient List<ImportIssue> conversionIssues = List.of();
