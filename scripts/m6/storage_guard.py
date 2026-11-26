@@ -3,14 +3,16 @@
 from pathlib import Path
 import shutil
 
-FLOOR = 10_000_000_000
+FLOOR = 4_200_000_000
+CASE_RESERVE = 512_000_000
+DIRTY_RESERVE = 32_000_000
 
 
-def require_free_space():
+def require_free_space(reserve=0):
     drives = {drive: shutil.disk_usage(drive).free for drive in ('C:/', 'D:/')}
-    if min(drives.values()) < FLOOR:
+    if min(drives.values()) < FLOOR + reserve:
         raise RuntimeError(
-            f'Storage guard: require at least {FLOOR} free bytes on both C: and D:; '
+            f'Storage guard: require at least {FLOOR} free bytes plus {reserve} reserve on both C: and D:; '
             f'available {drives}. No next case may start.')
     return drives
 

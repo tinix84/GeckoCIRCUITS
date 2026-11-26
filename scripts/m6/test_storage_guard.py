@@ -5,7 +5,7 @@ from unittest import TestCase, main
 from unittest.mock import Mock, patch
 
 import batch
-from storage_guard import FLOOR, require_free_space
+from storage_guard import CASE_RESERVE, FLOOR, require_free_space
 
 Usage = namedtuple('Usage', 'total used free')
 
@@ -27,6 +27,11 @@ class StorageAdmissionTest(TestCase):
         with patch('storage_guard.shutil.disk_usage', side_effect=OSError('drive unavailable')):
             with self.assertRaises(OSError):
                 require_free_space()
+
+    def test_launch_reserve_is_required_above_floor(self):
+        with patch('storage_guard.shutil.disk_usage', return_value=Usage(100 * FLOOR, 0, FLOOR + CASE_RESERVE - 1)):
+            with self.assertRaisesRegex(RuntimeError, 'reserve'):
+                require_free_space(CASE_RESERVE)
 
     def test_low_disk_prevents_case_directory_and_process(self):
         with patch('storage_guard.shutil.disk_usage', return_value=Usage(100 * FLOOR, 0, FLOOR - 1)):

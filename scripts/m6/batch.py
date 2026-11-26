@@ -7,11 +7,14 @@ import shutil
 import subprocess
 import sys
 import time
-from storage_guard import FLOOR, directory_bytes, require_free_space
+from storage_guard import CASE_RESERVE, DIRTY_RESERVE, FLOOR, directory_bytes, require_free_space
 
 BASE = Path(os.environ.get('GECKO_M6_EVIDENCE_ROOT', r'D:\codex-evidence\gecko-m6-20261124'))
 OUT = Path(os.environ.get('GECKO_M6_RUN_DIR', str(BASE / 'archive-import-batch-01')))
-HARNESS = BASE / 'archive-import-batch-01'
+HARNESS = Path(os.environ.get('GECKO_M6_HARNESS_DIR', str(BASE / 'archive-import-batch-01')))
+MODE = os.environ.get('GECKO_M6_MODE', 'selected_profile')
+if MODE not in ('selected_profile', 'unselected', 'legacy-non-ac'):
+    raise ValueError(f'Unknown audit mode: {MODE}')
 TEMP = Path(os.environ.get('GECKO_M6_TEMP_DIR', str(Path(r'D:\codex-temp\gecko-m6') / OUT.name)))
 AUTHOR = BASE / 'author-source'
 STOCK = Path(r'C:\Users\tinix\AppData\Local\LTspice\lib\sym')
@@ -28,6 +31,12 @@ EXPECTED = {
     CORE: '0892cf4ceba00a001a454e7938facb0f0d717d3318f6680f20ce76d9a5ab9623',
     DESKTOP: '9bd0b1f64a25acb878bc3e4e3f0292610893be707c48bc0c23b7b341e4f0dac4',
 }
+runtime_path = os.environ.get('GECKO_M6_RUNTIME_MANIFEST')
+if runtime_path:
+    runtime = json.loads(Path(runtime_path).read_text(encoding='utf-8'))
+    JAVA, CORE, DESKTOP = (Path(runtime[name]['path']) for name in ('java', 'core', 'desktop'))
+    EXPECTED = {CAT: EXPECTED[CAT], BASE / 'LTspice_SMPS.zip': EXPECTED[BASE / 'LTspice_SMPS.zip'],
+                **{Path(runtime[name]['path']): runtime[name]['sha256'] for name in ('java', 'core', 'desktop')}}
 BUDGET = 100_000_000
 CASE_LIMIT = 2_000_000
 
@@ -43,8 +52,8 @@ def write(path, data):
         json.dump(data, stream, ensure_ascii=False, indent=2)
         stream.write('\n')
 
-def storage():
-    drives = require_free_space()
+def storage(reserve=CASE_RESERVE):
+    drives = require_free_space(reserve)
     if TEMP.resolve().is_relative_to(BASE.resolve()) or TEMP.resolve().is_relative_to(OUT.resolve()):
         raise RuntimeError('Test temporary files must be outside the evidence folders')
     total = directory_bytes(OUT) + directory_bytes(TEMP)
@@ -53,7 +62,7 @@ def storage():
     return drives
 
 def provenance(catalog):
-    pinned = {str(path): digest(path) for path in (*EXPECTED, JAVA, CONTEXT)}
+    pinned = {str(path): digest(path) for path in (*EXPECTED, JAVA, CONTEXT, HARNESS / 'ImportAndParse.class')}
     for path, sha in EXPECTED.items():
         if pinned[str(path)] != sha:
             raise ValueError(f'Pinned input differs: {path}')
@@ -86,6 +95,10 @@ def preview():
     assert {c['archive_path'] for c in cases if not c['analysis_directives']} == set(contexts)
     assert len({c['source'].casefold() for c in cases}) == len({c['output'] for c in cases}) == 467
     assert not any(Path(c['output']).exists() for c in cases)
+    if MODE == 'legacy-non-ac':
+        cases = [case for case in cases if not any(d.split()[0].lower() == '.ac'
+                                                 for d in case['analysis_directives'])]
+        assert len(cases) == 345
     write(OUT / 'input-provenance-before.json', inputs)
     write(OUT / 'preview.json', {'profile': PROFILE, 'analysis_counts': counts, 'cases': cases,
                                'storage_floor_bytes': FLOOR, 'temp_directory': str(TEMP)})
@@ -101,7 +114,7 @@ def monitor_case(process, start, output, temp):
         try:
             limit = directory_bytes(output) + directory_bytes(temp) > CASE_LIMIT
             if time.monotonic() >= next_storage_check:
-                storage()
+                storage(reserve=DIRTY_RESERVE)
                 next_storage_check = time.monotonic() + 1
         except (RuntimeError, OSError) as failure:
             storage_error = str(failure)
@@ -122,7 +135,12 @@ def run_case(case):
     args = [str(JAVA), '-Xms32m', '-Xmx512m', '-Djava.awt.headless=true', '-Dfile.encoding=UTF-8',
             f'-Djava.io.tmpdir={temp}',
             '-cp', os.pathsep.join(map(str, (HARNESS, CORE, DESKTOP))), 'ImportAndParse', case['source'],
-            str(model), '--symbols', str(STOCK), '--source-root', str(AUTHOR), '--source-root', str(AUTHOR / 'Tof'), '--source-root', str(AUTHOR / 'Tof' / 'Subcircuits'), '--profile', PROFILE]
+            str(model)]
+    if MODE != 'legacy-non-ac':
+        args += ['--symbols', str(STOCK), '--source-root', str(AUTHOR), '--source-root', str(AUTHOR / 'Tof'),
+                 '--source-root', str(AUTHOR / 'Tof' / 'Subcircuits')]
+    if MODE == 'selected_profile':
+        args += ['--profile', PROFILE]
     stdout_path = model.parent / 'stdout.txt'
     stderr_path = model.parent / 'stderr.txt'
     with stdout_path.open('xb') as stdout, stderr_path.open('xb') as stderr:

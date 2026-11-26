@@ -1,23 +1,25 @@
 import collections
 from pathlib import Path
 import re
+import os
 
 from batch import BUDGET, CASE_LIMIT, FLOOR, OUT, digest, read, write
 
-cases = read(OUT / 'preview.json')['cases']
-recorded_floor = read(OUT / 'preview.json').get('storage_floor_bytes', 4_200_000_000)
+AUDIT = Path(os.environ.get('GECKO_M6_AUDIT_DIR', str(OUT)))
+cases = read(AUDIT / 'preview.json')['cases']
+recorded_floor = read(AUDIT / 'preview.json').get('storage_floor_bytes', 4_200_000_000)
 series = {
-    'selected_profile': read(OUT / 'results.json'),
-    'unselected_with_stock_and_roots': read(OUT / 'unselected/results.json'),
-    'legacy_non_ac_without_stock_or_hierarchy': read(OUT / 'legacy-non-ac/results.json'),
+    'selected_profile': read(AUDIT / 'results.json'),
+    'unselected_with_stock_and_roots': read(AUDIT / 'unselected/results.json'),
+    'legacy_non_ac_without_stock_or_hierarchy': read(AUDIT / 'legacy-non-ac/results.json'),
 }
 indexed = {key: {r['id']: r for r in rows} for key, rows in series.items()}
 assert [len(table) for table in indexed.values()] == [467, 467, 345]
 assert [len(rows) for rows in series.values()] == [467, 467, 345]
 assert all((folder / 'input-provenance-before.json').read_bytes() ==
            (folder / 'input-provenance-after.json').read_bytes() ==
-           (OUT / 'input-provenance-before.json').read_bytes()
-           for folder in (OUT, OUT / 'unselected', OUT / 'legacy-non-ac'))
+           (AUDIT / 'input-provenance-before.json').read_bytes()
+           for folder in (AUDIT, AUDIT / 'unselected', AUDIT / 'legacy-non-ac'))
 
 def issue_family(issue):
     message = issue['message'] or ''
@@ -62,7 +64,7 @@ for key, table in indexed.items():
                                        'output_bytes': row['output_bytes'], 'status': row['status']})
         if row['output']:
             output = Path(row['output'])
-            assert output.is_relative_to(OUT) and output.stat().st_size == row['output_bytes']
+            assert output.is_relative_to(AUDIT) and output.stat().st_size == row['output_bytes']
             assert digest(output) == row['output_sha256']
             assert read(output.parent / 'result.json') == row
         for issue in row['issues']:
