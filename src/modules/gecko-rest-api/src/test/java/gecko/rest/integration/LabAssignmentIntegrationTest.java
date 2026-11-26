@@ -52,8 +52,8 @@ class LabAssignmentIntegrationTest {
                 Path.of("../gecko-simulation-core/src/test/resources/ipes/buck_simple.ipes"));
         String assignment = """
                 {"title":"Buck","duration":0.004,"timeStep":0.000001,"checks":[
-                  {"signal":"u2","metric":"mean","t0":0.0029,"t1":0.0039,"target":18.82,"tolerance":0.3764},
-                  {"signal":"iL","metric":"ripple_pp","t0":0.0029,"t1":0.0039,"target":1.17,"tolerance":0.10}
+                  {"signal":"u2","metric":"mean","t0":0.003,"t1":0.004,"target":18.82,"tolerance":0.3764},
+                  {"signal":"iL","metric":"ripple_pp","t0":0.003,"t1":0.004,"target":1.17,"tolerance":0.10}
                 ]}
                 """;
         var definition = new MockMultipartFile("assignment", "definition.json", "application/json",

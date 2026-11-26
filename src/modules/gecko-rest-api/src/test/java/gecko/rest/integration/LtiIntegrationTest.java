@@ -117,6 +117,7 @@ class LtiIntegrationTest {
         assertEquals(CLIENT, linkClaims.getIssuer());
         assertEquals(endpoint("issuer"), linkClaims.getAudience().getFirst());
         assertEquals("LtiDeepLinkingResponse", linkClaims.getStringClaim(CLAIM + "message_type"));
+        assertNotNull(linkClaims.getStringClaim("nonce"));
         assertEquals("return this data", linkClaims.getStringClaim(DEEP + "data"));
         assertTrue(linkClaims.getClaim(DEEP + "content_items").toString().contains(assignment));
 

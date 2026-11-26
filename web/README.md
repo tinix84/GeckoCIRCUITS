@@ -30,3 +30,11 @@ npm test
 npx playwright install chromium
 npx playwright test
 ```
+
+## Embedded tutorials
+
+Set `extra.simulator_url` in `mkdocs.yml` to the base URL of the hosted Web app.
+The docs open `/embed?circuit=<url-or-id>&signals=Vout,IL` with a tutorial circuit
+and its starting scope channels. The app copies a stored circuit before a student
+edits it. A hosted circuit file must allow the Web app origin through CORS if the
+docs and the Web app use different origins.

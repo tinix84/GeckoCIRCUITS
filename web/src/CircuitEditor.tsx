@@ -11,13 +11,16 @@ import { downloadBlob } from './download';
 type Model = components['schemas']['ComponentListResponse'];
 type Component = components['schemas']['ComponentInfo'];
 
-export function CircuitEditor() {
-  const { id } = useParams();
+export function CircuitEditor({ circuitId, onSimulation }: {
+  circuitId?: string; onSimulation?: (id: string) => void;
+} = {}) {
+  const route = useParams();
+  const id = circuitId ?? route.id;
   if (!id) return <Alert severity="error">Select a circuit.</Alert>;
-  return <LoadedCircuit key={id} id={id} />;
+  return <LoadedCircuit key={id} id={id} onSimulation={onSimulation} />;
 }
 
-function LoadedCircuit({ id }: { id: string }) {
+function LoadedCircuit({ id, onSimulation }: { id: string; onSimulation?: (id: string) => void }) {
   const [model, setModel] = useState<Model>();
   const [name, setName] = useState('');
   const [selection, setSelection] = useState<number>();
@@ -75,7 +78,8 @@ function LoadedCircuit({ id }: { id: string }) {
         body: { circuitId: id },
       }), 'Could not run the circuit');
       if (!response.simulationId) throw new Error('The server did not return a simulation ID.');
-      navigate('/simulations/' + encodeURIComponent(response.simulationId));
+      if (onSimulation) onSimulation(response.simulationId);
+      else navigate('/simulations/' + encodeURIComponent(response.simulationId));
     } catch (cause) {
       setActionError(errorMessage(cause));
     } finally {

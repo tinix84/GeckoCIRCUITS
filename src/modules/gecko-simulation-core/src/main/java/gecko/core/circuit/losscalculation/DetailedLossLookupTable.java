@@ -22,12 +22,14 @@ public final class DetailedLossLookupTable {
         double[][] currentValues = new double[messkurvePvSWITCH.size()][];
         double[][] energyValues = new double[messkurvePvSWITCH.size()][];
         double[] temperatures = new double[messkurvePvSWITCH.size()];
+        boolean switchingEnergy = !messkurvePvSWITCH.isEmpty()
+                && messkurvePvSWITCH.getFirst() instanceof SwitchingLossCurve;
         for(int i = 0; i < messkurvePvSWITCH.size(); i++) {
             LossCurve curve = messkurvePvSWITCH.get(i);
             currentValues[i] = curve.data[0];
             energyValues[i] = new double[curve.data[dataIndex].length];
             System.arraycopy(curve.data[dataIndex], 0, energyValues[i], 0, energyValues[i].length);
-            if(messkurvePvSWITCH.get(0) instanceof SwitchingLossCurve) {
+            if(switchingEnergy) {
                 for(int j = 0; j < energyValues[i].length; j++) {
                     double curveBlockingVoltage = ((SwitchingLossCurve) curve)._uBlock.getDoubleValue();
                     energyValues[i][j] /= curveBlockingVoltage;
@@ -36,15 +38,18 @@ public final class DetailedLossLookupTable {
             temperatures[i] = curve.tj.getDoubleValue();
         }
 
-        return new DetailedLossLookupTable(currentValues, energyValues, temperatures);
+        return new DetailedLossLookupTable(currentValues, energyValues, temperatures, switchingEnergy);
     }
 
     private final double[][] _energyValues;
     private final double[][] _currentValues;
     private final double[] _temperatures;
     private final boolean _allCurrentsPositive;
+    private final boolean _switchingEnergy;
 
-    private DetailedLossLookupTable(final double[][] currentValues, final double[][] energyValues, final double[] temperatures) {
+    private DetailedLossLookupTable(final double[][] currentValues, final double[][] energyValues, final double[] temperatures,
+            final boolean switchingEnergy) {
+        _switchingEnergy = switchingEnergy;
         _energyValues = energyValues;
         _currentValues = currentValues;
 
@@ -85,7 +90,7 @@ public final class DetailedLossLookupTable {
         double upperTempEnergy = findLossValueOnCurve(signCorrectedCurrent,  _currentValues[upperTempIndex], data);
 
         if (upperTempIndex == lowerTempIndex) {
-            return upperTempEnergy;
+            return _switchingEnergy ? Math.max(upperTempEnergy, 0) : upperTempEnergy;
         }
 
         data = _energyValues[lowerTempIndex];

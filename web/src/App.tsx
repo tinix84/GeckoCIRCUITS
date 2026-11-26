@@ -11,6 +11,8 @@ const Scope = lazy(() => import('./Scope').then(({ Scope }) => ({ default: Scope
 const CircuitEditor = lazy(() => import('./CircuitEditor').then(({ CircuitEditor }) => ({ default: CircuitEditor })));
 const SchematicDraft = lazy(() => import('./SchematicDraftPage').then(({ SchematicDraftPage }) => ({ default: SchematicDraftPage })));
 
+const TutorialEmbed = lazy(() => import('./TutorialEmbed').then(({ TutorialEmbed }) => ({ default: TutorialEmbed })));
+
 function Login() {
   const { signIn } = useSession();
   const [key, setKey] = useState('');
@@ -187,6 +189,13 @@ function Dashboard() {
 export function App() {
   const { active, signOut } = useSession();
   const location = useLocation();
+  if (location.pathname === '/embed') {
+    return <Container component="main" className="content">
+      <Suspense fallback={<LinearProgress aria-label="Loading tutorial simulator" />}>
+        <TutorialEmbed key={location.search} search={location.search} login={<Login />} />
+      </Suspense>
+    </Container>;
+  }
   return <>
     <Box component="header" className="topbar">
       <Container className="topbar-inner" sx={{ display: 'flex' }}>

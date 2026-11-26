@@ -139,3 +139,25 @@
     display: none !important;
   }
 }
+
+.tutorial-with-simulator {
+  display: grid;
+  gap: 1rem;
+}
+
+.tutorial-with-simulator > * {
+  min-width: 0;
+}
+
+.tutorial-with-simulator iframe {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.3rem;
+  height: 44rem;
+  width: 100%;
+}
+
+@media (min-width: 80em) {
+  .tutorial-with-simulator {
+    grid-template-columns: minmax(0, 1fr) minmax(20rem, 1fr);
+  }
+}
