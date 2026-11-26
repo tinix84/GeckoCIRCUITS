@@ -11,6 +11,7 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import gecko.rest.config.ApiIdentity;
+import gecko.rest.config.ApiKeyProperties;
 import gecko.rest.service.LtiService;
 import jakarta.servlet.http.Cookie;
 import java.io.IOException;
@@ -72,6 +73,7 @@ class LtiIntegrationTest {
     @TempDir static Path storage;
     @Autowired private MockMvc mvc;
     @Autowired private ObjectMapper json;
+    @Autowired private ApiKeyProperties apiKeys;
 
     @DynamicPropertySource
     static void registrations(DynamicPropertyRegistry settings) throws IOException {
@@ -81,6 +83,7 @@ class LtiIntegrationTest {
         Files.writeString(jwk, TOOL_KEY.toJSONString());
         settings.add("gecko.education.directory", () -> storage.resolve("gradebook").toString());
         settings.add("gecko.api.tenants." + ApiIdentity.keyId("instructor"), () -> tenant);
+        settings.add("gecko.api.quota." + tenant + ".max-concurrent", () -> 1);
         settings.add("gecko.education.lti.base-url", () -> BASE);
         settings.add("gecko.education.lti.signing-jwk", jwk::toString);
         String platform = "gecko.education.lti.registrations[0].";
@@ -128,6 +131,16 @@ class LtiIntegrationTest {
         mvc.perform(multipart(PATH + "/submit").file(circuit()).cookie(sessionCookie(learner))
                         .param("csrf", "incorrect"))
                 .andExpect(status().isUnauthorized());
+        var quota = apiKeys.quotaFor(LtiService.tenantFor(endpoint("issuer"), CLIENT, DEPLOYMENT, COURSE));
+        quota.setMaxConcurrent(0);
+        try {
+            mvc.perform(multipart(PATH + "/submit").file(circuit()).cookie(sessionCookie(learner))
+                            .param("csrf", value(learner, "csrf")))
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(jsonPath("$.message").value("Tenant quota exceeded."));
+        } finally {
+            quota.setMaxConcurrent(1);
+        }
         mvc.perform(multipart(PATH + "/submit").file(circuit()).cookie(sessionCookie(learner))
                         .param("csrf", value(learner, "csrf")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.submission.score").value(1.0))

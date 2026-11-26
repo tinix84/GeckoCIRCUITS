@@ -208,6 +208,10 @@ public class SimulationService {
     }
 
     Map<String, double[]> runEmbeddedCircuit(byte[] circuit, SimulationRequest request) {
+        return runEmbeddedCircuit(circuit, request, currentTenant());
+    }
+
+    Map<String, double[]> runEmbeddedCircuit(byte[] circuit, SimulationRequest request, String tenant) {
         requireOwnership();
         var parser = new CircuitFileParser();
         CircuitSnapshot source;
@@ -217,8 +221,7 @@ public class SimulationService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot parse the submitted circuit", e);
         }
         PreparedCircuit prepared = prepare(request, new CircuitFileService.ResolvedSource(source, true));
-        String tenant = currentTenant();
-        Runnable release = admitEmbeddedSimulation(tenant);
+        Runnable release = admitEmbeddedSimulation(keys.isTenantEnabled() ? tenant : null);
         var started = new AtomicBoolean();
         var released = new AtomicBoolean();
         Runnable finish = () -> {

@@ -51,7 +51,7 @@ public class LabAssignmentService {
     public LabAssignment create(CourseUser instructor, Definition definition, byte[] reference) throws IOException {
         validate(definition);
         LabAssignment assignment = new LabAssignment(UUID.randomUUID(), definition, clock.instant());
-        if (evaluate(definition, reference).stream().anyMatch(result -> !result.passed())) {
+        if (evaluate(instructor.tenant(), definition, reference).stream().anyMatch(result -> !result.passed())) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "The reference circuit must pass each check.");
         }
@@ -86,7 +86,7 @@ public class LabAssignmentService {
 
     public Submission submit(CourseUser student, UUID assignmentId, byte[] circuit) throws IOException {
         LabAssignment assignment = get(student.tenant(), assignmentId);
-        List<CheckResult> results = evaluate(assignment.definition(), circuit);
+        List<CheckResult> results = evaluate(student.tenant(), assignment.definition(), circuit);
         double score = (double) results.stream().mapToInt(CheckResult::score).sum() / results.size();
         var submission = new Submission(UUID.randomUUID(), assignmentId, student.subject(), clock.instant(), score, results);
         writeNew(directory(student.tenant(), assignmentId).resolve("submissions").resolve(submission.id() + ".json"),
@@ -109,7 +109,7 @@ public class LabAssignmentService {
         }
     }
 
-    private List<CheckResult> evaluate(Definition definition, byte[] circuit) throws IOException {
+    private List<CheckResult> evaluate(String tenant, Definition definition, byte[] circuit) throws IOException {
         if (circuit.length == 0 || circuit.length > MAX_CIRCUIT_BYTES) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Upload an .ipes circuit up to 1 MiB.");
         }
@@ -120,7 +120,7 @@ public class LabAssignmentService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot read the submitted circuit.", e);
         }
         Map<String, double[]> waveforms = simulations.runEmbeddedCircuit(input,
-                new SimulationRequest(null, definition.duration(), definition.timeStep()));
+                new SimulationRequest(null, definition.duration(), definition.timeStep()), tenant);
         return definition.checks().stream()
                 .map(check -> evaluate(check, waveforms, definition.timeStep())).toList();
     }

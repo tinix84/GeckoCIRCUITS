@@ -56,11 +56,11 @@ class ObservabilityIntegrationTest {
                 mvc.perform(get("/api/v1/simulations/{id}", simulationId).header("X-API-Key", KEY))
                         .andExpect(jsonPath("$.status").value("COMPLETED")));
 
-        mvc.perform(get("/actuator/prometheus").header("X-API-Key", KEY))
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> mvc.perform(get("/actuator/prometheus").header("X-API-Key", KEY))
                 .andExpect(status().isOk())
                 .andExpect(content().string(matchesPattern("(?s).*\\ngecko_simulations_total\\{status=\"COMPLETED\",?\\} 1\\.0\\n.*")))
                 .andExpect(content().string(containsString("gecko_simulation_duration_seconds_bucket")))
                 .andExpect(content().string(containsString("gecko_simulations_active 0.0")))
-                .andExpect(content().string(containsString("gecko_simulation_queue_depth 0.0")));
+                .andExpect(content().string(containsString("gecko_simulation_queue_depth 0.0"))));
     }
 }
