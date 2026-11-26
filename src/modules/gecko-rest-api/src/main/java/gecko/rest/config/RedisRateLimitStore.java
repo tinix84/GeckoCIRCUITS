@@ -11,22 +11,28 @@ import org.springframework.stereotype.Component;
 @Component
 @Profile("redis")
 final class RedisRateLimitStore implements RateLimitStore {
-    // Keep both keys in one Redis Cluster slot. Keep the window in the key so expiry
-    // delays or different replica clocks cannot extend a budget into the next minute.
+    // Redis selects the minute for all API replicas. One key keeps both counters atomic.
+    @SuppressWarnings("rawtypes")
     private static final RedisScript<List> ADMIT = RedisScript.of("""
-            local general = tonumber(redis.call('GET', KEYS[1]) or '0')
-            local simulations = tonumber(redis.call('GET', KEYS[2]) or '0')
+            local now = tonumber(redis.call('TIME')[1])
+            local reset = (math.floor(now / 60) + 1) * 60
+            local ttl = reset - now
+            local values = redis.call('HMGET', KEYS[1], 'reset', 'general', 'simulations')
+            local general = 0
+            local simulations = 0
+            if tonumber(values[1]) == reset then
+                general = tonumber(values[2])
+                simulations = tonumber(values[3])
+            end
             local submission = ARGV[3] == 'true'
             if general >= tonumber(ARGV[1]) or (submission and simulations >= tonumber(ARGV[2])) then
-                return {0, general, simulations}
+                return {0, general, simulations, reset, ttl}
             end
-            general = redis.call('INCR', KEYS[1])
-            if general == 1 then redis.call('EXPIRE', KEYS[1], ARGV[4]) end
-            if submission then
-                simulations = redis.call('INCR', KEYS[2])
-                if simulations == 1 then redis.call('EXPIRE', KEYS[2], ARGV[4]) end
-            end
-            return {1, general, simulations}
+            general = general + 1
+            if submission then simulations = simulations + 1 end
+            redis.call('HSET', KEYS[1], 'reset', reset, 'general', general, 'simulations', simulations)
+            redis.call('EXPIRE', KEYS[1], ttl)
+            return {1, general, simulations, reset, ttl}
             """, List.class);
 
     private final StringRedisTemplate redis;
@@ -38,16 +44,17 @@ final class RedisRateLimitStore implements RateLimitStore {
     }
 
     @Override
-    public Admission admit(String client, long window, long ttl, boolean submission,
+    public Admission admit(String client, long now, boolean submission,
                            int generalLimit, int simulationLimit) {
-        String prefix = namespace + ":rate:{" + ApiIdentity.keyId(client) + "}:" + window;
-        List<?> result = redis.execute(ADMIT, List.of(prefix + ":all", prefix + ":simulation"),
+        String key = namespace + ":rate:{" + ApiIdentity.keyId(client) + "}:budget";
+        List<?> result = redis.execute(ADMIT, List.of(key),
                 Integer.toString(generalLimit), Integer.toString(simulationLimit),
-                Boolean.toString(submission), Long.toString(ttl + 60));
-        if (result == null || result.size() != 3) {
+                Boolean.toString(submission));
+        if (result == null || result.size() != 5) {
             throw new DataRetrievalFailureException("Missing Redis admission result");
         }
         return new Admission(((Number) result.get(0)).longValue() == 1,
-                ((Number) result.get(1)).intValue(), ((Number) result.get(2)).intValue());
+                ((Number) result.get(1)).intValue(), ((Number) result.get(2)).intValue(),
+                ((Number) result.get(3)).longValue(), ((Number) result.get(4)).longValue());
     }
 }

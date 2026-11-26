@@ -29,6 +29,11 @@ final class ListPage {
         descending = parts[1].equals("desc");
     }
 
+    int number() { return number; }
+    int size() { return size; }
+    String field() { return field; }
+    boolean descending() { return descending; }
+
     <T> List<T> select(List<T> items, Map<String, Comparator<T>> orders) {
         Comparator<T> comparator = orders.get(field);
         if (descending) comparator = comparator.reversed();

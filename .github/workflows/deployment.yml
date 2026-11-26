@@ -1,0 +1,80 @@
+name: Deployment
+
+on:
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - '.github/workflows/deployment.yml'
+      - 'deploy/**'
+      - 'docker/**'
+      - 'docker-compose.yml'
+      - 'pom-reactor.xml'
+      - 'src/modules/gecko-rest-api/**'
+      - 'src/modules/gecko-simulation-core/**'
+  push:
+    branches: [main, dev]
+    paths:
+      - '.github/workflows/deployment.yml'
+      - 'deploy/**'
+      - 'docker/**'
+      - 'docker-compose.yml'
+      - 'pom-reactor.xml'
+      - 'src/modules/gecko-rest-api/**'
+      - 'src/modules/gecko-simulation-core/**'
+
+permissions:
+  contents: read
+
+jobs:
+  deployment-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+      - name: Validate dashboard and Helm manifests
+        run: |
+          jq -e . deploy/grafana/gecko-rest-api.json >/dev/null
+          chart=deploy/helm/gecko-rest-api
+          helm lint "$chart" --strict
+          tools_dir=$(mktemp -d)
+          base=https://github.com/yannh/kubeconform/releases/download/v0.6.7
+          archive=kubeconform-linux-amd64.tar.gz
+          curl -fsSL "$base/$archive" -o "$tools_dir/$archive"
+          curl -fsSL "$base/CHECKSUMS" -o "$tools_dir/CHECKSUMS"
+          (cd "$tools_dir" && grep " $archive$" CHECKSUMS | sha256sum -c)
+          tar -xzf "$tools_dir/$archive" -C "$tools_dir" kubeconform
+          helm template gecko "$chart" | "$tools_dir/kubeconform" -strict -summary
+          helm template gecko "$chart" --set ingress.enabled=true --set ingress.host=gecko.example.test \
+            --set autoscaling.enabled=true --set auth.enabled=true --set auth.keys=deployment-smoke-key \
+            --set auth.jwtEnabled=true --set auth.jwtSecret=deployment-smoke-only-32-byte-key \
+            | "$tools_dir/kubeconform" -strict -summary
+      - uses: helm/kind-action@v1.12.0
+        with:
+          cluster_name: gecko-ci
+      - name: Install and verify the API in kind
+        run: |
+          docker build -f src/modules/gecko-rest-api/Dockerfile -t geckocircuits/rest-api:ci .
+          kind load docker-image geckocircuits/rest-api:ci --name gecko-ci
+          helm upgrade --install gecko deploy/helm/gecko-rest-api \
+            --set image.tag=ci --set image.pullPolicy=Never --set auth.enabled=true \
+            --set auth.keys=deployment-smoke-key --wait --timeout 4m
+          kubectl port-forward service/gecko 18080:8080 > "$RUNNER_TEMP/gecko-port-forward.log" 2>&1 &
+          forward_pid=$!
+          trap 'kill "$forward_pid"' EXIT
+          url=http://127.0.0.1:18080/gecko
+          curl --fail --silent --show-error --retry 12 --retry-connrefused --retry-delay 1 "$url/api/health" |
+            jq -e '.status == "UP"'
+          for probe in liveness readiness; do
+            curl -fsS "$url/actuator/health/$probe" | jq -e '.status == "UP"'
+          done
+          test "$(curl -sS -o /dev/null -w '%{http_code}' "$url/actuator/prometheus")" = 401
+          curl -fsS -H 'X-API-Key: deployment-smoke-key' "$url/actuator/prometheus" |
+            grep 'gecko_simulation_queue_depth'
+      - name: Show Kubernetes diagnostics on failure
+        if: failure()
+        run: |
+          kubectl get pods,services,events -o wide
+          kubectl logs deployment/gecko --all-containers

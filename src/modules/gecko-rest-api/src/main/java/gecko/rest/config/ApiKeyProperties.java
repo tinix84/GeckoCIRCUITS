@@ -25,6 +25,7 @@ public class ApiKeyProperties {
     /** Whether API key authentication is enforced. Default true. Set false to disable for testing. */
     private boolean authEnabled = true;
     private boolean tenantEnabled;
+    private boolean metricsPublic;
     private java.util.Map<String, String> tenants = new java.util.HashMap<>();
     private java.util.Map<String, SimulationJobLimits.TenantQuota> quota = new java.util.HashMap<>();
 
@@ -38,6 +39,9 @@ public class ApiKeyProperties {
     private Role defaultRole = Role.ADMIN;
 
     public enum Role { ADMIN, USER, READONLY }
+
+    public boolean isMetricsPublic() { return metricsPublic; }
+    public void setMetricsPublic(boolean value) { metricsPublic = value; }
 
     public boolean isTenantEnabled() { return tenantEnabled; }
     public void setTenantEnabled(boolean value) { tenantEnabled = value; }

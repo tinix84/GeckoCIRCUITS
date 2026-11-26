@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "gecko-rest-api.selector" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "gecko-rest-api.selector" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: api
+          image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-config
+            {{- if or .Values.auth.enabled .Values.auth.jwtEnabled .Values.auth.existingSecret }}
+            - secretRef:
+                name: {{ include "gecko-rest-api.secretName" . }}
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /gecko/actuator/health/liveness
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /gecko/actuator/health/liveness
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /gecko/actuator/health/readiness
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

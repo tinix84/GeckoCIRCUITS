@@ -37,7 +37,7 @@ services:
       - ./logs:/app/logs
 
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/gecko/api/health"]
       interval: 30s
       timeout: 3s
       start_period: 40s
@@ -69,6 +69,6 @@ networks:
 # docker-compose ps                 # Show status
 #
 # Access:
-# - REST API: http://localhost:8080/api/health
+# - REST API: http://localhost:8080/gecko/api/health
 # - Swagger UI: http://localhost:8080/swagger-ui.html
 # - API Docs: http://localhost:8080/api-docs

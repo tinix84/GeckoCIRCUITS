@@ -12,7 +12,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 /** Applies general and submission budgets in one atomic fixed-window admission. */
 public final class RateLimitFilter extends OncePerRequestFilter {
-    private static final Set<String> EXEMPT = Set.of("/api/health", "/api/v1/health", "/actuator/health",
+    private static final Set<String> EXEMPT = Set.of("/api/health", "/api/v1/health", "/actuator/health", ApiKeyAuthFilter.PROMETHEUS_PATH,
             "/api-docs", "/v3/api-docs", "/swagger-ui", "/swagger-ui.html", "/ws", "/ws-raw");
     private final RateLimitProperties properties;
     private final Clock clock;
@@ -67,18 +67,16 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 
     private Decision admit(String client, boolean submission) {
         long now = clock.instant().getEpochSecond();
-        long window = Math.floorDiv(now, 60);
-        long reset = (window + 1) * 60;
-        long retryAfter = Math.max(reset - now, 1);
         int generalLimit = properties.getRateLimit();
         int simulationLimit = properties.getRateLimitSimulation();
-        RateLimitStore.Admission admission = store.admit(client, window, retryAfter, submission,
+        RateLimitStore.Admission admission = store.admit(client, now, submission,
                 generalLimit, simulationLimit);
         int limit = submission ? simulationLimit : generalLimit;
         int generalRemaining = generalLimit - admission.general();
         int remaining = submission ? Math.min(generalRemaining, simulationLimit - admission.simulations())
                 : generalRemaining;
-        return new Decision(admission.allowed(), limit, Math.max(remaining, 0), reset, retryAfter);
+        return new Decision(admission.allowed(), limit, Math.max(remaining, 0),
+                admission.reset(), admission.retryAfter());
     }
 
     private record Decision(boolean allowed, int limit, int remaining, long reset, long retryAfter) { }

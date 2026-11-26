@@ -4,10 +4,13 @@ import gecko.rest.config.SimulationJobLimits;
 import gecko.rest.model.SimulationResponse.SimulationStatus;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.UnaryOperator;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +18,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Profile("postgres")
 public class PostgresPersistence {
     private static final List<SimulationStatus> ACTIVE = List.of(SimulationStatus.PENDING, SimulationStatus.RUNNING);
+
+    private static final String LIVE_REPLICAS = """
+            with live_replicas as materialized (
+                select objid::integer as id
+                  from pg_locks
+                 where locktype = 'advisory' and objsubid = 2 and mode = 'ExclusiveLock' and granted
+                   and database = (select oid from pg_database where datname = current_database())
+                   and classid = cast(? as oid)
+            )
+            """;
 
     private final CircuitMetadataRepository circuits;
     private final SimulationMetadataRepository jobs;
@@ -38,6 +51,19 @@ public class PostgresPersistence {
     @Transactional(readOnly = true)
     public List<CircuitMetadata> circuits(String tenant) {
         return tenant == null ? circuits.findAll() : circuits.findByTenant(tenant);
+    }
+
+    public record CircuitPage(List<CircuitMetadata> rows, int total) { }
+
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public CircuitPage circuitPage(String tenant, int page, int size, String field, boolean descending) {
+        long total = tenant == null ? circuits.count() : circuits.countByTenant(tenant);
+        if ((long) page * size >= total) return new CircuitPage(List.of(), Math.toIntExact(total));
+        var direction = descending ? Sort.Direction.DESC : Sort.Direction.ASC;
+        var sort = field.equals("createdAt") ? Sort.by(direction, "uploadedAt", "id") : Sort.by(direction, "id");
+        var request = PageRequest.of(page, size, sort);
+        var rows = tenant == null ? circuits.findAll(request).getContent() : circuits.findByTenant(tenant, request);
+        return new CircuitPage(rows, Math.toIntExact(total));
     }
 
     @Transactional
@@ -130,19 +156,35 @@ public class PostgresPersistence {
     @Transactional
     public long activeJobs(String tenant) {
         recoverAbandonedJobs(tenant, null);
-        return jobs.countByTenantAndStatusIn(tenant, ACTIVE);
+        long embedded = jdbc.queryForObject(LIVE_REPLICAS + """
+                , expired as (
+                    delete from embedded_simulation_lease lease where lease.tenant = ?
+                      and not exists (select 1 from live_replicas live where live.id = lease.replica_id)
+                )
+                select count(*) from embedded_simulation_lease lease
+                 join live_replicas live on lease.replica_id = live.id where lease.tenant = ?
+                """, Long.class, replica.namespace(), tenant, tenant);
+        return embedded + jobs.countByTenantAndStatusIn(tenant, ACTIVE);
+    }
+
+    @Transactional
+    public void admitEmbeddedSimulation(UUID id, String tenant, int limit) {
+        lockTenant("simulation", tenant);
+        SimulationJobLimits.requireTenantCapacity(activeJobs(tenant), 1, limit);
+        jdbc.update("insert into embedded_simulation_lease (id, tenant, replica_id) values (?, ?, ?)",
+                id, tenant, replica.liveId());
+        replica.liveId();
+    }
+
+    @Transactional
+    public void releaseEmbeddedSimulation(UUID id) {
+        jdbc.update("delete from embedded_simulation_lease where id = ?", id);
     }
 
     private void recoverAbandonedJobs(String tenant, String id) {
         // Replica IDs are unique in this schema. A replica takes its lock before it can create a job.
-        jdbc.update("""
-                with live_replicas as materialized (
-                    select objid::integer as id
-                      from pg_locks
-                     where locktype = 'advisory' and objsubid = 2 and mode = 'ExclusiveLock' and granted
-                       and database = (select oid from pg_database where datname = current_database())
-                       and classid = cast(? as oid)
-                ), abandoned as materialized (
+        jdbc.update(LIVE_REPLICAS + """
+                , abandoned as materialized (
                     select job.id from simulation_job job
                      where job.status in ('PENDING', 'RUNNING')
                        and (cast(? as text) is null or job.tenant = ?)

@@ -1,0 +1,42 @@
+replicaCount: 1
+
+image:
+  repository: geckocircuits/rest-api
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  port: 8080
+
+config:
+  profiles: []
+  metricsPublic: false
+  extraEnv: {}
+
+auth:
+  enabled: false
+  jwtEnabled: false
+  keys: ""
+  jwtSecret: ""
+  existingSecret: ""
+
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  path: /gecko
+  tlsSecretName: ""
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 75
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 640Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi

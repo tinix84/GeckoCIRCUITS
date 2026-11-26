@@ -1,6 +1,5 @@
 package gecko.rest.integration;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import gecko.rest.config.ApiIdentity;
 import java.io.ByteArrayInputStream;
@@ -28,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
     "gecko.education.enabled=true", "gecko.api.auth-enabled=true",
     "gecko.api.keys=instructor,learner,other-instructor",
+    "gecko.api.quota.course-a.max-concurrent=1", "gecko.api.quota.course-b.max-concurrent=0",
     "gecko.api.jwt.enabled=true", "gecko.api.jwt.secret=lab-grading-test-signing-key-123456"
 })
 @ActiveProfiles("tenant")
@@ -58,6 +58,10 @@ class LabAssignmentIntegrationTest {
                 """;
         var definition = new MockMultipartFile("assignment", "definition.json", "application/json",
                 assignment.getBytes(StandardCharsets.UTF_8));
+        mvc.perform(multipart("/api/v1/assignments").file(definition).file(circuit(reference))
+                        .header("X-API-Key", "other-instructor"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.message").value("Tenant quota exceeded."));
         var create = mvc.perform(multipart("/api/v1/assignments").file(definition).file(circuit(reference))
                         .header("X-API-Key", "instructor"))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsByteArray();

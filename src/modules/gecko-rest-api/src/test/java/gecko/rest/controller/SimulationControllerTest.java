@@ -201,8 +201,6 @@ class SimulationControllerTest {
                 .thenReturn(testResponse);
         when(simulationService.getSimulationProgress(testSimulationId))
                 .thenReturn(50.0);
-        when(simulationService.isRunning(testSimulationId))
-                .thenReturn(true);
 
         mockMvc.perform(get("/api/v1/simulations/{id}/progress", testSimulationId)
                         .accept(MediaType.APPLICATION_JSON))

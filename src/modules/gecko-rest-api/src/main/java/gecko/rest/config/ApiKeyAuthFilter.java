@@ -21,6 +21,7 @@ import java.util.Set;
 public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
     public static final String API_KEY_HEADER = "X-API-Key";
+    static final String PROMETHEUS_PATH = "/actuator/prometheus";
     private static final Logger log = LoggerFactory.getLogger(ApiKeyAuthFilter.class);
 
     private static final Set<String> PUBLIC_PATH_PREFIXES = Set.of(
@@ -58,15 +59,17 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String path = requestPath(request);
+        boolean metrics = path.equals(PROMETHEUS_PATH) || path.startsWith(PROMETHEUS_PATH + "/");
 
         // Allow public paths
-        if (isPublicPath(path) || path.equals("/api/v1/auth/refresh") || LTI_ROUTES.contains(path)) {
+        if (isPublicPath(path) || path.equals("/api/v1/auth/refresh") || LTI_ROUTES.contains(path)
+                || (metrics && apiKeyProperties.isMetricsPublic())) {
             filterChain.doFilter(request, response);
             return;
         }
 
         // If auth is disabled, pass through
-        if (!apiKeyProperties.isAuthEnabled()) {
+        if (!apiKeyProperties.isAuthEnabled() && !metrics) {
             var context = org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
             context.setAuthentication(ApiIdentity.forKey(null, apiKeyProperties));
             org.springframework.security.core.context.SecurityContextHolder.setContext(context);
@@ -94,7 +97,9 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             }
         }
         String providedKey = request.getHeader(API_KEY_HEADER);
-        if (apiKeyProperties.isValidKey(providedKey)) {
+        boolean validKey = metrics ? providedKey != null && apiKeyProperties.getKeys().contains(providedKey)
+                : apiKeyProperties.isValidKey(providedKey);
+        if (validKey) {
             var context = org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
             context.setAuthentication(ApiIdentity.forKey(providedKey, apiKeyProperties));
             org.springframework.security.core.context.SecurityContextHolder.setContext(context);
