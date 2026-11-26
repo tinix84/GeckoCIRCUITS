@@ -28,10 +28,8 @@ jobs:
       - name: SpotBugs (zero bugs)
         run: mvn spotbugs:check --no-transfer-progress
 
-      - name: Install test dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb build-essential
+      - name: Install test dependencies and start native persistence services
+        run: bash scripts/start-native-persistence-ci.sh xvfb build-essential
 
       - name: Build native test libraries
         run: |
@@ -128,20 +126,8 @@ jobs:
           distribution: 'temurin'
           cache: maven
       - name: Start native PostgreSQL and Redis
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql redis-server
-          sudo systemctl start postgresql redis-server
-          sudo -u postgres psql -v ON_ERROR_STOP=1 -c "CREATE ROLE gecko LOGIN PASSWORD 'gecko_test';"
-          sudo -u postgres createdb -O gecko gecko_persistence_test
-          redis-cli ping
+        run: bash scripts/start-native-persistence-ci.sh
       - name: Verify optional persistence profiles
-        env:
-          GECKO_TEST_POSTGRES: "true"
-          GECKO_TEST_REDIS: "true"
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost/gecko_persistence_test
-          SPRING_DATASOURCE_USERNAME: gecko
-          SPRING_DATASOURCE_PASSWORD: gecko_test
         run: |
           mvn -f pom-reactor.xml -pl :gecko-rest-api -am test --no-transfer-progress \
             -Dtest=NativePersistenceTest -Dsurefire.failIfNoSpecifiedTests=false
