@@ -23,6 +23,7 @@ public final class ComponentHelp {
     private ComponentHelp() {
     }
 
+    /** Returns the component page or the component index when no page exists. */
     public static URI urlFor(AbstractComponentTyp type) {
         String slug = PAGES.get(type.getTypeInfo()._fixedIDString);
         return URI.create(slug == null ? COMPONENTS_URL : COMPONENTS_URL + slug + "/");

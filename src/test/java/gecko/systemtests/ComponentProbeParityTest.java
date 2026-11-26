@@ -107,6 +107,10 @@ class ComponentProbeParityTest {
     }
 
     static Path writeProbeBuck(boolean scopeProbe) throws Exception {
+        return writeProbeBuck(scopeProbe, "/L.1.i/C.1.v/D.1.state");
+    }
+
+    static Path writeProbeBuck(boolean scopeProbe, String references) throws Exception {
         String source;
         try (var gzip = new GZIPInputStream(Files.newInputStream(BUCK))) {
             source = new String(gzip.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n");
@@ -135,6 +139,7 @@ class ComponentProbeParityTest {
                 idStringDialog PROBE.1
                 <\\ElementCONTROL>
                 """ + "thermANZAHL 0");
+        fixture = fixture.replace("parameterString[] /L.1.i/C.1.v/D.1.state", "parameterString[] " + references);
         if (scopeProbe) {
             fixture = fixture.replace(channels, "/iL/probeI/u2/probeV/probeState/gate");
         }

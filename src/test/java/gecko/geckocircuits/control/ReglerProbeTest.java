@@ -34,8 +34,6 @@ class ReglerProbeTest {
         assertArrayEquals(new String[]{"L.1.i", "C.1.v", "D.1.state"}, probe.getOutputNames());
         assertSame(attachedTerminal, probe.YOUT.getFirst());
         assertEquals("current", attachedTerminal.getLabelObject().getLabelString());
-        assertEquals("L.copy.i , C.1., LL.1.i",
-                ProbeDialog.renameReferenceText("L.1.i , C.1., LL.1.i", "L.1", "L.copy"));
         assertThrows(IllegalArgumentException.class, () ->
                 ProbeDialog.appendReferences("D.1.", ProbeReference.parseText("D.1.state")));
     }
@@ -49,8 +47,9 @@ class ReglerProbeTest {
         assertArrayEquals(new String[]{"Input.L.i", "C.1.v", "D.1.state"}, probe.getOutputNames());
         probe.remapTargets(Map.of("D.1", "D.2"), true);
         assertArrayEquals(new String[]{"Input.L.i", "C.1.v", "D.2.state"}, probe.getOutputNames());
-        probe.remapTargets(Map.of("C.1", "C.2"), false);
-        assertArrayEquals(new String[]{"C.2.v"}, probe.getOutputNames());
+        probe.remapTargets(Map.of("C.1", "C/copy"), false);
+        assertArrayEquals(new String[]{"C/copy.v"}, probe.getOutputNames());
+        assertEquals(List.of(new ProbeReference("C/copy", ProbeReference.Quantity.VOLTAGE)), probe.references());
         assertEquals(1, probe.YOUT.size());
         assertEquals("capacitorVoltage", probe.YOUT.getFirst().getLabelObject().getLabelString());
     }

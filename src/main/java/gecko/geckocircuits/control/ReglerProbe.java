@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import javax.swing.undo.AbstractUndoableEdit;
+import javax.swing.undo.UndoableEdit;
 
 public final class ReglerProbe extends RegelBlock implements VariableTerminalNumber {
     private static final long serialVersionUID = 1L;
@@ -32,13 +34,44 @@ public final class ReglerProbe extends RegelBlock implements VariableTerminalNum
         setReferences(ProbeReference.parseText(text));
     }
 
-    public void renameTarget(String previous, String current) {
-        remapTargets(Map.of(previous, current), true);
-        if (dialog != null && dialog.isShowing()) {
-            dialog.renameTarget(previous, current);
+    /** Renames matching Probe entries and returns an edit for the entries that changed. */
+    public UndoableEdit renameTarget(String previous, String current) {
+        var saved = ProbeReferenceRename.capture(getOutputNames(), previous, current);
+        var originalDialog = dialog;
+        var draft = originalDialog != null && originalDialog.isShowing()
+                ? originalDialog.captureRename(previous, current) : saved.escapedForEditor();
+        if (saved.isEmpty() && draft.isEmpty()) {
+            return null;
         }
+        var edit = new AbstractUndoableEdit() {
+            void apply(boolean forward) {
+                String[] entries = getOutputNames();
+                if (saved.apply(entries, forward)) {
+                    parameterString = Arrays.stream(entries).map(ProbeReference::encodeSavedEntry)
+                            .toArray(String[]::new);
+                }
+                if (dialog != null && dialog.isShowing()) {
+                    dialog.applyRename(dialog == originalDialog ? draft : saved.escapedForEditor(), forward);
+                }
+            }
+
+            @Override
+            public void undo() {
+                super.undo();
+                apply(false);
+            }
+
+            @Override
+            public void redo() {
+                super.redo();
+                apply(true);
+            }
+        };
+        edit.apply(true);
+        return edit;
     }
 
+    /** Remaps copied targets. The caller selects whether to keep references outside the copy. */
     public void remapTargets(Map<String, String> replacements, boolean keepUncopied) {
         List<ProbeReference> remapped = new ArrayList<>();
         List<String> labels = new ArrayList<>();
@@ -58,7 +91,8 @@ public final class ReglerProbe extends RegelBlock implements VariableTerminalNum
     }
 
     private void setReferences(List<ProbeReference> references) {
-        parameterString = references.stream().map(ProbeReference::toString).toArray(String[]::new);
+        parameterString = references.stream().map(ProbeReference::toString).map(ProbeReference::encodeSavedEntry)
+                .toArray(String[]::new);
         setOutputTerminalNumber(references.size());
     }
 
@@ -90,7 +124,7 @@ public final class ReglerProbe extends RegelBlock implements VariableTerminalNum
 
     @Override
     public String[] getOutputNames() {
-        return parameterString.clone();
+        return Arrays.stream(parameterString).map(ProbeReference::decodeSavedEntry).toArray(String[]::new);
     }
 
     @Override

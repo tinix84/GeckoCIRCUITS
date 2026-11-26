@@ -20,7 +20,9 @@ A schematic needs one meter block per measured quantity. A Probe can collect sev
 
 ## Rationale
 
-The editor shows a comma-separated list such as `L.1.i, C.1.v, D.1.state`. Split each reference at its last dot so names can contain dots. Each backend resolves a unique electrical name when it prepares the circuit. The existing meter sign convention sets the direction of current and voltage.
+The editor shows a comma-separated list such as `L.1.i, C.1.v, D.1.state`. Split each reference at its last dot so names can contain dots. In editor text, use a backslash before a comma or a backslash in a component name.
+The saved Probe encodes references that contain a slash so each remains one entry in the saved list.
+Each backend resolves a unique electrical name when it prepares the circuit. The existing meter sign convention sets the direction of current and voltage.
 
 | Quantity | Supported components | Value |
 | --- | --- | --- |

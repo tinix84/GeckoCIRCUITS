@@ -1,5 +1,6 @@
 package gecko.core.io;
 
+import gecko.core.simulation.ProbeReference;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -143,7 +144,12 @@ public final class CircuitFileWriter {
                             scopes.getOrDefault(HierarchyIndex.parent(data.getSavedBlock()), scopes.get(0L)));
             tokens.put("parameter[]", Arrays.stream(values).mapToObj(Double::toString)
                     .collect(Collectors.joining(" ")));
-            tokens.put("parameterString[]", strings(data.getParameterStrings()));
+            String[] parameterStrings = data.getParameterStrings();
+            if (domain.equals("CONTROL") && data.getType() == ProbeReference.TYPE) {
+                parameterStrings = Arrays.stream(parameterStrings).map(ProbeReference::encodeSavedEntry)
+                        .toArray(String[]::new);
+            }
+            tokens.put("parameterString[]", strings(parameterStrings));
         }
         tokens.putIfAbsent("dxTxt", "2.0");
         tokens.putIfAbsent("dyTxt", "2.0");
