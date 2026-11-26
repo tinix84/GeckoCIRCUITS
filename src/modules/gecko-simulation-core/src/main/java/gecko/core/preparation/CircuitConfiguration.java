@@ -340,6 +340,7 @@ public final class CircuitConfiguration {
                 diagnostics.add(override("OVERRIDE_CONFLICT", path, binding.component(), "Assignments to the same field must agree"));
             }
         }
+        if (diagnostics.isEmpty() && saveEdits) components(model).forEach(CircuitConfiguration::preserveSourceLayout);
         if (diagnostics.isEmpty()) assignments.forEach((binding, value) -> {
             write(binding.component().data(), binding.field(), value);
             if (saveEdits) saveAssignment(binding, value);
@@ -351,6 +352,26 @@ public final class CircuitConfiguration {
                     && binding.field().matches(issue.parameterPath().substring(prefix.length())));
         });
         return diagnostics;
+    }
+
+    private static void preserveSourceLayout(Component component) {
+        var data = component.data();
+        if (!data.isParsedInput()) return;
+        var tokens = data.getImportTokens();
+        double[] values = data.getNumericParameters();
+        if (isSource(component)) {
+            // Legacy readers take amplitude from the shared DC slot unless it has a named value.
+            if (!tokens.containsKey("amplitude")) {
+                tokens.put("amplitude", Double.toString(values[20]));
+                String binding = legacyBinding(data, 1);
+                if (!binding.isEmpty()) tokens.put("amplitude$ParameterName", binding);
+            }
+            if (!tokens.containsKey("phase")) tokens.putIfAbsent("phaseDegrees", Double.toString(values[4]));
+        } else if (isSignal(component)) {
+            // Native CONTROL SIGNAL arrays store offset before phase. The normalized array reverses them.
+            if (!tokens.containsKey("phase")) tokens.putIfAbsent("phaseDegrees", Double.toString(Math.toDegrees(values[3])));
+            if (!tokens.containsKey("anteilDC")) tokens.putIfAbsent("offset", Double.toString(values[4]));
+        }
     }
 
     private static void saveAssignment(Binding binding, double value) {

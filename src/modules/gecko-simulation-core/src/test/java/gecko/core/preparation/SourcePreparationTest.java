@@ -1,9 +1,11 @@
 package gecko.core.preparation;
 
 import gecko.core.io.CircuitFileParser;
+import gecko.core.io.CircuitFileWriter;
 import gecko.core.io.CircuitModel;
 import gecko.core.simulation.HeadlessSimulationEngine;
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
@@ -86,6 +88,27 @@ class SourcePreparationTest {
             for (double current : CircuitPreparationTest.currents(repeated.execution())) assertEquals(0.1, current, 1e-10);
         }
     }
+    @org.junit.jupiter.api.Test
+    void editingLegacyDcDoesNotChangeTheAmplitudeBindingOrPhaseOnReload() throws Exception {
+        var model = parse(element("LK", 4, "source", "402 6 1 4 1.5707963267948966",
+                "/1", "/0", "nameOpt[] /NIX_NIX_NIX/sourceValue")
+                + element("LK", 1, "R.1", "10", "/1", "/0", ""));
+        model.getOptimizerParameters().put("sourceValue", 20.0);
+        var preparation = new CircuitPreparation();
+        var edited = assertInstanceOf(PreparationResult.Ready.class, preparation.prepareForSave(
+                preparation.capture(model), new PreparationRequest(SolverOverrides.none(), Map.of("source.dcValue", 9.0))));
+        byte[] bytes = new CircuitFileWriter().write(edited.circuit().toModel());
+
+        var reopened = new CircuitFileParser().parse(new ByteArrayInputStream(bytes), "reopened.ipes");
+        reopened.getOptimizerParameters().put("sourceValue", 40.0);
+        var prepared = assertInstanceOf(PreparationResult.Ready.class,
+                preparation.prepare(preparation.capture(reopened), PreparationRequest.defaults()));
+        var source = prepared.circuit().toModel().getCircuitComponents().getFirst().getParameters();
+        assertEquals(9.0, source.get("dcValue"));
+        assertEquals(40.0, source.get("amplitude"));
+        assertEquals(90.0, source.get("phaseDegrees"));
+    }
+
     @org.junit.jupiter.api.Test
     void savedNullOptimizerArrayMeansNoBinding() throws Exception {
         var model = parse(element("LK", 4, "source", "401 6", "/1", "/0", "nameOpt[] null")
