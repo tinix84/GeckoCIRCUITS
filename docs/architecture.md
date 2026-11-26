@@ -97,4 +97,8 @@ Set `gecko.api.quota.<tenant>.max-circuits` and `gecko.api.quota.<tenant>.max-co
 
 Upload a circuit and use its ID to submit simulations in tenant mode. The API returns 404 for circuit, simulation and batch IDs from another tenant. Circuit and simulation records created before tenant mode have no tenant assignment.
 
-PostgreSQL serializes quota admission across API instances. If an instance stops abruptly, its pending and running jobs retain their last recorded status. An administrator must resolve those job records before their quota can be reused.
+PostgreSQL serializes quota admission across API replicas. When PostgreSQL releases a stopped replica's session lock, the next admission, quota lookup, or matching job read marks its abandoned jobs failed. The same admission can reuse the released quota.
+
+Drain and stop all older API replicas before the first startup that applies Flyway migration V3. The migration marks remaining pending and running jobs from older versions failed because those jobs have no replica owner. Jobs with a terminal status keep that status.
+
+Use a direct PostgreSQL connection or session pooling. Each API replica reserves one pool connection for its session lock. Set the pool size to at least two. A replica that loses its ownership session cancels its active local jobs. A failed state write also causes the replica to release its session. Its health endpoint and simulation submissions return HTTP 503. Previously confirmed results remain readable on that replica while it runs. Restart that replica to establish a fresh ownership session.

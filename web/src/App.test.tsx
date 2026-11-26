@@ -5,6 +5,8 @@ import { App } from './App';
 import { SessionProvider } from './session';
 import { publicApi } from './api/client';
 
+vi.mock('./Waveform', () => ({ Waveform: () => null }));
+
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 test('shows sign-in before a protected route', () => {

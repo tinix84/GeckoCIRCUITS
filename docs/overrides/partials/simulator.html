@@ -1,0 +1,19 @@
+{% set tutorial = page.meta.simulator %}
+{% set asset = "assets/circuits/" ~ tutorial.circuit %}
+{% set circuit = (config.site_url | trim("/")) ~ "/" ~ asset %}
+{% set query = "circuit=" ~ (circuit | urlencode) ~ "&signals=" ~ (tutorial.signals | urlencode) %}
+{% if config.extra.simulator_url %}
+  <iframe title="{{ page.title | e }} simulator" loading="lazy"
+    src="{{ ((config.extra.simulator_url | trim('/')) ~ '/embed?' ~ query) | e }}"></iframe>
+{% else %}
+  <div class="admonition note">
+    <p class="admonition-title">Run locally</p>
+    <p>From the GeckoCIRCUITS repository, start the API and Web app.</p>
+    <pre><code>docker compose up -d
+cd web
+npm ci
+npm run dev</code></pre>
+    <p><a href="http://localhost:5173/embed?{{ query | e }}">Open the local simulator</a>
+      or <a href="{{ asset | url }}">download the circuit</a>.</p>
+  </div>
+{% endif %}

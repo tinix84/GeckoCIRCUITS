@@ -4,6 +4,8 @@ import gecko.GeckoExternal;
 import gecko.GeckoSim;
 import gecko.core.ac.AcDocumentSettings;
 import gecko.core.ac.AcSweep;
+import gecko.core.io.CircuitFileParser;
+import gecko.core.simulation.ProbeReference;
 import gecko.geckocircuits.allg.MainWindow;
 import gecko.geckocircuits.circuit.AbstractBlockInterface;
 import gecko.geckocircuits.circuit.DialogCircuitComponent;
@@ -22,6 +24,8 @@ import java.awt.Container;
 import java.awt.Window;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -84,6 +88,92 @@ class M7ComponentEditorTest {
             }
             return null;
         });
+    }
+
+    @Test
+    void renamesValidReferencesWhenAnotherSavedReferenceIsInvalid() throws Exception {
+        GeckoExternal.openFile(ComponentProbeParityTest.writeProbeBuck(false, "/L.1.i/C.1.v/D.1.invalid")
+                .toAbsolutePath().toString());
+        onEdt(() -> {
+            var probe = (ReglerProbe) block("PROBE.1");
+            var inductor = block("L.1");
+            var output = probe.YOUT.getFirst();
+            inductor.getIDStringDialog().setNewNameCheckedUndoable("L.input");
+            assertArrayEquals(new String[]{"L.input.i", "C.1.v", "D.1.invalid"}, probe.getOutputNames());
+            assertSame(output, probe.YOUT.getFirst());
+            AbstractUndoGenericModel.undoManager.undo();
+            assertEquals("L.1", inductor.getStringID());
+            assertArrayEquals(new String[]{"L.1.i", "C.1.v", "D.1.invalid"}, probe.getOutputNames());
+            return null;
+        });
+    }
+
+    @Test
+    void renameUndoLeavesEarlierUnboundReferencesAndDraftTextAlone() throws Exception {
+        GeckoExternal.openFile(ComponentProbeParityTest.writeProbeBuck(false, "/L.1.i/L.input.i/D.1.state")
+                .toAbsolutePath().toString());
+        onEdt(() -> {
+            var probe = (ReglerProbe) block("PROBE.1");
+            var inductor = block("L.1");
+            probe.doDoubleClickAction(probe.getSheetPosition());
+            var dialog = probeDialog();
+            try {
+                referenceField(dialog).setText("L.1.i, L.input.i, D.1.state,  L.1.v");
+                inductor.getIDStringDialog().setNewNameCheckedUndoable("L.input");
+                assertArrayEquals(new String[]{"L.input.i", "L.input.i", "D.1.state"}, probe.getOutputNames());
+                AbstractUndoGenericModel.undoManager.undo();
+                assertArrayEquals(new String[]{"L.1.i", "L.input.i", "D.1.state"}, probe.getOutputNames());
+                assertEquals("L.1.i, L.input.i, D.1.state,  L.1.v", referenceField(dialog).getText());
+                AbstractUndoGenericModel.undoManager.redo();
+                assertEquals("L.input.i, L.input.i, D.1.state,  L.input.v", referenceField(dialog).getText());
+            } finally {
+                dialog.dispose();
+            }
+            return null;
+        });
+    }
+
+    @Test
+    void scriptedRenameFollowsTheProbeAndTheDialogCanSaveANameWithAComma() throws Exception {
+        GeckoExternal.setComponentName("L.1", "L,coil");
+        onEdt(() -> {
+            var probe = (ReglerProbe) block("PROBE.1");
+            assertArrayEquals(new String[]{"L,coil.i", "C.1.v", "D.1.state"}, probe.getOutputNames());
+            probe.doDoubleClickAction(probe.getSheetPosition());
+            return null;
+        });
+        var dialog = awaitDialog(candidate -> candidate.getClass().getSimpleName().equals("ProbeDialog"));
+        onEdt(() -> {
+            try {
+                assertEquals("L\\,coil.i, C.1.v, D.1.state", referenceField(dialog).getText());
+                ((DialogCircuitComponent<?>) dialog).jButtonOk.doClick();
+                assertFalse(dialog.isShowing());
+            } finally {
+                dialog.dispose();
+            }
+            return null;
+        });
+    }
+
+    @Test
+    void slashNamedProbeTargetSurvivesTheDesktopSaveAndBothReaders() throws Exception {
+        GeckoExternal.setComponentName("L.1", "L/coil");
+        Path saved = Files.createTempDirectory(Path.of("target"), "m7-probe-save").resolve("buck.ipes");
+        GeckoExternal.saveFileAs(saved.toAbsolutePath().toString());
+        GeckoExternal.openFile(saved.toAbsolutePath().toString());
+        var expected = List.of("L/coil.i", "C.1.v", "D.1.state");
+        onEdt(() -> {
+            var probe = (ReglerProbe) block("PROBE.1");
+            assertEquals(expected, List.of(probe.getOutputNames()));
+            assertEquals(3, probe.YOUT.size());
+            assertNotNull(block("L/coil"));
+            return null;
+        });
+
+        var model = new CircuitFileParser().parse(saved.toString());
+        var probe = model.getControlComponents().stream().filter(component -> component.getType() == ProbeReference.TYPE)
+                .findFirst().orElseThrow();
+        assertEquals(expected, ProbeReference.parse(probe.getParameterStrings()).stream().map(Object::toString).toList());
     }
 
     @Test

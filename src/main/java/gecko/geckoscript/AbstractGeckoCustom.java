@@ -311,7 +311,7 @@ public abstract class AbstractGeckoCustom implements GeckoRemoteInterface {
     @Override
     public void setComponentName(final String oldName, final String newName) throws Exception {
         AbstractBlockInterface foundBlock = IDStringDialog.getComponentByName(oldName);
-        foundBlock.setNewNameChecked(newName);
+        foundBlock.getIDStringDialog().setNewNameInCircuit(newName);
     }
 
     /**

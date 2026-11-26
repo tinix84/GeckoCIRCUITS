@@ -1,10 +1,22 @@
 ---
 title: GeckoCIRCUITS Tutorials
+simulator:
+  circuit: rc-step.ipes
+  signals: vc,vin
 ---
 
 # GeckoCIRCUITS Tutorials
 
 Comprehensive tutorials for learning power electronics simulation with GeckoCIRCUITS, organized by topic and difficulty level.
+
+## Try an RC step response
+
+Run the RC circuit and look at the input voltage `vin` and capacitor voltage `vc`.
+The 500 Ω resistor and 1 µF capacitor give a time constant of 0.5 ms.
+After the input rises from 0 V to 5 V, `vc` reaches about 3.16 V after one time constant.
+Double the resistance and rerun to see how the charge time changes.
+
+Continue with the [open-loop buck converter](dcdc/buck-converter.md).
 
 ## Quick Start
 

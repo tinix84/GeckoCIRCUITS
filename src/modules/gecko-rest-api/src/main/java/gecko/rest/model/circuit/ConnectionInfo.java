@@ -14,5 +14,15 @@ public record ConnectionInfo(
     String to,
 
     @Schema(description = "Wire label/name", example = "switch_node")
-    String label
-) {}
+    String label,
+
+    @Schema(description = "Connection domain")
+    String domain,
+
+    @Schema(description = "Ordered schematic grid points", example = "[[4,8],[6,8]]")
+    int[][] points
+) {
+    public ConnectionInfo(String from, String to, String label) {
+        this(from, to, label, null, new int[0][]);
+    }
+}

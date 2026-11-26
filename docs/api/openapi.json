@@ -339,8 +339,20 @@
         }
       },
       "CircuitParameterUpdate": {
-        "description": "Partial update of circuit simulation parameters",
+        "description": "Partial update of solver settings and numeric component parameters",
         "properties": {
+          "componentParameters": {
+            "additionalProperties": {
+              "description": "Numeric component parameters by component name and field name",
+              "format": "double",
+              "type": "number"
+            },
+            "description": "Numeric component parameters by component name and field name",
+            "example": {
+              "L.1.inductance": 0.0006
+            },
+            "type": "object"
+          },
           "simulationDuration": {
             "description": "Simulation duration in seconds",
             "example": 0.05,
@@ -492,6 +504,13 @@
               "$ref": "#/components/schemas/ComponentInfo"
             },
             "type": "array"
+          },
+          "connections": {
+            "description": "Saved wire paths in schematic coordinates",
+            "items": {
+              "$ref": "#/components/schemas/ConnectionInfo"
+            },
+            "type": "array"
           }
         }
       },
@@ -541,6 +560,63 @@
             "type": "string"
           },
           "name": {
+            "type": "string"
+          }
+        }
+      },
+      "ConnectionInfo": {
+        "description": "Connection between circuit components",
+        "properties": {
+          "domain": {
+            "description": "Connection domain",
+            "type": "string"
+          },
+          "from": {
+            "description": "Source component terminal",
+            "example": "Q1.drain",
+            "type": "string"
+          },
+          "label": {
+            "description": "Wire label/name",
+            "example": "switch_node",
+            "type": "string"
+          },
+          "points": {
+            "description": "Ordered schematic grid points",
+            "example": [
+              [
+                4,
+                8
+              ],
+              [
+                6,
+                8
+              ]
+            ],
+            "items": {
+              "description": "Ordered schematic grid points",
+              "example": [
+                [
+                  4,
+                  8
+                ],
+                [
+                  6,
+                  8
+                ]
+              ],
+              "items": {
+                "description": "Ordered schematic grid points",
+                "format": "int32",
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "to": {
+            "description": "Destination component terminal",
+            "example": "L1.in",
             "type": "string"
           }
         }
@@ -927,6 +1003,39 @@
           }
         }
       },
+      "Part": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "RESISTOR",
+              "INDUCTOR",
+              "CAPACITOR",
+              "VOLTAGE_SOURCE",
+              "CURRENT_SOURCE",
+              "DIODE",
+              "SWITCH",
+              "TRANSFORMER",
+              "GROUND"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "format": "double",
+            "type": "number"
+          },
+          "x": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "y": {
+            "format": "int32",
+            "type": "integer"
+          }
+        }
+      },
       "PeriodicSteadyStateRequest": {
         "description": "Optional periodic steady-state search. The simulation first runs period by period from the DC operating point until the full state repeats, and records nothing during the search. It then records simulationTime seconds from that state. Off when omitted. The period must be a whole number of time steps. A CONTROL carrier that clamps per step has a simulated period of a whole number of steps, so a 35 kHz carrier at a 1 microsecond step has a period of 30 microseconds, not 28.57. Search steps count toward the step limit. A pre-calculation time cannot combine with the search. Batch requests do not accept this field.",
         "properties": {
@@ -996,6 +1105,47 @@
         },
         "required": [
           "refreshToken"
+        ]
+      },
+      "SchematicDraftRequest": {
+        "properties": {
+          "duration": {
+            "description": "Simulation duration in seconds",
+            "format": "double",
+            "type": "number"
+          },
+          "filename": {
+            "maxLength": 100,
+            "minLength": 0,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9_. -]*\\.ipes",
+            "type": "string"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/Part"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "type": "array"
+          },
+          "step": {
+            "description": "Simulation time step in seconds",
+            "format": "double",
+            "type": "number"
+          },
+          "wires": {
+            "items": {
+              "$ref": "#/components/schemas/Wire"
+            },
+            "maxItems": 256,
+            "minItems": 0,
+            "type": "array"
+          }
+        },
+        "required": [
+          "filename",
+          "parts",
+          "wires"
         ]
       },
       "SignalAnalysisRequest": {
@@ -1269,6 +1419,17 @@
           "voltage"
         ]
       },
+      "Terminal": {
+        "properties": {
+          "part": {
+            "type": "string"
+          },
+          "port": {
+            "format": "int32",
+            "type": "integer"
+          }
+        }
+      },
       "TokenPair": {
         "properties": {
           "accessToken": {
@@ -1343,6 +1504,16 @@
             "type": "number"
           }
         }
+      },
+      "Wire": {
+        "properties": {
+          "from": {
+            "$ref": "#/components/schemas/Terminal"
+          },
+          "to": {
+            "$ref": "#/components/schemas/Terminal"
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -1406,6 +1577,19 @@
               }
             },
             "description": "API is healthy"
+          },
+          "503": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "example": {
+                    "status": "DOWN",
+                    "version": "1.0.0"
+                  }
+                }
+              }
+            },
+            "description": "API lost PostgreSQL simulation ownership"
           }
         },
         "security": [],
@@ -1844,6 +2028,47 @@
         ]
       }
     },
+    "/api/v1/circuits/schematic": {
+      "post": {
+        "operationId": "saveSchematic",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SchematicDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/CircuitLoadResponse"
+                }
+              }
+            },
+            "description": "Native circuit saved and loaded"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/CircuitLoadResponse"
+                }
+              }
+            },
+            "description": "Invalid schematic"
+          }
+        },
+        "summary": "Save a grid schematic as a native circuit",
+        "tags": [
+          "Circuit Files"
+        ]
+      }
+    },
     "/api/v1/circuits/{circuitId}": {
       "delete": {
         "description": "Remove circuit from memory. Useful for cleanup after processing.",
@@ -2016,6 +2241,51 @@
           }
         },
         "summary": "Get circuit information",
+        "tags": [
+          "Circuit Files"
+        ]
+      }
+    },
+    "/api/v1/circuits/{circuitId}/ipes": {
+      "get": {
+        "operationId": "exportCircuit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "circuitId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary"
+                }
+              }
+            },
+            "description": "Native circuit file"
+          },
+          "404": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "items": {
+                    "format": "byte",
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Circuit not found"
+          }
+        },
+        "summary": "Export a native circuit file",
         "tags": [
           "Circuit Files"
         ]

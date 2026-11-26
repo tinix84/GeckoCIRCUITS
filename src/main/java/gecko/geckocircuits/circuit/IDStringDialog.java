@@ -19,6 +19,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.undo.CannotRedoException;
 import javax.swing.undo.CannotUndoException;
+import javax.swing.undo.CompoundEdit;
 import javax.swing.undo.UndoableEdit;
 import gecko.modelviewcontrol.AbstractUndoGenericModel;
 
@@ -97,14 +98,14 @@ public final class IDStringDialog {
         if (oldName.equals(newName)) {
             return;
         }
-        renameWithProbeReferences(newName);
+        var probeEdits = renameWithProbeReferences(newName);
 
         AbstractUndoGenericModel.undoManager.addEdit(new UndoableEdit() {
             @Override
             public void undo() throws CannotUndoException {
-                deleteIDString();
                 try {
-                    renameWithProbeReferences(oldName);
+                    setNewNameChecked(oldName);
+                    probeEdits.undo();
                 } catch (NameAlreadyExistsException ex) {
                     Logger.getLogger(IDStringDialog.class.getName()).log(Level.SEVERE, null, ex);
                 }
@@ -118,9 +119,9 @@ public final class IDStringDialog {
 
             @Override
             public void redo() throws CannotRedoException {
-                deleteIDString();
                 try {
-                    renameWithProbeReferences(newName);
+                    setNewNameChecked(newName);
+                    probeEdits.redo();
                 } catch (NameAlreadyExistsException ex) {
                     Logger.getLogger(IDStringDialog.class.getName()).log(Level.SEVERE, null, ex);
                 }
@@ -170,13 +171,23 @@ public final class IDStringDialog {
 
     }
 
-    private void renameWithProbeReferences(String newName) throws NameAlreadyExistsException {
+    /** Renames an existing component and updates its Probe references. */
+    public void setNewNameInCircuit(String newName) throws NameAlreadyExistsException {
+        if (!_idString.equals(newName)) {
+            renameWithProbeReferences(newName);
+        }
+    }
+
+    private CompoundEdit renameWithProbeReferences(String newName) throws NameAlreadyExistsException {
         String previous = _idString;
         setNewNameChecked(newName);
+        var edits = new CompoundEdit();
         if (_parent instanceof gecko.geckocircuits.circuit.circuitcomponents.AbstractCircuitBlockInterface
                 && _parent.getParentCircuitSheet() != null && SchematicEditor2.Singleton != null) {
-            SchematicEditor2.Singleton.updateProbeReferences(previous, newName);
+            SchematicEditor2.Singleton.updateProbeReferences(previous, newName, edits);
         }
+        edits.end();
+        return edits;
     }
 
     public void setNewNameChecked(final String newName) throws NameAlreadyExistsException {

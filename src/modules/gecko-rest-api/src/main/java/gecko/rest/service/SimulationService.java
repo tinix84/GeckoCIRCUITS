@@ -24,6 +24,7 @@ import gecko.rest.model.BatchSimulationResponse;
 import gecko.rest.model.SimulationRequest;
 import gecko.rest.model.SimulationResponse;
 import gecko.rest.model.SimulationResponse.SimulationStatus;
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +33,7 @@ import gecko.rest.persistence.SimulationMetadata;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.TransactionException;
 import org.springframework.stereotype.Service;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -52,6 +54,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.LongFunction;
@@ -65,6 +69,7 @@ import java.util.function.Supplier;
 public class SimulationService {
     private static final Logger logger = LoggerFactory.getLogger(SimulationService.class);
     static final String CANCELLED_BY_USER = "Cancelled by user";
+    private static final String OWNERSHIP_FAILURE = "Simulation ownership could not be confirmed.";
     private static final int DEFAULT_BATCH_CONCURRENCY = 4;
 
     private final Map<String, SimulationJob> jobs = new ConcurrentHashMap<>();
@@ -77,6 +82,7 @@ public class SimulationService {
     private final Object admissionMonitor = new Object();
     private final CircuitFileService circuitFiles;
     private PostgresPersistence persistence;
+    private ScheduledExecutorService ownershipMonitor;
     private ApiKeyProperties keys = new ApiKeyProperties();
     private final CircuitPreparation preparation = new CircuitPreparation();
 
@@ -101,6 +107,15 @@ public class SimulationService {
         this(limits, circuitFiles);
         this.persistence = persistence.getIfAvailable();
         this.keys = keys;
+    }
+
+    @PostConstruct
+    private void startOwnershipMonitor() {
+        if (persistence != null) {
+            ownershipMonitor = Executors.newSingleThreadScheduledExecutor(
+                    Thread.ofPlatform().daemon().name("gecko-replica-ownership").factory());
+            ownershipMonitor.scheduleWithFixedDelay(this::checkReplicaOwnership, 1, 1, TimeUnit.SECONDS);
+        }
     }
 
     public SimulationService(SimulationJobLimits limits, CircuitFileService circuitFiles) {
@@ -151,6 +166,7 @@ public class SimulationService {
      * @throws ResponseStatusException when capacity prevents admission.
      */
     public SimulationResponse submitSimulation(SimulationRequest request) {
+        requireOwnership();
         request = new SimulationRequest(request);
         var source = circuitFiles.resolveSource(request.getCircuitId(), request.getCircuitFile());
         PreparedCircuit circuit = prepare(request, source);
@@ -183,6 +199,7 @@ public class SimulationService {
     }
 
     Map<String, double[]> runEmbeddedCircuit(byte[] circuit, SimulationRequest request) {
+        requireOwnership();
         var parser = new CircuitFileParser();
         CircuitSnapshot source;
         try {
@@ -191,9 +208,11 @@ public class SimulationService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot parse the submitted circuit", e);
         }
         PreparedCircuit prepared = prepare(request, new CircuitFileService.ResolvedSource(source, true));
-        var replay = new FutureTask<>(() ->
-                engineFactory.get().runSimulation(prepared, ExecutionOptions.defaults(),
-                        () -> Thread.currentThread().isInterrupted()));
+        var replay = new FutureTask<>(() -> {
+            requireOwnership();
+            return engineFactory.get().runSimulation(prepared, ExecutionOptions.defaults(),
+                    () -> !hasOwnership() || Thread.currentThread().isInterrupted());
+        });
         try {
             executorService.execute(replay);
         } catch (RejectedExecutionException e) {
@@ -201,6 +220,7 @@ public class SimulationService {
         }
         try {
             SimulationResult result = replay.get(60, TimeUnit.SECONDS);
+            requireOwnership();
             if (!result.isSuccess()) {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Submitted circuit simulation failed");
             }
@@ -213,6 +233,7 @@ public class SimulationService {
             Thread.currentThread().interrupt();
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Submitted circuit simulation was interrupted", e);
         } catch (ExecutionException e) {
+            if (e.getCause() instanceof ResponseStatusException status) throw status;
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Submitted circuit simulation failed", e);
         } finally {
             if (replay.cancel(true) && executorService instanceof ThreadPoolExecutor pool) {
@@ -271,14 +292,60 @@ public class SimulationService {
         return new SimulationMetadata(job.circuitId, job.owner, job.tenant, job.response);
     }
 
-    private void persistTransition(SimulationJob job) {
-        if (persistence == null) return;
+    private boolean persistTransition(SimulationJob job) {
+        if (persistence == null) return true;
         try {
-            persistence.saveSimulation(metadata(job));
-        } catch (DataAccessException e) {
+            return persistence.saveSimulation(metadata(job));
+        } catch (DataAccessException | TransactionException e) {
             logger.error("Could not persist {} state of simulation {}", job.response.getStatus(),
                     job.response.getSimulationId(), e);
+            persistence.relinquishOwnership();
+            return false;
         }
+    }
+
+    private boolean hasOwnership() {
+        return persistence == null || persistence.hasOwnership();
+    }
+
+    private boolean checkOwnership() {
+        return persistence == null || persistence.checkOwnership();
+    }
+
+    private void requireOwnership() {
+        if (!checkOwnership()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Simulation ownership lost. Restart the API.");
+        }
+    }
+
+    private void checkReplicaOwnership() {
+        if (checkOwnership()) return;
+        synchronized (admissionMonitor) {
+            for (BatchJob batch : batches.values()) {
+                synchronized (batch) {
+                    batch.cancelled = true;
+                }
+            }
+            for (SimulationJob job : jobs.values()) {
+                synchronized (job) {
+                    if (!job.terminalPublished) {
+                        failUnconfirmedJob(job);
+                        notifyTerminal(job);
+                    }
+                }
+            }
+        }
+        ownershipMonitor.shutdown();
+    }
+
+    private static void failUnconfirmedJob(SimulationJob job) {
+        job.response.setStatus(SimulationStatus.FAILED);
+        job.response.setErrorMessage(OWNERSHIP_FAILURE);
+        job.response.setEndTime(Instant.now());
+        job.response.setResults(Map.of());
+        job.response.setProgressDetails(null);
+        job.response.setSteadyState(null);
+        if (job.engine != null) job.engine.cancel();
     }
 
     private SimulationResponse loadMetadata(String id) {
@@ -297,13 +364,15 @@ public class SimulationService {
     private SimulationJob visibleJob(String id) {
         String tenant = currentTenant();
         SimulationJob job = jobs.get(id);
-        return job != null && visible(job.tenant, tenant) ? job : null;
+        return job != null && visible(job.tenant, tenant) && (job.durableTerminal || checkOwnership()) ? job : null;
     }
 
     private BatchJob visibleBatch(String id) {
         String tenant = currentTenant();
         BatchJob batch = batches.get(id);
-        return batch != null && visible(batch.tenant, tenant) ? batch : null;
+        if (batch == null || !visible(batch.tenant, tenant)) return null;
+        return checkOwnership() || batch.response.getSimulationIds().stream()
+                .map(jobs::get).allMatch(job -> job != null && job.durableTerminal) ? batch : null;
     }
 
     /** Checks both credential owner and tenant for live progress subscriptions. */
@@ -314,7 +383,7 @@ public class SimulationService {
     public boolean isOwnedBy(String simulationId, String owner, String tenant) {
         if (owner == null || (keys.isTenantEnabled() && tenant == null)) return false;
         SimulationJob job = jobs.get(simulationId);
-        return job != null && visible(job.tenant, tenant) && owner.equals(job.owner);
+        return job != null && visible(job.tenant, tenant) && owner.equals(job.owner) && checkOwnership();
     }
 
     private void admitTenantJobs(java.util.Collection<SimulationJob> admissions, String tenant) {
@@ -365,10 +434,15 @@ public class SimulationService {
                     return;
                 }
                 job.engine = engine;
-                if (markRunning(job.response)) persistTransition(job);
+                if (markRunning(job.response) && !persistTransition(job)) {
+                    failUnconfirmedJob(job);
+                    notifyTerminal(job);
+                    return;
+                }
             }
             // The durable signal also covers cancellation before the engine starts.
-            SimulationResult result = engine.runSimulation(job.circuit, job.options, job::isCancelled);
+            SimulationResult result = engine.runSimulation(job.circuit, job.options,
+                    () -> !hasOwnership() || job.isCancelled());
             synchronized (job) {
                 boolean committed = result.isSuccess()
                         ? applySuccessfulResult(job.response, result)
@@ -454,11 +528,14 @@ public class SimulationService {
     private Map<String, SimulationResponse> simulationSnapshots(boolean includeResults) {
         Map<String, SimulationResponse> result = new HashMap<>();
         String tenant = currentTenant();
+        boolean useLocal = checkOwnership();
         if (persistence != null) {
             persistence.simulations(tenant).forEach(row -> result.put(row.id(), row.response()));
         }
         jobs.forEach((id, job) -> {
-            if (visible(job.tenant, tenant)) result.put(id, snapshot(job, includeResults));
+            if (visible(job.tenant, tenant) && (job.durableTerminal || useLocal && hasOwnership())) {
+                result.put(id, snapshot(job, includeResults));
+            }
         });
         return result;
     }
@@ -538,8 +615,9 @@ public class SimulationService {
                     if (isTerminal(job.response)) {
                         job.response.setEndTime(Instant.now());
                         publishTerminal(job);
-                    } else {
-                        persistTransition(job);
+                    } else if (!persistTransition(job)) {
+                        failUnconfirmedJob(job);
+                        notifyTerminal(job);
                     }
                 }
             }
@@ -646,6 +724,7 @@ public class SimulationService {
             List<SseEmitter> emitters = new ArrayList<>(job.emitters);
             SimulationResponse.ProgressDetails details = job.response.getProgressDetails();
             job.mailbox.progress(() -> {
+                if (!hasOwnership()) return;
                 for (SseEmitter emitter : emitters) {
                     try {
                         emitter.send(SseEmitter.event().name("progress").data(data));
@@ -680,7 +759,12 @@ public class SimulationService {
         if (!isTerminal(job.response) || job.terminalPublished) {
             return;
         }
-        persistTransition(job);
+        job.durableTerminal = persistTransition(job);
+        if (!job.durableTerminal) failUnconfirmedJob(job);
+        notifyTerminal(job);
+    }
+
+    private void notifyTerminal(SimulationJob job) {
         job.terminalPublished = true;
         boolean success = job.response.getStatus() == SimulationStatus.COMPLETED;
         String simulationId = job.response.getSimulationId();
@@ -731,6 +815,7 @@ public class SimulationService {
 
     @PreDestroy
     public void shutdown() {
+        if (ownershipMonitor != null) ownershipMonitor.shutdownNow();
         clearAll();
         executorService.shutdownNow();
         if (deliveryExecutor instanceof ExecutorService pool) {
@@ -815,6 +900,7 @@ public class SimulationService {
      * @throws ResponseStatusException when retained capacity prevents admission.
      */
     public BatchSimulationResponse submitBatch(BatchSimulationRequest request) {
+        requireOwnership();
         int requestedLimit = request.getMaxConcurrent() == null
                 ? DEFAULT_BATCH_CONCURRENCY : request.getMaxConcurrent();
         if (requestedLimit < 0 || requestedLimit > 100) throw invalidBatch("Batch concurrency must be between zero and 100");
@@ -973,6 +1059,7 @@ public class SimulationService {
         private final List<SseEmitter> emitters = new ArrayList<>();
         private HeadlessSimulationEngine engine;
         private boolean terminalPublished;
+        private volatile boolean durableTerminal;
         private final ProgressMailbox mailbox;
 
         private SimulationJob(PreparedCircuit circuit, BatchJob batch, BundleInput bundleInput,

@@ -21,6 +21,7 @@ public class SimulationMetadata {
     private String owner;
     @Column(columnDefinition = "text")
     private String tenant;
+    private Integer replicaId;
     @Column(columnDefinition = "text", nullable = false)
     @Enumerated(EnumType.STRING)
     private SimulationResponse.SimulationStatus status;
@@ -47,6 +48,14 @@ public class SimulationMetadata {
     public String owner() { return owner; }
     public String tenant() { return tenant; }
     public String status() { return status.name(); }
+
+    void recordTransition(SimulationMetadata transition) {
+        status = transition.status;
+        finishedAt = transition.finishedAt;
+        error = transition.error;
+    }
+
+    void assignReplica(int replica) { replicaId = replica; }
 
     public SimulationResponse response() {
         var response = new SimulationResponse(id);

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block content %}
+  {% if page.meta and page.meta.simulator %}
+    <div class="tutorial-with-simulator">
+      <div>{{ super() }}</div>
+      <aside aria-label="Tutorial simulator">
+        {% include "partials/simulator.html" %}
+      </aside>
+    </div>
+  {% else %}
+    {{ super() }}
+  {% endif %}
+{% endblock %}

@@ -8,6 +8,7 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Base64;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -119,6 +120,8 @@ class CircuitFileServiceTest {
         assertEquals(circuitId, response.circuitId());
         assertNotNull(response.components());
         assertEquals(24, response.components().size());
+        assertEquals(10, response.connections().size());
+        assertTrue(response.connections().stream().anyMatch(wire -> wire.points().length > 1));
         assertTrue(response.components().stream().anyMatch(component -> "U.1".equals(component.name())));
         assertTrue(response.components().stream().anyMatch(component -> "R.1".equals(component.name())));
     }
@@ -175,6 +178,49 @@ class CircuitFileServiceTest {
         assertEquals(gecko.core.allg.SolverType.SOLVER_GS, updated.getSolverType());
         assertEquals(8e-4, captured.getSimulationDuration());
         assertEquals(1e-8, captured.getTimeStep());
+    }
+
+    @Test
+    void componentUpdateUsesTheSameValidatedSnapshotAsSimulation() throws IOException {
+        byte[] fixture = gecko.rest.support.PreparationCircuitFixtures.resistorCircuit(10);
+        String id = service.loadCircuit(Base64.getEncoder().encodeToString(fixture), "resistor.ipes").circuitId();
+        var original = service.resolveSource(id, null).snapshot();
+        var current = service.getComponents(id).components().stream()
+                .filter(component -> component.parameters().containsKey("resistance")).findFirst().orElseThrow();
+        var update = new CircuitParameterUpdate();
+        update.setComponentParameters(Map.of(current.name() + ".resistance", 50.0));
+
+        service.updateCircuitParameters(id, update);
+
+        var saved = service.getComponents(id).components().stream()
+                .filter(component -> component.name().equals(current.name())).findFirst().orElseThrow();
+        assertEquals(50.0, saved.parameters().get("resistance"));
+        assertNotSame(original, service.resolveSource(id, null).snapshot());
+        assertEquals(10.0, current.parameters().get("resistance"));
+    }
+
+    @Test
+    void savedEditsSurviveNativeRoundTripWithNamedValuesAndBindings() throws IOException {
+        for (boolean bound : new boolean[]{false, true}) {
+            byte[] fixture = gecko.rest.support.PreparationCircuitFixtures.namedResistorCircuit(bound);
+            String id = service.loadCircuit(Base64.getEncoder().encodeToString(fixture), "resistor.ipes").circuitId();
+            assertEquals(bound ? 20.0 : 30.0, resistance(id));
+            var update = new CircuitParameterUpdate();
+            update.setComponentParameters(Map.of("R.1.resistance", 60.0));
+            service.updateCircuitParameters(id, update);
+
+            byte[] exported = service.exportCircuit(id);
+            String reopened = service.loadCircuit(Base64.getEncoder().encodeToString(exported), "reopened.ipes").circuitId();
+            assertEquals(60.0, resistance(reopened));
+            assertEquals(20.0, service.resolveSource(reopened, null).snapshot().toModel()
+                    .getOptimizerParameters().get("resistorValue"));
+        }
+    }
+
+    private Object resistance(String id) {
+        return service.getComponents(id).components().stream()
+                .filter(component -> "R.1".equals(component.name())).findFirst().orElseThrow()
+                .parameters().get("resistance");
     }
 
     @Test

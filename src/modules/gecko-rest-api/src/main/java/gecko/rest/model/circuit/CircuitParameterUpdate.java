@@ -1,12 +1,13 @@
 package gecko.rest.model.circuit;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.Map;
 
 /**
- * Partial update of circuit simulation parameters.
+ * Partial update of solver settings and numeric component parameters.
  * All fields are optional - only provided fields are updated.
  */
-@Schema(description = "Partial update of circuit simulation parameters")
+@Schema(description = "Partial update of solver settings and numeric component parameters")
 public class CircuitParameterUpdate {
 
     @Schema(description = "Simulation duration in seconds", example = "0.05")
@@ -20,6 +21,10 @@ public class CircuitParameterUpdate {
         example = "trapezoidal"
     )
     private String solverType;
+
+    @Schema(description = "Numeric component parameters by component name and field name",
+            example = "{\"L.1.inductance\":0.0006}")
+    private Map<String, Double> componentParameters;
 
     public CircuitParameterUpdate() {
     }
@@ -52,5 +57,13 @@ public class CircuitParameterUpdate {
 
     public void setSolverType(String solverType) {
         this.solverType = solverType;
+    }
+
+    public Map<String, Double> getComponentParameters() {
+        return componentParameters;
+    }
+
+    public void setComponentParameters(Map<String, Double> componentParameters) {
+        this.componentParameters = componentParameters;
     }
 }

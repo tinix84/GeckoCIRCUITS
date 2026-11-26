@@ -23,6 +23,7 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -120,14 +121,28 @@ public class LabAssignmentService {
         }
         Map<String, double[]> waveforms = simulations.runEmbeddedCircuit(input,
                 new SimulationRequest(null, definition.duration(), definition.timeStep()));
-        return definition.checks().stream().map(check -> evaluate(check, waveforms)).toList();
+        return definition.checks().stream()
+                .map(check -> evaluate(check, waveforms, definition.timeStep())).toList();
     }
 
-    private CheckResult evaluate(Check check, Map<String, double[]> waveforms) {
+    private CheckResult evaluate(Check check, Map<String, double[]> waveforms, double timeStep) {
         double[] values = waveforms.get(check.signal());
         if (values == null) return new CheckResult(check, null, false, "Signal is missing.");
         try {
-            var signal = new TimedSignal(waveforms.get("time"), values).window(check.t0(), check.t1());
+            double[] time = waveforms.get("time");
+            if (time != null && time.length >= 2 && time.length == values.length) {
+                int last = time.length - 1;
+                // Use the nominal next step to account for accumulated clock roundoff.
+                double steps = Math.rint((time[last] - time[0]) / timeStep);
+                double nextStep = Math.fma(steps + 1, timeStep, time[0]);
+                if (check.t1() > time[last] && check.t1() <= Math.nextUp(nextStep)) {
+                    time = Arrays.copyOf(time, last + 2);
+                    values = Arrays.copyOf(values, last + 2);
+                    time[last + 1] = check.t1();
+                    values[last + 1] = values[last];
+                }
+            }
+            var signal = new TimedSignal(time, values).window(check.t0(), check.t1());
             var metrics = analysis.computeCharacteristics(signal, check.signal());
             double value = switch (check.metric()) {
                 case MEAN -> metrics.getAverage();

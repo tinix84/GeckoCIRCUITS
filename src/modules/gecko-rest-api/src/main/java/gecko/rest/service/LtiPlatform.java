@@ -45,6 +45,7 @@ record LtiPlatform(Registration registration, Set<String> returnOrigins, NimbusJ
 
     String deepLink(LabAssignment assignment, URI launch, String deployment, String data, Instant now, RSAKey key) {
         var claims = toolClaims(registration.issuer(), now)
+                .claim("nonce", UUID.randomUUID().toString())
                 .claim(CLAIM + "deployment_id", deployment)
                 .claim(CLAIM + "message_type", "LtiDeepLinkingResponse").claim(CLAIM + "version", "1.3.0")
                 .claim(DEEP + "content_items", List.of(Map.of("type", "ltiResourceLink",

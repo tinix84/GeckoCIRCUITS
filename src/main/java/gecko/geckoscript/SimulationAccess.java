@@ -392,7 +392,7 @@ public final class SimulationAccess implements GeckoFileable {
             throw new IllegalArgumentException("Error: cannot insert emtyp name!");
         }
         String oldName = element.getStringID();
-        element.setNewNameChecked(newName);
+        element.getIDStringDialog().setNewNameInCircuit(newName);
         se.updateComponentCouplings(oldName, newName);
     }
 

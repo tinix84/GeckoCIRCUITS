@@ -1,11 +1,22 @@
 ---
 title: Buck Converter
 description: Step-down DC-DC converter tutorial
+simulator:
+  circuit: buck-open-loop.ipes
+  signals: Vout,IL
 ---
 
 # Tutorial 201: Buck Converter
 
 The buck converter is the fundamental step-down DC-DC topology, efficiently converting a higher voltage to a lower voltage using PWM control.
+
+## Try the open-loop buck converter
+
+Run the circuit and compare the output voltage `Vout` with the inductor current `IL`.
+The PWM generator starts at a fixed 40% duty cycle. Select `SIGNAL.1` to change the
+duty cycle, then run again to compare the output voltage and ripple.
+
+Continue with the [closed-loop buck exercise](../scripting/geckoscript.md#try-the-closed-loop-buck-converter).
 
 ## Overview
 

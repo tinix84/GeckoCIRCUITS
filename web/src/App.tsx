@@ -1,14 +1,17 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Alert, Box, Button, Container, LinearProgress, Paper, Stack, TextField, Typography } from '@mui/material';
-import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { api, requireData } from './api/client';
 import type { components } from './api/schema';
 import { useSession } from './session';
 
-export function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'The request failed.';
-}
+import { errorMessage } from './errors';
+const Scope = lazy(() => import('./Scope').then(({ Scope }) => ({ default: Scope })));
+const CircuitEditor = lazy(() => import('./CircuitEditor').then(({ CircuitEditor }) => ({ default: CircuitEditor })));
+const SchematicDraft = lazy(() => import('./SchematicDraftPage').then(({ SchematicDraftPage }) => ({ default: SchematicDraftPage })));
+
+const TutorialEmbed = lazy(() => import('./TutorialEmbed').then(({ TutorialEmbed }) => ({ default: TutorialEmbed })));
 
 function Login() {
   const { signIn } = useSession();
@@ -100,7 +103,9 @@ function Circuits() {
   return <Stack spacing={2.5}>
     <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 2 }}>
       <Typography variant="h1">Circuit library</Typography>
-      <Button component="label" variant="contained" disabled={uploading}>
+      <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1 }}>
+        <Button component={Link} to="/circuits/new" variant="outlined">New schematic</Button>
+        <Button component="label" variant="contained" disabled={uploading}>
         {uploading ? 'Uploading…' : 'Upload circuit'}
         <input hidden type="file" accept=".ipes" aria-label="Upload circuit" disabled={uploading}
           onChange={(event) => {
@@ -108,7 +113,8 @@ function Circuits() {
             event.target.value = '';
             if (file) void upload(file);
           }} />
-      </Button>
+        </Button>
+      </Stack>
     </Stack>
     {uploadError && <Alert severity="error">{uploadError}</Alert>}
     {error && <Alert severity="error">{error}</Alert>}
@@ -176,25 +182,20 @@ function Dashboard() {
   </Stack>;
 }
 
-function CircuitPlaceholder() {
-  const { id } = useParams();
-  return <Stack spacing={2}>
-    <Typography variant="h1">Circuit editor</Typography>
-    <Typography className="route-row">{id}</Typography>
-  </Stack>;
-}
 
-function ResultsPlaceholder() {
-  const { id } = useParams();
-  return <Stack spacing={2}>
-    <Typography variant="h1">Simulation results</Typography>
-    <Typography className="route-row">{id}</Typography>
-  </Stack>;
-}
+
+
 
 export function App() {
   const { active, signOut } = useSession();
   const location = useLocation();
+  if (location.pathname === '/embed') {
+    return <Container component="main" className="content">
+      <Suspense fallback={<LinearProgress aria-label="Loading tutorial simulator" />}>
+        <TutorialEmbed key={location.search} search={location.search} login={<Login />} />
+      </Suspense>
+    </Container>;
+  }
   return <>
     <Box component="header" className="topbar">
       <Container className="topbar-inner" sx={{ display: 'flex' }}>
@@ -212,8 +213,9 @@ export function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/circuits" element={<Circuits />} />
-        <Route path="/circuits/:id" element={<CircuitPlaceholder />} />
-        <Route path="/simulations/:id" element={<ResultsPlaceholder />} />
+        <Route path="/circuits/new" element={<Suspense fallback={<LinearProgress aria-label="Loading drawing tools" />}><SchematicDraft /></Suspense>} />
+        <Route path="/circuits/:id" element={<Suspense fallback={<LinearProgress aria-label="Loading circuit editor" />}><CircuitEditor /></Suspense>} />
+        <Route path="/simulations/:id" element={<Suspense fallback={<LinearProgress aria-label="Loading scope" />}><Scope /></Suspense>} />
         <Route path="*" element={<Navigate replace to="/" />} />
       </Routes>
     </Container> : <main key={location.pathname}><Login /></main>}

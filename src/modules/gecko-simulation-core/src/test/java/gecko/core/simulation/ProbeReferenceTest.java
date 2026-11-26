@@ -1,11 +1,13 @@
 package gecko.core.simulation;
 
 import gecko.core.io.CircuitFileParser;
+import gecko.core.io.CircuitFileWriter;
 import gecko.core.io.CircuitModel;
 import gecko.core.preparation.CircuitPreparation;
 import gecko.core.preparation.ExecutionOptions;
 import gecko.core.preparation.PreparationRequest;
 import gecko.core.preparation.PreparationResult;
+import java.io.ByteArrayInputStream;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -19,6 +21,23 @@ class ProbeReferenceTest {
         assertTrue(ProbeReference.parseText(" ").isEmpty());
         assertThrows(IllegalArgumentException.class, () -> ProbeReference.parseText("L.1.loss"));
         assertThrows(IllegalArgumentException.class, () -> ProbeReference.parseText("D.1.i,"));
+    }
+
+    @Test
+    void acceptsEscapedCommasAndBackslashesInComponentNames() {
+        var references = ProbeReference.parseText("L\\,coil.i, R\\\\.v, C.1.v");
+        assertEquals(List.of("L,coil.i", "R\\.v", "C.1.v"), references.stream().map(Object::toString).toList());
+    }
+
+    @Test
+    void coreWriterKeepsAProbeReferenceWithASlashInOneSavedEntry() throws Exception {
+        var model = buckWithProbe("L/coil.i", "C.1.v", "D.1.state");
+        var bytes = new CircuitFileWriter().write(model);
+        var reopened = new CircuitFileParser().parse(new ByteArrayInputStream(bytes), "buck.ipes");
+        var probe = reopened.getControlComponents().stream().filter(component -> component.getType() == ProbeReference.TYPE)
+                .findFirst().orElseThrow();
+        assertEquals(List.of("L/coil.i", "C.1.v", "D.1.state"),
+                ProbeReference.parse(probe.getParameterStrings()).stream().map(Object::toString).toList());
     }
 
     @Test
