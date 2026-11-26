@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import javax.swing.undo.AbstractUndoableEdit;
 import javax.swing.undo.UndoableEdit;
 
@@ -51,7 +52,7 @@ public final class ReglerProbe extends RegelBlock implements VariableTerminalNum
                             .toArray(String[]::new);
                 }
                 if (dialog != null && dialog.isShowing()) {
-                    dialog.applyRename(dialog == originalDialog ? draft : saved.escapedForEditor(), forward);
+                    dialog.applyRename(Objects.equals(dialog, originalDialog) ? draft : saved.escapedForEditor(), forward);
                 }
             }
 
