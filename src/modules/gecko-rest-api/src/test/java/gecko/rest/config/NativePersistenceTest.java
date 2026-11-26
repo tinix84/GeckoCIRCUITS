@@ -5,6 +5,7 @@ import gecko.core.preparation.PreparedCircuit;
 import gecko.core.simulation.HeadlessSimulationEngine;
 import gecko.core.simulation.SimulationResult;
 import gecko.rest.GeckoRestApiApplication;
+import gecko.rest.model.BatchSimulationRequest;
 import gecko.rest.model.SimulationRequest;
 import gecko.rest.model.SimulationResponse;
 import gecko.rest.persistence.PostgresPersistence;
@@ -24,12 +25,17 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -166,16 +172,21 @@ class NativePersistenceTest {
             var first = victim.getBean(SimulationService.class);
             var second = peer.getBean(SimulationService.class);
             var jdbc = peer.getBean(JdbcTemplate.class);
+            var request = buckRequest(victim);
+            var batch = new BatchSimulationRequest();
+            batch.setCircuitId(request.getCircuitId());
+            batch.setParameterSets(List.of(Map.of()));
+            var settings = new BatchSimulationRequest.SimulationSettings();
+            settings.setSimulationTime(request.getSimulationTime());
+            settings.setTimeStep(request.getTimeStep());
+            batch.setSimulationSettings(settings);
+            var previous = first.submitBatch(batch);
+            String completed = previous.getSimulationIds().getFirst();
+            await(() -> first.getSimulationStatus(completed).getStatus() == SimulationStatus.COMPLETED);
+            assertThat(first.getSimulation(completed).getResults()).isNotEmpty();
+
             ReflectionTestUtils.setField(first, "engineFactory", (Supplier<HeadlessSimulationEngine>) () -> victimEngine);
             ReflectionTestUtils.setField(second, "engineFactory", (Supplier<HeadlessSimulationEngine>) () -> peerEngine);
-
-            var path = Path.of("../gecko-simulation-core/src/test/resources/ipes/buck_simple.ipes");
-            var upload = victim.getBean(CircuitFileService.class).loadCircuit(
-                    Base64.getEncoder().encodeToString(Files.readAllBytes(path)), "buck_simple.ipes");
-            assertThat(upload.status()).isEqualTo("loaded");
-            var request = new SimulationRequest(null, 0.002, 1e-6);
-            request.setCircuitId(upload.circuitId());
-
             String running = first.submitSimulation(request).getSimulationId();
             assertThat(victimEngine.started.await(15, TimeUnit.SECONDS)).isTrue();
             String pending = first.submitSimulation(request).getSimulationId();
@@ -195,12 +206,14 @@ class NativePersistenceTest {
                     .timeout(Duration.ofSeconds(5)).header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString("""
                             {"circuitId":"%s","simulationTime":0.002,"timeStep":0.000001}
-                            """.formatted(upload.circuitId()))).build();
+                            """.formatted(request.getCircuitId()))).build();
             assertThat(http.send(blocked, HttpResponse.BodyHandlers.discarding()).statusCode()).isEqualTo(503);
             for (String job : List.of(running, pending)) {
                 assertThat(second.getSimulationStatus(job).getStatus()).isEqualTo(SimulationStatus.FAILED);
                 assertThat(first.getSimulation(job).getStatus()).isEqualTo(SimulationStatus.FAILED);
             }
+            assertThat(first.getSimulation(completed).getResults()).isNotEmpty();
+            assertThat(first.getBatchStatus(previous.getBatchId()).getCompleted()).isEqualTo(1);
             assertThat(victimEngine.invocations.get()).isEqualTo(1);
             assertThat(peerEngine.cancelled.getCount()).isEqualTo(1);
             assertThat(second.getSimulationStatus(unaffected).getStatus()).isEqualTo(SimulationStatus.RUNNING);
@@ -216,6 +229,104 @@ class NativePersistenceTest {
             victimEngine.release.countDown();
             peerEngine.release.countDown();
         }
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "GECKO_TEST_POSTGRES", matches = "true")
+    void rechecksOwnershipAfterWaitingForJobAndQuotaLocks() throws Exception {
+        String[] options = postgresOptions();
+        var engine = new ControlledEngine();
+        try (var victim = application("postgres", options); var peer = application("postgres", options);
+             var work = Executors.newVirtualThreadPerTaskExecutor(); var http = HttpClient.newHttpClient()) {
+            var service = victim.getBean(SimulationService.class);
+            var persistence = victim.getBean(PostgresPersistence.class);
+            var jdbc = peer.getBean(JdbcTemplate.class);
+            ReflectionTestUtils.setField(service, "engineFactory", (Supplier<HeadlessSimulationEngine>) () -> engine);
+            String id = service.submitSimulation(buckRequest(victim)).getSimulationId();
+            assertThat(engine.started.await(15, TimeUnit.SECONDS)).isTrue();
+            var workers = (ThreadPoolExecutor) ReflectionTestUtils.getField(service, "executorService");
+
+            try (var lock = peer.getBean(DataSource.class).getConnection()) {
+                lock.setAutoCommit(false);
+                int blocker;
+                try (var statement = lock.createStatement(); var row = statement.executeQuery("select pg_backend_pid()")) {
+                    assertThat(row.next()).isTrue();
+                    blocker = row.getInt(1);
+                }
+                try (var rowLock = lock.prepareStatement("select id from simulation_job where id = ? for update");
+                     var quotaLock = lock.prepareStatement("select pg_advisory_xact_lock(hashtextextended(?, 0))")) {
+                    rowLock.setString(1, id);
+                    rowLock.execute();
+                    quotaLock.setString(1, "simulation:contended-admission");
+                    quotaLock.execute();
+                }
+
+                try {
+                    engine.release.countDown();
+                    var admission = work.submit(() -> persistence.admitSimulations(
+                            List.of(job("blocked-admission", "contended-admission")), "contended-admission", 1));
+                    await(() -> jdbc.queryForObject("""
+                            select count(*) from pg_stat_activity where ? = any(pg_blocking_pids(pid))
+                            """, Integer.class, blocker) >= 2);
+                    terminateOwner(jdbc, id);
+                    assertThat(health(http, victim)).isEqualTo(503);
+                    lock.commit();
+                    assertThatThrownBy(() -> admission.get(15, TimeUnit.SECONDS))
+                            .isInstanceOf(ExecutionException.class).hasCauseInstanceOf(ResponseStatusException.class);
+                    await(() -> workers.getCompletedTaskCount() == 1);
+                } finally {
+                    lock.rollback();
+                }
+            }
+            assertThat(jdbc.queryForObject("select status from simulation_job where id = ?", String.class, id))
+                    .isEqualTo("RUNNING");
+            assertThat(jdbc.queryForObject("select count(*) from simulation_job where id = 'blocked-admission'", Long.class))
+                    .isZero();
+            assertThat(peer.getBean(SimulationService.class).getSimulationStatus(id).getStatus())
+                    .isEqualTo(SimulationStatus.FAILED);
+        } finally {
+            engine.release.countDown();
+        }
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "GECKO_TEST_POSTGRES", matches = "true")
+    void failedCompletionWriteFencesReplicaWithLiveOwnershipConnection() throws Exception {
+        var engine = new ControlledEngine();
+        try (var context = application("postgres", postgresOptions()); var http = HttpClient.newHttpClient()) {
+            var service = context.getBean(SimulationService.class);
+            var jdbc = context.getBean(JdbcTemplate.class);
+            ReflectionTestUtils.setField(service, "engineFactory", (Supplier<HeadlessSimulationEngine>) () -> engine);
+            String id = service.submitSimulation(buckRequest(context)).getSimulationId();
+            assertThat(engine.started.await(15, TimeUnit.SECONDS)).isTrue();
+            assertThat(health(http, context)).isEqualTo(200);
+            jdbc.execute("alter table audit_log add constraint test_block_completion check (action <> 'COMPLETED')");
+            var workers = (ThreadPoolExecutor) ReflectionTestUtils.getField(service, "executorService");
+
+            engine.release.countDown();
+            await(() -> workers.getCompletedTaskCount() == 1);
+            assertThat(health(http, context)).isEqualTo(503);
+            assertThat(service.getSimulation(id).getStatus()).isEqualTo(SimulationStatus.FAILED);
+            assertThat(service.getSimulation(id).getResults()).isEmpty();
+        } finally {
+            engine.release.countDown();
+        }
+    }
+
+    private static SimulationRequest buckRequest(ConfigurableApplicationContext context) throws Exception {
+        var path = Path.of("../gecko-simulation-core/src/test/resources/ipes/buck_simple.ipes");
+        var upload = context.getBean(CircuitFileService.class).loadCircuit(
+                Base64.getEncoder().encodeToString(Files.readAllBytes(path)), "buck_simple.ipes");
+        assertThat(upload.status()).isEqualTo("loaded");
+        var request = new SimulationRequest(null, 0.002, 1e-6);
+        request.setCircuitId(upload.circuitId());
+        return request;
+    }
+
+    private static void await(BooleanSupplier condition) throws InterruptedException {
+        Instant deadline = Instant.now().plusSeconds(15);
+        while (!condition.getAsBoolean() && Instant.now().isBefore(deadline)) Thread.sleep(25);
+        assertThat(condition.getAsBoolean()).isTrue();
     }
 
     private static void terminateOwner(JdbcTemplate jdbc, String id) {
@@ -283,7 +394,7 @@ class NativePersistenceTest {
         String schema = "gecko_test_" + UUID.randomUUID().toString().replace("-", "");
         return new String[] {
             "--gecko.jobs.workers=1",
-            "--gecko.jobs.retained=2",
+            "--gecko.jobs.retained=3",
             "--spring.flyway.schemas=" + schema,
             "--spring.flyway.default-schema=" + schema,
             "--spring.jpa.properties.hibernate.default_schema=" + schema,

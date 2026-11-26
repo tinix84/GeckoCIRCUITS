@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
 import org.springframework.context.annotation.Profile;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -83,26 +84,35 @@ public class PostgresPersistence {
 
     public boolean hasOwnership() { return replica.hasOwnership(); }
 
+    public void relinquishOwnership() { replica.relinquishOwnership(); }
+
     @Transactional
     public boolean saveSimulation(SimulationMetadata simulation) {
-        if (!replica.checkOwnership() || jobs.updateActiveJob(simulation.id(), replica.id(),
-                simulation.simulationStatus(), simulation.finishedAt(), simulation.error(), ACTIVE) == 0) {
-            return false;
-        }
+        if (!replica.hasOwnership()) return false;
+        var stored = jobs.lockActiveJob(simulation.id(), replica.id(), ACTIVE);
+        if (stored.isEmpty() || !replica.checkOwnership()) return false;
+        stored.get().recordTransition(simulation);
         audit("simulation", simulation.id(), simulation.owner(), simulation.status());
+        jobs.flush();
+        if (!replica.checkOwnership()) {
+            throw new DataAccessResourceFailureException("Simulation ownership lost before committing its status.");
+        }
         return true;
     }
 
     @Transactional
     public void admitSimulations(List<SimulationMetadata> simulations, String tenant, int limit) {
-        int replicaId = replica.liveId();
+        long active = 0;
         if (tenant != null) {
             lockTenant("simulation", tenant);
-            SimulationJobLimits.requireTenantCapacity(activeJobs(tenant), simulations.size(), limit);
+            active = activeJobs(tenant);
         }
+        int replicaId = replica.liveId();
+        if (tenant != null) SimulationJobLimits.requireTenantCapacity(active, simulations.size(), limit);
         simulations.forEach(job -> job.assignReplica(replicaId));
-        jobs.saveAll(simulations);
+        jobs.saveAllAndFlush(simulations);
         simulations.forEach(simulation -> audit("simulation", simulation.id(), simulation.owner(), simulation.status()));
+        replica.liveId();
     }
 
     @Transactional

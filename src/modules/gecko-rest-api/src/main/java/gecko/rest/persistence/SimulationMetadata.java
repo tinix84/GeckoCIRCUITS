@@ -49,9 +49,11 @@ public class SimulationMetadata {
     public String tenant() { return tenant; }
     public String status() { return status.name(); }
 
-    SimulationResponse.SimulationStatus simulationStatus() { return status; }
-    Instant finishedAt() { return finishedAt; }
-    String error() { return error; }
+    void recordTransition(SimulationMetadata transition) {
+        status = transition.status;
+        finishedAt = transition.finishedAt;
+        error = transition.error;
+    }
 
     void assignReplica(int replica) { replicaId = replica; }
 

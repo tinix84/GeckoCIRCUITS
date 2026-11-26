@@ -45,7 +45,8 @@ public class HealthController {
     @Operation(summary = "Health check", description = "Check API health status")
     @ApiResponse(responseCode = "200", description = "API is healthy",
             content = @Content(schema = @Schema(example = "{\"status\":\"UP\",\"version\":\"1.0.0\"}")))
-    @ApiResponse(responseCode = "503", description = "API lost PostgreSQL simulation ownership")
+    @ApiResponse(responseCode = "503", description = "API lost PostgreSQL simulation ownership",
+            content = @Content(schema = @Schema(example = "{\"status\":\"DOWN\",\"version\":\"1.0.0\"}")))
     public ResponseEntity<Map<String, String>> health() {
         var postgres = persistence.getIfAvailable();
         boolean ready = postgres == null || postgres.checkOwnership();

@@ -72,15 +72,20 @@ final class PostgresReplica {
         } catch (SQLException e) {
             logger.debug("PostgreSQL ownership validation failed.", e);
         }
+        relinquishOwnership();
+        return false;
+    }
+
+    synchronized void relinquishOwnership() {
+        if (lost) return;
         lost = true;
-        logger.error("PostgreSQL replica ownership session lost. Restart the API.");
+        logger.error("PostgreSQL replica ownership released. Restart the API.");
         try (session) {
             if (source instanceof HikariDataSource pool) pool.evictConnection(session);
             else session.abort(Runnable::run);
         } catch (SQLException | RuntimeException e) {
-            logger.warn("Could not release the lost PostgreSQL ownership session.", e);
+            logger.warn("Could not release the PostgreSQL ownership session.", e);
         }
-        return false;
     }
 
     int liveId() {

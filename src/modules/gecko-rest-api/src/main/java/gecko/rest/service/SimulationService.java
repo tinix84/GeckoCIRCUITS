@@ -33,6 +33,7 @@ import gecko.rest.persistence.SimulationMetadata;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.TransactionException;
 import org.springframework.stereotype.Service;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -295,10 +296,11 @@ public class SimulationService {
         if (persistence == null) return true;
         try {
             return persistence.saveSimulation(metadata(job));
-        } catch (DataAccessException e) {
+        } catch (DataAccessException | TransactionException e) {
             logger.error("Could not persist {} state of simulation {}", job.response.getStatus(),
                     job.response.getSimulationId(), e);
-            return checkOwnership();
+            persistence.relinquishOwnership();
+            return false;
         }
     }
 
@@ -362,13 +364,15 @@ public class SimulationService {
     private SimulationJob visibleJob(String id) {
         String tenant = currentTenant();
         SimulationJob job = jobs.get(id);
-        return job != null && visible(job.tenant, tenant) && checkOwnership() ? job : null;
+        return job != null && visible(job.tenant, tenant) && (job.durableTerminal || checkOwnership()) ? job : null;
     }
 
     private BatchJob visibleBatch(String id) {
         String tenant = currentTenant();
         BatchJob batch = batches.get(id);
-        return batch != null && visible(batch.tenant, tenant) && checkOwnership() ? batch : null;
+        if (batch == null || !visible(batch.tenant, tenant)) return null;
+        return checkOwnership() || batch.response.getSimulationIds().stream()
+                .map(jobs::get).allMatch(job -> job != null && job.durableTerminal) ? batch : null;
     }
 
     /** Checks both credential owner and tenant for live progress subscriptions. */
@@ -528,11 +532,11 @@ public class SimulationService {
         if (persistence != null) {
             persistence.simulations(tenant).forEach(row -> result.put(row.id(), row.response()));
         }
-        if (useLocal && hasOwnership()) {
-            jobs.forEach((id, job) -> {
-                if (visible(job.tenant, tenant)) result.put(id, snapshot(job, includeResults));
-            });
-        }
+        jobs.forEach((id, job) -> {
+            if (visible(job.tenant, tenant) && (job.durableTerminal || useLocal && hasOwnership())) {
+                result.put(id, snapshot(job, includeResults));
+            }
+        });
         return result;
     }
 
@@ -755,7 +759,8 @@ public class SimulationService {
         if (!isTerminal(job.response) || job.terminalPublished) {
             return;
         }
-        if (!persistTransition(job)) failUnconfirmedJob(job);
+        job.durableTerminal = persistTransition(job);
+        if (!job.durableTerminal) failUnconfirmedJob(job);
         notifyTerminal(job);
     }
 
@@ -1054,6 +1059,7 @@ public class SimulationService {
         private final List<SseEmitter> emitters = new ArrayList<>();
         private HeadlessSimulationEngine engine;
         private boolean terminalPublished;
+        private volatile boolean durableTerminal;
         private final ProgressMailbox mailbox;
 
         private SimulationJob(PreparedCircuit circuit, BatchJob batch, BundleInput bundleInput,
