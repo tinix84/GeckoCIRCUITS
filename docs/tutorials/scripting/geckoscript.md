@@ -1,11 +1,24 @@
 ---
 title: GeckoSCRIPT Basics
 description: Built-in JavaScript scripting for automation and batch simulations
+simulator:
+  circuit: buck-closed-loop.ipes
+  signals: Vout,IL
 ---
 
 # 701 - GeckoSCRIPT Basics
 
 GeckoSCRIPT is JavaScript-based scripting built directly into GeckoCIRCUITS, enabling automation without leaving the application. Powered by GraalVM Polyglot, it provides full access to the circuit simulator API from JavaScript.
+
+## Try the closed-loop buck converter
+
+Run the circuit and observe `Vout` and `IL`. The subtractor compares the output
+voltage with the reference in `CONST.1`. The PI controller adjusts the PWM duty
+cycle to reduce this error. Change the reference from 12 V and rerun to compare
+the response.
+
+The controller runs in the circuit. The scripting examples below use GeckoSCRIPT
+to automate changes and simulations.
 
 ## What is GeckoSCRIPT?
 

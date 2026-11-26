@@ -37,7 +37,7 @@ public final class GeckoFileChooser {
             FileFilter filter = new FileFilter() {
                 @Override
                 public boolean accept(final File file) {
-                    return file.isDirectory() || file.getName().endsWith(ending);
+                    return file.isDirectory() || hasEnding(file.getName(), ending);
                 }
 
                 @Override
@@ -70,10 +70,14 @@ public final class GeckoFileChooser {
         }
 
         String fileName = _fileChooser.getSelectedFile().getAbsolutePath();
-        if (!fileName.endsWith(_fileEnding)) {
+        if (!hasEnding(fileName, _fileEnding)) {
             fileName += _fileEnding;
         }
         return new File(fileName);
+    }
+
+    static boolean hasEnding(String fileName, String ending) {
+        return fileName.regionMatches(true, fileName.length() - ending.length(), ending, 0, ending.length());
     }
 
     public static GeckoFileChooser createOpenFileChooser(final String ending,

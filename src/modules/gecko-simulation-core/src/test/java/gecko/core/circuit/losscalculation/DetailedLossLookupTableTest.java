@@ -30,6 +30,18 @@ class DetailedLossLookupTableTest {
 
     private static final double DELTA = 1e-6;
 
+    @Test
+    void aSingleTemperatureCurveCannotExtrapolateNegativeSwitchingEnergy() {
+        var curve = new SwitchingLossCurve(25.0, 400.0);
+        curve.setCurveData(new double[][] {{10, 20}, {105e-6, 245e-6}, {15e-6, 50e-6}});
+        var turnOn = DetailedLossLookupTable.fabric(List.of(curve), 1);
+        var turnOff = DetailedLossLookupTable.fabric(List.of(curve), 2);
+
+        assertEquals(0, turnOn.getInterpolatedYValue(25, 1));
+        assertEquals(0, turnOff.getInterpolatedYValue(25, 1));
+        assertEquals(32.5e-6, 400 * turnOff.getInterpolatedYValue(25, 15), 1e-12);
+    }
+
     // ====================================================
     // Single Temperature Curve Tests
     // ====================================================
@@ -701,9 +713,7 @@ class DetailedLossLookupTableTest {
 
     @Test
     public void testExtrapolation_BelowMinimumWithSingleCurve() {
-        // Test extrapolation below minimum current with SINGLE temperature curve
-        // Note: With single temperature curve, early return at line 88 bypasses clamping
-        // So negative values ARE returned (this may be a bug, but it's current behavior)
+        // Preserve signed extrapolation on a single conduction curve.
         LeitverlusteMesskurve curve = new LeitverlusteMesskurve(25.0);
         double[][] data = {
             {5, 10},   // Two points starting at 5A
@@ -719,7 +729,6 @@ class DetailedLossLookupTableTest {
         // Below first point: 0A (extrapolation)
         // Uses first two points: weight1=2, weight2=-1
         // Result: 2*2 + 5*(-1) = 4 - 5 = -1
-        // With single temperature curve, early return bypasses Math.max clamping
         double result = table.getInterpolatedYValue(25.0, 0.0);
         assertEquals(-1.0, result, DELTA);
 

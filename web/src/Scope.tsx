@@ -15,13 +15,14 @@ type FourierResponse = components['schemas']['FourierResponse'];
 
 import { downloadBlob } from './download';
 
-export function Scope() {
-  const { id } = useParams();
+export function Scope({ simulationId, initialSignals }: { simulationId?: string; initialSignals?: string[] } = {}) {
+  const route = useParams();
+  const id = simulationId ?? route.id;
   if (!id) return <Alert severity="error">Select a simulation.</Alert>;
-  return <SimulationScope key={id} id={id} />;
+  return <SimulationScope key={id} id={id} initialSignals={initialSignals} />;
 }
 
-function SimulationScope({ id }: { id: string }) {
+function SimulationScope({ id, initialSignals }: { id: string; initialSignals?: string[] }) {
   const [status, setStatus] = useState('Loading');
   const [error, setError] = useState('');
   const [time, setTime] = useState<number[]>([]);
@@ -103,17 +104,19 @@ function SimulationScope({ id }: { id: string }) {
         const output = signals.find((name) => /v_?out/i.test(name)) ?? signals[0];
         setTime(times);
         setChannelNames(signals);
-        setSelected([output]);
-        setFftSignal(output);
+        const preferred = signals.filter((name) => initialSignals?.includes(name));
+        const selectedNames = preferred.length ? preferred : [output];
+        setSelected(selectedNames);
+        setFftSignal(selectedNames[0]);
         setCursors([times[0], times[Math.min(times.length - 1, Math.floor(times.length * 0.1))]]);
-        void loadChannel(output, times.length, controller.signal);
+        selectedNames.forEach((name) => void loadChannel(name, times.length, controller.signal));
       } catch (cause) {
         if (!controller.signal.aborted) setError(errorMessage(cause));
       }
     }
     void poll();
     return () => { controller.abort(); window.clearTimeout(timer); };
-  }, [id]);
+  }, [id, initialSignals]);
 
   const visible = useMemo(() => traces.filter(({ name }) => selected.includes(name)), [traces, selected]);
   const fftData = useMemo(() => {
