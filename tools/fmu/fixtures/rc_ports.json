@@ -1,0 +1,6 @@
+{
+  "model": "GeckoRC",
+  "step": 0.000002,
+  "inputs": [{"name": "Vs", "start": 0.0}],
+  "outputs": ["Vc"]
+}

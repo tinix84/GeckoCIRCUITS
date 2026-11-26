@@ -1,6 +1,6 @@
 # Run FMI co-simulation in a private Java process
 
-ADR-0025 · GeckoCIRCUITS · 2026-11-24 · Status: Proposed · Version 1.0
+ADR-0025 · GeckoCIRCUITS · 2026-11-24 · Status: Accepted · Version 1.1
 
 Audience: maintainers of the Functional Mock-up Interface (FMI) export.
 
@@ -43,6 +43,6 @@ flowchart LR
 
 ## Status
 
-Proposed on 2026-11-24. This decision applies to the first FMI export in issue #47.
+Accepted on 2026-11-25. This decision applies to the first FMI export in issue #47.
 
 Sources: [FMI 2.0.4](https://github.com/modelica/fmi-standard/releases/tag/v2.0.4) and [PythonFMU](https://github.com/NTNU-IHB/PythonFMU).

@@ -1,0 +1,8 @@
+vin_max_v: 48
+iout_a: 10
+fsw_hz: 50000
+ambient_c: 40
+output_power_w: 120
+efficiency_target: 0.95
+gate_drive_current_a: 1.5
+conduction_fraction: 1.0
