@@ -48,6 +48,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
+import javax.swing.undo.CompoundEdit;
 import javax.swing.undo.UndoableEdit;
 import gecko.modelviewcontrol.AbstractUndoGenericModel;
 import gecko.modelviewcontrol.GroupableUndoManager;
@@ -1912,10 +1913,13 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
         }
     }
 
-    void updateProbeReferences(String previous, String current) {
+    void updateProbeReferences(String previous, String current, CompoundEdit edits) {
         for (var block : _circuitSheet.getAllElements().getClassFromContainer(RegelBlock.class)) {
             if (block instanceof ReglerProbe probe) {
-                probe.renameTarget(previous, current);
+                var edit = probe.renameTarget(previous, current);
+                if (edit != null) {
+                    edits.addEdit(edit);
+                }
             }
         }
     }

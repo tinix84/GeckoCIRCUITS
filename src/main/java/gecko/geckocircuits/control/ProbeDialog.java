@@ -5,10 +5,9 @@ import gecko.geckocircuits.circuit.SchematicEditor2;
 import gecko.geckocircuits.circuit.circuitcomponents.AbstractCircuitBlockInterface;
 import java.awt.BorderLayout;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.swing.BoxLayout;
 import javax.swing.JCheckBox;
@@ -22,7 +21,8 @@ final class ProbeDialog extends DialogElementCONTROL<ReglerProbe> {
 
     ProbeDialog(ReglerProbe element) {
         super(element, false);
-        references.setText(String.join(", ", element.getOutputNames()));
+        references.setText(Arrays.stream(element.getOutputNames()).map(ProbeReference::escapeText)
+                .collect(Collectors.joining(", ")));
     }
 
     @Override
@@ -97,22 +97,22 @@ final class ProbeDialog extends DialogElementCONTROL<ReglerProbe> {
         };
     }
 
-    void renameTarget(String previous, String current) {
-        String text = references.getText();
-        String updated = renameReferenceText(text, previous, current);
-        if (!text.equals(updated)) {
-            references.setText(updated);
-        }
+    ProbeReferenceRename captureRename(String previous, String current) {
+        return ProbeReferenceRename.capture(ProbeReference.splitTextEntries(references.getText()),
+                ProbeReference.escapeText(previous), ProbeReference.escapeText(current));
     }
 
-    static String renameReferenceText(String text, String previous, String current) {
-        String target = "(^|,)(\\s*)" + Pattern.quote(previous) + "(?=\\s*\\.(?:i|v|state)\\s*(?:,|$))";
-        return Pattern.compile(target).matcher(text).replaceAll("$1$2" + Matcher.quoteReplacement(current));
+    void applyRename(ProbeReferenceRename rename, boolean forward) {
+        String[] entries = ProbeReference.splitTextEntries(references.getText());
+        if (rename.apply(entries, forward)) {
+            references.setText(String.join(",", entries));
+        }
     }
 
     static String appendReferences(String text, List<ProbeReference> additions) {
         var existing = new HashSet<>(ProbeReference.parseText(text));
         String appended = additions.stream().filter(existing::add).map(ProbeReference::toString)
+                .map(ProbeReference::escapeText)
                 .collect(Collectors.joining(", "));
         if (appended.isEmpty()) {
             return text;
