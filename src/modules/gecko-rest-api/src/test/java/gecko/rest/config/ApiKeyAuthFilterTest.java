@@ -24,6 +24,28 @@ class ApiKeyAuthFilterTest {
         filterChain = new MockFilterChain();
     }
 
+    @Test
+    void privateMetricsRequireCredentialsEvenWhenOrdinaryApiAuthIsDisabled() throws Exception {
+        properties.setAuthEnabled(false);
+        var request = new MockHttpServletRequest("GET", "/actuator/prometheus");
+        var response = new MockHttpServletResponse();
+        filter.doFilterInternal(request, response, filterChain);
+        assertEquals(401, response.getStatus());
+        assertNull(filterChain.getRequest());
+    }
+
+    @Test
+    void publicMetricsAllowScrapesWithoutAnApiKey() throws Exception {
+        properties.setAuthEnabled(true);
+        properties.setKeys("valid-key");
+        properties.setMetricsPublic(true);
+        var request = new MockHttpServletRequest("GET", "/actuator/prometheus");
+        var response = new MockHttpServletResponse();
+        filter.doFilterInternal(request, response, filterChain);
+        assertEquals(200, response.getStatus());
+        assertSame(request, filterChain.getRequest());
+    }
+
     // Test 1: Valid API key in header → filter chain continues
     @Test
     void testValidApiKeyAllowsRequest() throws Exception {

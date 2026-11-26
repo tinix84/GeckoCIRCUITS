@@ -19,6 +19,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.hamcrest.Matchers.aMapWithSize;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -34,6 +35,9 @@ class ListPaginationTest {
         List<CircuitListResponse.CircuitSummary> items = IntStream.range(0, count)
                 .mapToObj(i -> new CircuitListResponse.CircuitSummary("id-%03d".formatted(i),
                         "example.ipes", 1, Instant.EPOCH.plusSeconds(i).toString())).toList();
+        doCallRealMethod().when(circuits).getCircuitPage(org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyBoolean());
         when(circuits.getAllCircuits()).thenReturn(new CircuitListResponse(items.reversed(), count));
         Map<String, SimulationResponse> jobs = new HashMap<>();
         items.forEach(item -> {

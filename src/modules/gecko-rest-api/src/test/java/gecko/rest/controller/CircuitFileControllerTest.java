@@ -237,6 +237,8 @@ class CircuitFileControllerTest {
             ),
             2
         );
+        when(circuitFileService.getCircuitPage(org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean())).thenCallRealMethod();
         when(circuitFileService.getAllCircuits()).thenReturn(mockResponse);
 
         // Test GET /api/v1/circuits
@@ -254,6 +256,8 @@ class CircuitFileControllerTest {
     void testGetAllCircuits_empty() throws Exception {
         // Mock service response
         CircuitListResponse mockResponse = new CircuitListResponse(List.of(), 0);
+        when(circuitFileService.getCircuitPage(org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean())).thenCallRealMethod();
         when(circuitFileService.getAllCircuits()).thenReturn(mockResponse);
 
         // Test GET /api/v1/circuits

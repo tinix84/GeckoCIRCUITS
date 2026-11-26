@@ -7,6 +7,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.TimeoutException;
 import gecko.core.allg.SolverType;
 import gecko.core.preparation.*;
@@ -74,6 +75,7 @@ public class SimulationService {
 
     private final Map<String, SimulationJob> jobs = new ConcurrentHashMap<>();
     private final Map<String, BatchJob> batches = new ConcurrentHashMap<>();
+    private final Map<String, Integer> embeddedByTenant = new ConcurrentHashMap<>();
     private final ExecutorService executorService;
     private final Supplier<HeadlessSimulationEngine> engineFactory;
     private final LongFunction<SseEmitter> emitterFactory;
@@ -83,6 +85,7 @@ public class SimulationService {
     private final CircuitFileService circuitFiles;
     private PostgresPersistence persistence;
     private ScheduledExecutorService ownershipMonitor;
+    private SimulationMetrics metrics;
     private ApiKeyProperties keys = new ApiKeyProperties();
     private final CircuitPreparation preparation = new CircuitPreparation();
 
@@ -107,6 +110,12 @@ public class SimulationService {
         this(limits, circuitFiles);
         this.persistence = persistence.getIfAvailable();
         this.keys = keys;
+    }
+
+    @Autowired(required = false)
+    void configureMetrics(SimulationMetrics metrics) {
+        this.metrics = metrics;
+        if (executorService instanceof ThreadPoolExecutor pool) metrics.bind(pool);
     }
 
     @PostConstruct
@@ -208,17 +217,35 @@ public class SimulationService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot parse the submitted circuit", e);
         }
         PreparedCircuit prepared = prepare(request, new CircuitFileService.ResolvedSource(source, true));
-        var replay = new FutureTask<>(() -> {
-            requireOwnership();
-            return engineFactory.get().runSimulation(prepared, ExecutionOptions.defaults(),
-                    () -> !hasOwnership() || Thread.currentThread().isInterrupted());
-        });
+        String tenant = currentTenant();
+        Runnable release = admitEmbeddedSimulation(tenant);
+        var started = new AtomicBoolean();
+        var released = new AtomicBoolean();
+        Runnable finish = () -> {
+            if (released.compareAndSet(false, true)) release.run();
+        };
+        var replay = new FutureTask<SimulationResult>(() -> {
+            try {
+                requireOwnership();
+                return engineFactory.get().runSimulation(prepared, ExecutionOptions.defaults(),
+                        () -> !hasOwnership() || Thread.currentThread().isInterrupted());
+            } finally {
+                finish.run();
+            }
+        }) {
+            @Override
+            public void run() {
+                if (!started.compareAndSet(false, true)) return;
+                try {
+                    super.run();
+                } finally {
+                    // A cancelled FutureTask can skip the callable.
+                    finish.run();
+                }
+            }
+        };
         try {
             executorService.execute(replay);
-        } catch (RejectedExecutionException e) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Simulation queue is full", e);
-        }
-        try {
             SimulationResult result = replay.get(60, TimeUnit.SECONDS);
             requireOwnership();
             if (!result.isSuccess()) {
@@ -227,6 +254,8 @@ public class SimulationService {
             SimulationResponse response = new SimulationResponse("replay");
             applySuccessfulResult(response, result);
             return response.getResults();
+        } catch (RejectedExecutionException e) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Simulation queue is full", e);
         } catch (TimeoutException e) {
             throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "Submitted circuit simulation timed out", e);
         } catch (InterruptedException e) {
@@ -236,10 +265,36 @@ public class SimulationService {
             if (e.getCause() instanceof ResponseStatusException status) throw status;
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Submitted circuit simulation failed", e);
         } finally {
-            if (replay.cancel(true) && executorService instanceof ThreadPoolExecutor pool) {
-                pool.remove(replay);
+            if (replay.cancel(true)) {
+                if (started.compareAndSet(false, true)) finish.run();
+                if (executorService instanceof ThreadPoolExecutor pool) pool.remove(replay);
             }
         }
+    }
+
+    private Runnable admitEmbeddedSimulation(String tenant) {
+        if (tenant == null) return () -> { };
+        int limit = keys.quotaFor(tenant).getMaxConcurrent();
+        if (persistence != null) {
+            UUID id = UUID.randomUUID();
+            persistence.admitEmbeddedSimulation(id, tenant, limit);
+            return () -> {
+                boolean interrupted = Thread.interrupted();
+                try {
+                    persistence.releaseEmbeddedSimulation(id);
+                } catch (DataAccessException | TransactionException e) {
+                    logger.error("Could not release the embedded simulation lease {}", id, e);
+                    persistence.relinquishOwnership();
+                } finally {
+                    if (interrupted) Thread.currentThread().interrupt();
+                }
+            };
+        }
+        synchronized (admissionMonitor) {
+            SimulationJobLimits.requireTenantCapacity(activeJobs(tenant), 1, limit);
+            embeddedByTenant.merge(tenant, 1, Integer::sum);
+        }
+        return () -> embeddedByTenant.computeIfPresent(tenant, (key, count) -> count == 1 ? null : count - 1);
     }
 
     record BundleData(byte[] circuit, SimulationRequest request, Map<String, double[]> results) {}
@@ -397,7 +452,7 @@ public class SimulationService {
 
     public long activeJobs(String tenant) {
         if (persistence != null) return persistence.activeJobs(tenant);
-        return jobs.values().stream()
+        return embeddedByTenant.getOrDefault(tenant, 0) + jobs.values().stream()
                 .filter(job -> tenant.equals(job.tenant) && !isTerminal(job.response))
                 .count();
     }
@@ -766,6 +821,7 @@ public class SimulationService {
 
     private void notifyTerminal(SimulationJob job) {
         job.terminalPublished = true;
+        if (metrics != null) metrics.recordTerminal(job.response);
         boolean success = job.response.getStatus() == SimulationStatus.COMPLETED;
         String simulationId = job.response.getSimulationId();
         List<SseEmitter> emitters = new ArrayList<>(job.emitters);

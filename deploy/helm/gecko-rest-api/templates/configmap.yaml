@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+data:
+  SPRING_PROFILES_ACTIVE: {{ prepend .Values.config.profiles "observability" | uniq | join "," | quote }}
+  GECKO_API_METRICS_PUBLIC: {{ .Values.config.metricsPublic | quote }}
+  GECKO_API_AUTH_ENABLED: {{ .Values.auth.enabled | quote }}
+  GECKO_API_JWT_ENABLED: {{ .Values.auth.jwtEnabled | quote }}
+  {{- range $key, $value := .Values.config.extraEnv }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}

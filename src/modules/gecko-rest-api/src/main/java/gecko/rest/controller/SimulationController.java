@@ -2,6 +2,7 @@ package gecko.rest.controller;
 
 import gecko.rest.model.SimulationRequest;
 import gecko.rest.model.SimulationResponse;
+import gecko.rest.model.SimulationResponse.SimulationStatus;
 import gecko.rest.service.SimulationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -188,8 +189,14 @@ public class SimulationController {
         Map<String, Object> result = new HashMap<>();
         result.put("simulationId", simulationId);
         result.put("status", response.getStatus().toString());
-        result.put("progress", simulationService.getSimulationProgress(simulationId));
-        result.put("isRunning", simulationService.isRunning(simulationId));
+        boolean running = response.getStatus() == SimulationStatus.RUNNING;
+        double progress = switch (response.getStatus()) {
+            case COMPLETED -> 100.0;
+            case RUNNING -> simulationService.getSimulationProgress(simulationId);
+            default -> 0.0;
+        };
+        result.put("progress", progress);
+        result.put("isRunning", running);
         return ResponseEntity.ok(result);
     }
 

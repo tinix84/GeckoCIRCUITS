@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import gecko.rest.config.ApiIdentity;
 import gecko.rest.config.ApiKeyProperties;
 import gecko.rest.config.SimulationJobLimits;
+import gecko.rest.model.PageMetadata;
 import gecko.rest.model.circuit.*;
 import gecko.rest.persistence.CircuitMetadata;
 import gecko.rest.persistence.PostgresPersistence;
@@ -235,19 +236,36 @@ public class CircuitFileService {
         List<CircuitListResponse.CircuitSummary> summaries = (persistence == null
                 ? circuits.entrySet().stream().filter(entry -> visible(entry.getValue(), tenant))
                 : persistence.circuits(tenant).stream().map(row -> Map.entry(row.id(), parseStored(row))))
-            .map(entry -> {
-                String id = entry.getKey();
-                ParsedCircuit parsed = entry.getValue();
-                return new CircuitListResponse.CircuitSummary(
-                    id,
-                    parsed.filename,
-                    parsed.snapshot.toModel().getTotalComponentCount(),
-                    parsed.loadedAt.toString()
-                );
-            })
+            .map(entry -> summary(entry.getKey(), entry.getValue()))
             .collect(Collectors.toList());
 
         return new CircuitListResponse(summaries, summaries.size());
+    }
+
+    public CircuitListResponse getCircuitPage(int page, int size, String field, boolean descending) {
+        List<CircuitListResponse.CircuitSummary> selected;
+        int total;
+        if (persistence == null) {
+            var response = getAllCircuits();
+            var byId = Comparator.comparing(CircuitListResponse.CircuitSummary::circuitId);
+            var comparator = field.equals("createdAt") ? Comparator.comparing(
+                    (CircuitListResponse.CircuitSummary item) -> item.loadedAt() == null ? null : Instant.parse(item.loadedAt()),
+                    Comparator.nullsFirst(Comparator.naturalOrder())).thenComparing(byId) : byId;
+            selected = response.circuits().stream().sorted(descending ? comparator.reversed() : comparator)
+                    .skip((long) page * size).limit(size).toList();
+            total = response.total();
+        } else {
+            var response = persistence.circuitPage(currentTenant(), page, size, field, descending);
+            selected = response.rows().stream().map(row -> summary(row.id(), parseStored(row))).toList();
+            total = response.total();
+        }
+        var metadata = new PageMetadata(page, size, total, (int) (((long) total + size - 1) / size));
+        return new CircuitListResponse(selected, total, metadata);
+    }
+
+    private static CircuitListResponse.CircuitSummary summary(String id, ParsedCircuit circuit) {
+        return new CircuitListResponse.CircuitSummary(id, circuit.filename,
+                circuit.snapshot.toModel().getTotalComponentCount(), circuit.loadedAt.toString());
     }
 
     /**

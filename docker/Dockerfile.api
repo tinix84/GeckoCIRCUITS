@@ -12,8 +12,8 @@ WORKDIR /build
 RUN apk add --no-cache maven
 
 # Copy core module files
-COPY gecko-simulation-core/pom.xml gecko-simulation-core/
-COPY gecko-simulation-core/src gecko-simulation-core/src/
+COPY src/modules/gecko-simulation-core/pom.xml gecko-simulation-core/
+COPY src/modules/gecko-simulation-core/src gecko-simulation-core/src/
 
 # Build and install core module to local repo
 WORKDIR /build/gecko-simulation-core
@@ -33,8 +33,8 @@ RUN apk add --no-cache maven
 COPY --from=core-builder /root/.m2/repository /root/.m2/repository
 
 # Copy REST API module files
-COPY gecko-rest-api/pom.xml gecko-rest-api/
-COPY gecko-rest-api/src gecko-rest-api/src/
+COPY src/modules/gecko-rest-api/pom.xml gecko-rest-api/
+COPY src/modules/gecko-rest-api/src gecko-rest-api/src/
 
 # Build REST API (uses core from local repo)
 WORKDIR /build/gecko-rest-api
@@ -52,7 +52,7 @@ RUN addgroup -g 1000 gecko && \
 WORKDIR /app
 
 # Copy the built JAR from api-builder stage
-COPY --from=api-builder /build/gecko-rest-api/target/*.jar app.jar
+COPY --from=api-builder /build/gecko-rest-api/target/gecko-rest-api-1.0.0.jar app.jar
 
 # Create directory for circuit files and set ownership
 RUN mkdir -p /app/circuits /app/data && \
@@ -73,7 +73,7 @@ EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/gecko/api/health || exit 1
 
 # Run the application
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
