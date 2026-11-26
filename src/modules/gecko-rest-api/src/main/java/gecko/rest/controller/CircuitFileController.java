@@ -33,6 +33,31 @@ public class CircuitFileController {
         this.circuitFileService = circuitFileService;
     }
 
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PostMapping(value = "/schematic", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Save a grid schematic as a native circuit")
+    @ApiResponses({
+        @ApiResponse(responseCode = "201", description = "Native circuit saved and loaded"),
+        @ApiResponse(responseCode = "400", description = "Invalid schematic")
+    })
+    public ResponseEntity<CircuitLoadResponse> saveSchematic(@Valid @RequestBody SchematicDraftRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(circuitFileService.saveSchematic(request));
+    }
+
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'USER', 'READONLY')")
+    @GetMapping(value = "/{circuitId}/ipes", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    @Operation(summary = "Export a native circuit file")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Native circuit file",
+                content = @Content(mediaType = MediaType.APPLICATION_OCTET_STREAM_VALUE,
+                        schema = @Schema(type = "string", format = "binary"))),
+        @ApiResponse(responseCode = "404", description = "Circuit not found")
+    })
+    public ResponseEntity<byte[]> exportCircuit(@PathVariable String circuitId) {
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(circuitFileService.exportCircuit(circuitId));
+    }
+
     /**
      * Load circuit from multipart file upload.
      */

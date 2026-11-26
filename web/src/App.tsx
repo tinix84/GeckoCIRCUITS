@@ -9,6 +9,7 @@ import { useSession } from './session';
 import { errorMessage } from './errors';
 const Scope = lazy(() => import('./Scope').then(({ Scope }) => ({ default: Scope })));
 const CircuitEditor = lazy(() => import('./CircuitEditor').then(({ CircuitEditor }) => ({ default: CircuitEditor })));
+const SchematicDraft = lazy(() => import('./SchematicDraftPage').then(({ SchematicDraftPage }) => ({ default: SchematicDraftPage })));
 
 function Login() {
   const { signIn } = useSession();
@@ -100,7 +101,9 @@ function Circuits() {
   return <Stack spacing={2.5}>
     <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 2 }}>
       <Typography variant="h1">Circuit library</Typography>
-      <Button component="label" variant="contained" disabled={uploading}>
+      <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1 }}>
+        <Button component={Link} to="/circuits/new" variant="outlined">New schematic</Button>
+        <Button component="label" variant="contained" disabled={uploading}>
         {uploading ? 'Uploading…' : 'Upload circuit'}
         <input hidden type="file" accept=".ipes" aria-label="Upload circuit" disabled={uploading}
           onChange={(event) => {
@@ -108,7 +111,8 @@ function Circuits() {
             event.target.value = '';
             if (file) void upload(file);
           }} />
-      </Button>
+        </Button>
+      </Stack>
     </Stack>
     {uploadError && <Alert severity="error">{uploadError}</Alert>}
     {error && <Alert severity="error">{error}</Alert>}
@@ -200,6 +204,7 @@ export function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/circuits" element={<Circuits />} />
+        <Route path="/circuits/new" element={<Suspense fallback={<LinearProgress aria-label="Loading drawing tools" />}><SchematicDraft /></Suspense>} />
         <Route path="/circuits/:id" element={<Suspense fallback={<LinearProgress aria-label="Loading circuit editor" />}><CircuitEditor /></Suspense>} />
         <Route path="/simulations/:id" element={<Suspense fallback={<LinearProgress aria-label="Loading scope" />}><Scope /></Suspense>} />
         <Route path="*" element={<Navigate replace to="/" />} />

@@ -2,6 +2,7 @@ package gecko.rest.service;
 
 import gecko.core.io.CircuitFileParser;
 import gecko.core.io.CircuitFileWriter;
+import gecko.core.io.importer.SchematicDraft;
 import gecko.core.io.CircuitModel;
 import gecko.core.preparation.*;
 import java.nio.file.Files;
@@ -54,6 +55,28 @@ public class CircuitFileService {
 
     // Default storage keeps parsed snapshots in memory.
     private final Map<String, ParsedCircuit> circuits = new ConcurrentHashMap<>();
+
+    public CircuitLoadResponse saveSchematic(SchematicDraftRequest request) {
+        try {
+            CircuitModel model = SchematicDraft.build(request.parts(), request.wires(), request.duration(), request.step());
+            byte[] content = writer.write(model);
+            CircuitLoadResponse loaded = loadCircuitFromBytes(content, request.filename());
+            if ("failed".equals(loaded.status())) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, loaded.errorMessage());
+            }
+            return loaded;
+        } catch (IllegalArgumentException failure) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, failure.getMessage(), failure);
+        } catch (IOException failure) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Cannot serialize circuit", failure);
+        }
+    }
+
+    public byte[] exportCircuit(String circuitId) {
+        ParsedCircuit circuit = findCircuit(circuitId);
+        if (circuit == null) throw missingCircuit(circuitId);
+        return encode(circuit.snapshot);
+    }
 
     /**
      * Load circuit from multipart file upload.

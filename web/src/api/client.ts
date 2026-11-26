@@ -16,9 +16,12 @@ api.use({
   },
 });
 
-export function requireData<T>(result: { data?: T; response: Response }, message: string): T {
+export function requireData<T>(result: { data?: T; response: Response; error?: unknown }, message: string): T {
   if (!result.response.ok || result.data === undefined) {
-    throw new Error(message + ' (HTTP ' + result.response.status + ').');
+    const { error } = result;
+    const detail = typeof error === 'object' && error && 'message' in error && typeof error.message === 'string'
+      ? ' ' + error.message : '';
+    throw new Error(message + ' (HTTP ' + result.response.status + ').' + detail);
   }
   return result.data;
 }
