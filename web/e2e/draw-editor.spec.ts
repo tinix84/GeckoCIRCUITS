@@ -64,6 +64,7 @@ test('draws, saves, reopens, and simulates an RC low-pass circuit', async ({ pag
   const outputResponse = page.waitForResponse('**/api/v1/simulations/*/results/V_n2');
   const timesResponse = page.waitForResponse('**/api/v1/simulations/*/results/time');
   await page.getByRole('button', { name: 'Run simulation', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'V_n2', exact: true }).check({ timeout: 30_000 });
   const [output, time] = await Promise.all([outputResponse, timesResponse]);
   expect(output.ok() && time.ok()).toBeTruthy();
   const { data: values } = await output.json() as { data: number[] };
@@ -80,6 +81,25 @@ test('draws, saves, reopens, and simulates an RC low-pass circuit', async ({ pag
   const maximum = Math.max(...relativeErrors);
   console.log('RC maximum relative error after 0.5 ms: ' + (maximum * 100).toFixed(4) + '%');
   expect(maximum).toBeLessThan(0.01);
+});
+
+test('rejects a conflicting elbow before it becomes a wire', async ({ page }) => {
+  await page.goto('/circuits/new');
+  await page.getByLabel('API key').fill(process.env.GECKO_TEST_API_KEY ?? 'gecko-web-test-key');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await place(page, 'Resistor', 4, 6);
+  await place(page, 'Resistor', 11, 11);
+  await place(page, 'Capacitor', 11, 6);
+  const first = page.getByRole('button', { name: 'R1 terminal 1', exact: true });
+  const second = page.getByRole('button', { name: 'R2 terminal 1', exact: true });
+  await first.click();
+  await second.click();
+  await expect(page.getByRole('alert')).toContainText('different nets share a grid point');
+  await expect(page.getByTestId('draft-wire')).toHaveCount(0);
+  await second.click();
+  await first.click();
+  await expect(page.getByTestId('draft-wire')).toHaveCount(1);
+  await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
 async function readDownload(download: import('@playwright/test').Download) {

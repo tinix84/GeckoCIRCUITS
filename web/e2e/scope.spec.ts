@@ -90,14 +90,19 @@ test('pans a 500,000-sample trace and measures frame time', async ({ page }) => 
       pixels[index + 1] > red + 25 && pixels[index + 2] > red + 20);
     const idle = [];
     const panning = [];
+    const plot = document.querySelector<HTMLElement>('.chart-host')!;
+    let moved = 0;
     for (let index = 0; index < 10; index += 1) {
       const inactive = await frame();
       idle.push((await frame()) - inactive);
       const start = await frame();
+      const previous = Number(plot.dataset.xMin);
       pan[index % 2]!.click();
       panning.push((await frame()) - start);
+      const current = Number(plot.dataset.xMin);
+      if (index % 2 === 0 ? current > previous : current < previous) moved += 1;
     }
-    return { idle, panning, traceVisible };
+    return { idle, panning, traceVisible, moved };
   });
   const sorted = benchmark.panning.slice().sort((a, b) => a - b);
   const idle = benchmark.idle.slice().sort((a, b) => a - b);
@@ -106,5 +111,6 @@ test('pans a 500,000-sample trace and measures frame time', async ({ page }) => 
   await test.info().attach('Pan frame time', { body: message, contentType: 'text/plain' });
   console.log(message);
   expect(benchmark.traceVisible).toBeTruthy();
-  expect(benchmark.panning).toHaveLength(10);
+  expect(benchmark.moved).toBe(10);
+  expect(sorted[5]).toBeLessThanOrEqual(Math.max(33.4, idle[5] + 16.7));
 });

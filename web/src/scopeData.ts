@@ -46,6 +46,17 @@ export function reducedRows(time: number[], traces: Trace[], bucketSize: number)
   return [indexes.map((index) => time[index]), ...traces.map(({ values }) => indexes.map((index) => values[index]))];
 }
 
+export function fourierWindow(time: number[]) {
+  // Use a power-of-two sample interval so the server does not reduce the bandwidth by resampling.
+  const available = Math.min(65_536, Math.max(8, Math.floor((time.length - 1) / 4)));
+  const intervals = 2 ** Math.floor(Math.log2(available));
+  return {
+    startTime: time[time.length - 1 - intervals],
+    endTime: time[time.length - 1],
+    harmonics: intervals / 2 - 1,
+  };
+}
+
 export function numericSeries(value: unknown): number[] {
   if (!Array.isArray(value) || !value.every((point) => typeof point === 'number' && Number.isFinite(point))) {
     throw new Error('The signal contains invalid samples.');

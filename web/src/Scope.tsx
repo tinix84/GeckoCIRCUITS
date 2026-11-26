@@ -7,7 +7,7 @@ import type uPlot from 'uplot';
 import { api, requireData } from './api/client';
 import type { components } from './api/schema';
 import { errorMessage } from './errors';
-import { chartCsv, closestSample, numericSeries } from './scopeData';
+import { chartCsv, closestSample, fourierWindow, numericSeries } from './scopeData';
 import type { CursorPair, Trace } from './scopeData';
 import { Waveform } from './Waveform';
 
@@ -26,6 +26,10 @@ function SimulationScope({ id }: { id: string }) {
   const [error, setError] = useState('');
   const [time, setTime] = useState<number[]>([]);
   const [traces, setTraces] = useState<Trace[]>([]);
+  const [channelNames, setChannelNames] = useState<string[]>([]);
+  const [channelErrors, setChannelErrors] = useState<Map<string, string>>(new Map());
+  const pending = useRef(new Set<string>());
+  const connection = useRef<AbortController>();
   const [selected, setSelected] = useState<string[]>([]);
   const [tab, setTab] = useState<'waveform' | 'fft'>('waveform');
   const [cursors, setCursors] = useState<CursorPair>([0, 0]);
@@ -36,8 +40,41 @@ function SimulationScope({ id }: { id: string }) {
   const [fft, setFft] = useState<FourierResponse>();
   const chart = useRef<uPlot>();
 
+  async function readSignal(name: string, signal: AbortSignal) {
+    const data = requireData(await api.GET('/api/v1/simulations/{simulationId}/results/{signalName}', {
+      params: { path: { simulationId: id, signalName: name } }, signal,
+    }), 'Could not load ' + name);
+    return numericSeries(data.data);
+  }
+
+  async function loadChannel(name: string, length: number, signal: AbortSignal) {
+    if (pending.current.has(name)) return;
+    pending.current.add(name);
+    setChannelErrors((current) => {
+      const next = new Map(current);
+      next.delete(name);
+      return next;
+    });
+    try {
+      const values = await readSignal(name, signal);
+      if (values.length !== length) throw new Error('The channel and time arrays have different lengths.');
+      if (!signal.aborted) setTraces((current) => [...current, { name, values }]);
+    } catch (cause) {
+      if (!signal.aborted) setChannelErrors((current) => new Map(current).set(name, errorMessage(cause)));
+    } finally {
+      pending.current.delete(name);
+    }
+  }
+
+  function selectChannel(name: string, checked: boolean) {
+    setSelected((current) => checked ? [...current, name] : current.filter((value) => value !== name));
+    const signal = connection.current?.signal;
+    if (checked && signal && !traces.some((trace) => trace.name === name)) void loadChannel(name, time.length, signal);
+  }
+
   useEffect(() => {
     const controller = new AbortController();
+    connection.current = controller;
     let timer: number | undefined;
     const path = { simulationId: id };
     async function poll() {
@@ -59,23 +96,17 @@ function SimulationScope({ id }: { id: string }) {
         const timeName = names.find((name) => name.toLowerCase() === 'time');
         if (!timeName) throw new Error('The simulation did not record time samples.');
 
-        const loaded: Trace[] = [];
-        for (const name of names) {
-          const data = requireData(await api.GET('/api/v1/simulations/{simulationId}/results/{signalName}', {
-            params: { path: { ...path, signalName: name } }, signal: controller.signal,
-          }), 'Could not get ' + name);
-          loaded.push({ name, values: numericSeries(data.data) });
-        }
+        const times = await readSignal(timeName, controller.signal);
         if (controller.signal.aborted) return;
-        const times = loaded.find(({ name }) => name === timeName)!.values;
-        const signals = loaded.filter(({ name, values }) => name !== timeName && values.length === times.length);
+        const signals = names.filter((name) => name !== timeName);
         if (times.length < 2 || !signals.length) throw new Error('The simulation has no plottable signals.');
-        const output = signals.find(({ name }) => /v_?out/i.test(name)) ?? signals[0];
+        const output = signals.find((name) => /v_?out/i.test(name)) ?? signals[0];
         setTime(times);
-        setTraces(signals);
-        setSelected([output.name]);
-        setFftSignal(output.name);
+        setChannelNames(signals);
+        setSelected([output]);
+        setFftSignal(output);
         setCursors([times[0], times[Math.min(times.length - 1, Math.floor(times.length * 0.1))]]);
+        void loadChannel(output, times.length, controller.signal);
       } catch (cause) {
         if (!controller.signal.aborted) setError(errorMessage(cause));
       }
@@ -110,9 +141,7 @@ function SimulationScope({ id }: { id: string }) {
 
   async function computeFourier() {
     if (time.length < 10 || fftBusy) return;
-    const start = Math.min(Math.floor(time.length * 0.75), time.length - 10);
-    const resolution = 2 ** Math.floor(Math.log2(time.length - start - 2));
-    const harmonics = Math.min(100, resolution / 2 - 1);
+    const { startTime, endTime, harmonics } = fourierWindow(time);
     setFftBusy(true);
     setFftError('');
     setFft(undefined);
@@ -121,7 +150,7 @@ function SimulationScope({ id }: { id: string }) {
         params: { query: { harmonics } },
         body: {
           simulationId: id, signalName: fftSignal,
-          startTime: time[start], endTime: time[time.length - 1],
+          startTime, endTime,
         },
       }), 'Could not compute the Fourier spectrum');
       setFft(result);
@@ -150,15 +179,21 @@ function SimulationScope({ id }: { id: string }) {
       <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2.5 }, minWidth: 0 }}>
         {tab === 'waveform' ? <Stack spacing={1.5}>
           <Stack direction="row" sx={{ flexWrap: 'wrap' }}>
-            {traces.map(({ name }) => <FormControlLabel key={name} label={name}
-              control={<Checkbox checked={selected.includes(name)} onChange={(_, checked) =>
-                setSelected((previous) => checked ? [...previous, name] : previous.filter((value) => value !== name))
-              } />} />)}
+            {channelNames.map((name) => <FormControlLabel key={name} label={name}
+              control={<Checkbox checked={selected.includes(name)} onChange={(_, checked) => selectChannel(name, checked)} />} />)}
           </Stack>
+          {[...channelErrors].filter(([name]) => selected.includes(name)).map(([name, message]) => (
+            <Alert key={name} severity="error" action={<Button onClick={() => {
+              const signal = connection.current?.signal;
+              if (signal) void loadChannel(name, time.length, signal);
+            }}>Retry</Button>}>{message}</Alert>
+          ))}
+          {selected.some((name) => !traces.some((trace) => trace.name === name) && !channelErrors.has(name)) &&
+            <LinearProgress aria-label="Loading selected channels" />}
           {visible.length ? <Waveform time={time} traces={visible} cursors={cursors}
             onCursor={(value) => { putCursor(nextCursor, value); setNextCursor(1 - nextCursor); }}
             chartRef={(instance) => { chart.current = instance; }} />
-            : <Typography color="text.secondary">Select a signal to display it.</Typography>}
+            : !selected.length && <Typography color="text.secondary">Select a signal to display it.</Typography>}
           <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
             <Typography aria-label="Cursor delta time">Δt {deltaTime.toPrecision(6)} s</Typography>
             {activeTrace && deltaValue !== undefined && <Typography aria-label="Cursor delta value">
@@ -176,7 +211,7 @@ function SimulationScope({ id }: { id: string }) {
           <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 2 }}>
             <TextField select label="Fourier signal" value={fftSignal} disabled={fftBusy}
               onChange={(event) => { setFftSignal(event.target.value); setFft(undefined); }}>
-              {traces.map(({ name }) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
+              {channelNames.map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
             </TextField>
             <Button variant="contained" onClick={() => void computeFourier()} disabled={fftBusy || time.length < 10}>
               {fftBusy ? 'Calculating…' : 'Calculate spectrum'}
