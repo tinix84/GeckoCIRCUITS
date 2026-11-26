@@ -30,7 +30,7 @@ To replay an existing sealed import audit without launching Java:
 
 Use the inventory hash printed or recorded for the audit being replayed. The example hash above belongs only to the pinned baseline audit.
 
-The Markdown and JSON reports distinguish full conversion, core IPES deserialization, historical completed runs and historical numerical acceptance. Deserialization does not prove simulation readiness. Counts can differ between stages because historical qualifications can use a different import route from the current selected-profile check. Blocker counts overlap; unexpanded subcircuits can hide further blockers. Provisional tier assignments do not waive numerical verification.
+The Markdown and JSON reports distinguish full conversion, core IPES deserialization, historical completed runs and historical numerical acceptance. Deserialization does not prove simulation readiness. Counts can differ between stages because historical qualifications can use a different import route from the current selected-profile check. Blocker counts overlap; unexpanded subcircuits and resource-limited diagnostics can hide further blockers. A falling diagnostic count caused by a failed or capped attempt is not a capability improvement. Provisional tier assignments do not waive numerical verification.
 
 Run the Python checks without creating temporary fixtures:
 

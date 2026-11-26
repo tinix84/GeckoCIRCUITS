@@ -61,6 +61,12 @@ class ScoreboardTest(TestCase):
                 with self.assertRaisesRegex(ValueError, 'run-metadata.json'):
                     verify_inventory(Path(r'D:\unused-sealed-audit'), 'seal')
 
+    def test_resource_failure_keeps_missing_diagnostics_explicit_and_tier_provisional(self):
+        report = summarize([case(status='output_limit_incomplete', parsed=False)], [])
+        self.assertEqual(report['non_ac_legacy_capability_gaps']['resource-limited or failed diagnostics'], 1)
+        self.assertTrue(report['analyses'][0]['tier_provisional'])
+        self.assertEqual(report['by_analysis']['.tran']['numerically_accepted'], 0)
+
 
 if __name__ == '__main__':
     main()

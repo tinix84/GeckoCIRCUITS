@@ -100,6 +100,8 @@ def summarize(cases, prior):
         attempts = case['attempts']
         canonical = attempts['selected_profile']
         observed = {capability(issue) for attempt in attempts.values() for issue in attempt['issues']}
+        diagnostic_limits = {name: attempt['status'] for name, attempt in attempts.items()
+                             if attempt['status'] == 'process_failure' or attempt['status'].endswith('_incomplete')}
         unexpanded = 'subcircuit blocks' in observed or 'hierarchy AC-only gate' in observed
         for number, directive in enumerate(case['original_analyses']):
             key = (path, number)
@@ -131,11 +133,14 @@ def summarize(cases, prior):
                 gaps[gap].add(analysis_id)
             legacy = attempts.get('legacy_non_ac_without_stock_or_hierarchy')
             legacy_gaps = {capability(issue) for issue in legacy['issues']} if legacy else set()
+            if 'legacy_non_ac_without_stock_or_hierarchy' in diagnostic_limits:
+                legacy_gaps.add('resource-limited or failed diagnostics')
             if family != '.ac':
                 for gap in legacy_gaps:
                     non_ac_gaps[gap].add(analysis_id)
             inventory.append({'archive_path': path, 'sha256': case['sha256'], 'directive_index': number,
-                              'directive': directive, 'tier': tier, 'tier_provisional': unexpanded,
+                              'directive': directive, 'tier': tier, 'tier_provisional': unexpanded or bool(diagnostic_limits),
+                              'diagnostic_limits': diagnostic_limits,
                               'blockers': sorted(observed), 'solver_issues': solver_issues,
                               'behavioural_spike_issue': 162 if 'behavioural sources' in observed else None,
                               'historical_qualification': history,
@@ -166,7 +171,8 @@ def markdown(report):
               '## Capability gaps in non-AC legacy imports', '', '| Capability | Analyses touched |', '|---|---:|']
     for gap, count in sorted(report['non_ac_legacy_capability_gaps'].items(), key=lambda pair: (-pair[1], pair[0])):
         lines.append(f'| {gap} | {count} |')
-    lines += ['', 'Counts overlap. Unexpanded subcircuits hide further blockers. Tier assignments are provisional '
+    lines += ['', 'Counts overlap. Resource-limited or failed diagnostics and unexpanded subcircuits hide further blockers. '
+              'A lower diagnostic count caused by a capped or failed attempt is not a capability improvement. Tier assignments are provisional '
               'where hierarchy is unexpanded; observed device-physics blockers link to #163/#164. Behavioural '
               'sources remain subject to #162 and are not automatically moved to Tier C.', '',
               f'Contexts retained: {report["context_schematics"]}. Newly accepted analyses: 0.', '']
