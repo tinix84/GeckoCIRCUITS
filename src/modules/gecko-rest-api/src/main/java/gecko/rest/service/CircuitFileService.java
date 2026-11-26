@@ -304,7 +304,7 @@ public class CircuitFileService {
 
     private ParsedCircuit applyParameterUpdate(String id, ParsedCircuit current, CircuitParameterUpdate update) {
         if (current == null) throw missingCircuit(id);
-        PreparationResult result = preparation.prepare(current.snapshot, new PreparationRequest(
+        PreparationResult result = preparation.prepareForSave(current.snapshot, new PreparationRequest(
                 new SolverOverrides(update.getSolverType() == null ? null : parseSolverType(update.getSolverType()),
                         update.getTimeStep(), update.getSimulationDuration()),
                 update.getComponentParameters() == null ? Map.of() : update.getComponentParameters()));

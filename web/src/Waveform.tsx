@@ -104,6 +104,8 @@ export function Waveform({ time, traces, cursors, onCursor, frequency = false, c
       hooks: {
         setScale: [(instance, key) => { if (key === 'x') setResolution(instance); }],
         draw: [(instance) => {
+          mount.dataset.xMin = String(instance.scales.x.min);
+          mount.dataset.xMax = String(instance.scales.x.max);
           if (!cursorValues.current) return;
           const { ctx, bbox, scales } = instance;
           ctx.save();

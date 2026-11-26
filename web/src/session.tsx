@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { PropsWithChildren } from 'react';
-import { api, publicApi, requireData, setAccessToken } from './api/client';
+import { api, publicApi, requireData, setAccessToken, usesCurrentAccessToken } from './api/client';
 import type { components } from './api/schema';
 
 type Session = { active: boolean; signIn: (key: string) => Promise<void>; signOut: () => void };
@@ -42,8 +42,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }
 
   useEffect(() => {
-    const middleware = { onResponse({ response }: { response: Response }) {
-      if (response.status === 401) signOut();
+    const middleware = { onResponse({ request, response }: { request: Request; response: Response }) {
+      if (response.status === 401 && usesCurrentAccessToken(request)) signOut();
     } };
     api.use(middleware);
     return () => {

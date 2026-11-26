@@ -46,6 +46,15 @@ public final class CircuitPreparation {
      * @return the effective circuit and readiness report, or a rejection report
      */
     public PreparationResult prepare(CircuitSnapshot base, PreparationRequest request) {
+        return prepare(base, request, false);
+    }
+
+    /** Applies edits to the saved configuration of the circuit. */
+    public PreparationResult prepareForSave(CircuitSnapshot base, PreparationRequest request) {
+        return prepare(base, request, true);
+    }
+
+    private PreparationResult prepare(CircuitSnapshot base, PreparationRequest request, boolean saveEdits) {
         var model = base.toModel();
         if (model.getAcSettings() != null) return prepareAc(base, model, request);
         if (model.getHierarchy() != null || model.getCircuitComponents().stream().anyMatch(component ->
@@ -61,7 +70,7 @@ public final class CircuitPreparation {
             if (!model.getImportIssues().contains(issue)) model.getImportIssues().add(issue);
         }
         List<Diagnostic> diagnostics = new ArrayList<>();
-        var overrideDiagnostics = CircuitConfiguration.apply(model, request.parameters());
+        var overrideDiagnostics = CircuitConfiguration.apply(model, request.parameters(), saveEdits);
         diagnostics.addAll(overrideDiagnostics);
         var settings = request.settings();
         if (settings.solver() != null) model.setSolverType(settings.solver());

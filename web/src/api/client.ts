@@ -10,6 +10,10 @@ export function setAccessToken(value?: string) {
   token = value;
 }
 
+export function usesCurrentAccessToken(request: Request) {
+  return token !== undefined && request.headers.get('Authorization') === 'Bearer ' + token;
+}
+
 api.use({
   onRequest({ request }) {
     if (token) request.headers.set('Authorization', 'Bearer ' + token);

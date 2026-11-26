@@ -4,10 +4,10 @@ import type { Page } from '@playwright/test';
 async function runAndGetOutput(page: Page) {
   const output = page.waitForResponse('**/api/v1/simulations/*/results/u2', { timeout: 45_000 });
   await page.getByRole('button', { name: 'Run simulation' }).click();
+  await page.getByRole('checkbox', { name: 'u2' }).check({ timeout: 45_000 });
   const response = await output;
   expect(response.ok()).toBeTruthy();
   const { data } = await response.json();
-  await page.getByRole('checkbox', { name: 'u2' }).check();
   await expect(page.getByRole('img', { name: /Waveforms: .*u2/ })).toBeVisible();
   return data as number[];
 }

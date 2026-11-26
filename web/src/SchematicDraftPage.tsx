@@ -41,6 +41,42 @@ function portPoint(part: Part, port: number): Point {
   return [(part.x ?? 0) + dx, (part.y ?? 0) + dy];
 }
 
+function wirePoints(wire: Wire, parts: Map<string | undefined, Part>): Point[] {
+  const first = parts.get(wire.from?.part);
+  const second = parts.get(wire.to?.part);
+  if (!first || !second || wire.from?.port === undefined || wire.to?.port === undefined) return [];
+  const from = portPoint(first, wire.from.port);
+  const to = portPoint(second, wire.to.port);
+  return from[0] === to[0] || from[1] === to[1] ? [from, to] : [from, [to[0], from[1]], to];
+}
+
+function blockedLayout(parts: Part[], wires: Wire[], byName: Map<string | undefined, Part>) {
+  const key = (terminal?: Terminal) => terminal?.part + ':' + terminal?.port;
+  const terminals = parts.flatMap((part) => offsets(part).map((_, port) => ({ part: part.name, port })));
+  const parents = new Map(terminals.map((terminal) => [key(terminal), key(terminal)]));
+  function root(terminal: string): string {
+    const parent = parents.get(terminal);
+    return parent === undefined || parent === terminal ? terminal : root(parent);
+  }
+  for (const wire of wires) parents.set(root(key(wire.from)), root(key(wire.to)));
+  const ground = new Set(parts.filter((part) => part.kind === 'GROUND')
+    .map((part) => root(key({ part: part.name, port: 0 }))));
+  const layout = new Map<string, string>();
+  function conflicts(point: Point, terminal: Terminal | undefined) {
+    const group = root(key(terminal));
+    const node = ground.has(group) ? 'ground' : group;
+    const position = point.join(',');
+    const previous = layout.get(position);
+    if (previous !== undefined && previous !== node) return true;
+    layout.set(position, node);
+    return false;
+  }
+  return terminals.some((terminal) => conflicts(portPoint(byName.get(terminal.part)!, terminal.port), terminal))
+    || wires.some((wire) => wirePoints(wire, byName).some((point) => conflicts(point, wire.from)));
+}
+
+const layoutError = 'Wires or terminals on different nets share a grid point. Move a part or connect in the opposite order.';
+
 function sameTerminal(first: Terminal | undefined, second: Terminal | undefined) {
   return Boolean(first && second && first.part === second.part && first.port === second.port);
 }
@@ -70,6 +106,7 @@ export function SchematicDraftPage() {
 
   const activePart = parts.find(({ name }) => name === selected);
   const byName = new Map(parts.map((part) => [part.name, part]));
+  const layoutBlocked = blockedLayout(parts, wires, byName);
 
   function coordinates(clientX: number, clientY: number): Point {
     const matrix = board.current?.getScreenCTM();
@@ -112,7 +149,14 @@ export function SchematicDraftPage() {
         (sameTerminal(from, terminal) && sameTerminal(to, next)) ||
         (sameTerminal(from, next) && sameTerminal(to, terminal)),
       );
-      if (!duplicate && wires.length < 256) setWires((current) => [...current, { from: terminal, to: next }]);
+      if (!duplicate && wires.length < 256) {
+        const updated = [...wires, { from: terminal, to: next }];
+        if (blockedLayout(parts, updated, byName)) setError(layoutError);
+        else {
+          setError('');
+          setWires(updated);
+        }
+      }
       setTerminal(undefined);
     }
   }
@@ -149,7 +193,7 @@ export function SchematicDraftPage() {
     }
   }
 
-  const ready = /^[A-Za-z0-9][A-Za-z0-9_. -]*\.ipes$/.test(filename.trim()) &&
+  const ready = !layoutBlocked && /^[A-Za-z0-9][A-Za-z0-9_. -]*\.ipes$/.test(filename.trim()) &&
     parts.some(({ kind }) => kind === 'GROUND') && parts.some(({ kind }) => kind !== 'GROUND') &&
     parts.every(({ value }) => typeof value === 'number' && Number.isFinite(value)) &&
     Number(step) > 0 && Number(duration) >= Number(step);
@@ -159,7 +203,7 @@ export function SchematicDraftPage() {
       <Typography variant="h1">New schematic</Typography>
       <Button variant="contained" disabled={!ready || saving} onClick={() => void save()}>Save circuit</Button>
     </Stack>
-    {error && <Alert severity="error">{error}</Alert>}
+    {(layoutBlocked || error) && <Alert severity="error">{layoutBlocked ? layoutError : error}</Alert>}
     <div className="editor-layout">
       <Paper variant="outlined" sx={{ p: 1.5 }}>
         <Stack spacing={1.5}>
@@ -190,15 +234,11 @@ export function SchematicDraftPage() {
               <circle cx="0" cy="0" r=".055" fill="#a5bbb0" />
             </pattern></defs>
             <rect width={maxX} height={maxY} fill="url(#draw-grid)" />
-            {wires.map(({ from, to }, index) => {
-              const first = byName.get(from?.part);
-              const second = byName.get(to?.part);
-              if (!first || !second || from?.port === undefined || to?.port === undefined) return null;
-              const [fromX, fromY] = portPoint(first, from.port);
-              const [toX, toY] = portPoint(second, to.port);
-              return <polyline key={index} data-testid="draft-wire" points={fromX + ',' + fromY
-                + ' ' + toX + ',' + fromY + ' ' + toX + ',' + toY} fill="none" stroke="#38685b" strokeWidth=".14" />;
-            })}
+            {wires.map((wire, index) => (
+              <polyline key={index} data-testid="draft-wire"
+                points={wirePoints(wire, byName).map((point) => point.join(',')).join(' ')}
+                fill="none" stroke="#38685b" strokeWidth=".14" />
+            ))}
             {parts.map((part) => <g key={part.name} transform={'translate(' + part.x + ',' + part.y + ')'}>
               <g role="button" tabIndex={0} aria-label={part.name}
                 onPointerDown={(event) => {

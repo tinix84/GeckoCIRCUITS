@@ -8,6 +8,7 @@ import gecko.rest.GeckoRestApiApplication;
 import gecko.rest.model.BatchSimulationRequest;
 import gecko.rest.model.SimulationRequest;
 import gecko.rest.model.SimulationResponse;
+import gecko.rest.model.circuit.CircuitParameterUpdate;
 import gecko.rest.persistence.PostgresPersistence;
 import gecko.rest.persistence.SimulationMetadata;
 import gecko.rest.model.SimulationResponse.SimulationStatus;
@@ -101,6 +102,32 @@ class NativePersistenceTest {
                     .contains(jobId);
             assertThat(service.getStatistics().get(SimulationStatus.COMPLETED)).isEqualTo(1L);
         }
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "GECKO_TEST_POSTGRES", matches = "true")
+    void savedComponentEditSurvivesRestart() throws Exception {
+        var options = postgresOptions();
+        String id;
+        try (var context = application("postgres", options)) {
+            var circuits = context.getBean(CircuitFileService.class);
+            byte[] fixture = gecko.rest.support.PreparationCircuitFixtures.namedResistorCircuit(true);
+            id = circuits.loadCircuit(Base64.getEncoder().encodeToString(fixture), "bound-resistor.ipes").circuitId();
+            assertThat(resistance(circuits, id)).isEqualTo(20.0);
+            var update = new CircuitParameterUpdate();
+            update.setComponentParameters(Map.of("R.1.resistance", 60.0));
+            circuits.updateCircuitParameters(id, update);
+            assertThat(resistance(circuits, id)).isEqualTo(60.0);
+        }
+        try (var context = application("postgres", options)) {
+            assertThat(resistance(context.getBean(CircuitFileService.class), id)).isEqualTo(60.0);
+        }
+    }
+
+    private static Object resistance(CircuitFileService circuits, String id) {
+        return circuits.getComponents(id).components().stream()
+                .filter(component -> "R.1".equals(component.name())).findFirst().orElseThrow()
+                .parameters().get("resistance");
     }
 
     @Test

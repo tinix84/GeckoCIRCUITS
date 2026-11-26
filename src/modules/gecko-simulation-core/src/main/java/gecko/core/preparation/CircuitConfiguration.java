@@ -303,7 +303,7 @@ public final class CircuitConfiguration {
         return diagnostics;
     }
 
-    static List<Diagnostic> apply(CircuitModel model, Map<String, Double> parameters) {
+    static List<Diagnostic> apply(CircuitModel model, Map<String, Double> parameters, boolean saveEdits) {
         List<Diagnostic> diagnostics = new ArrayList<>();
         Map<Binding, Double> assignments = new LinkedHashMap<>();
         for (var entry : parameters.entrySet()) {
@@ -340,8 +340,10 @@ public final class CircuitConfiguration {
                 diagnostics.add(override("OVERRIDE_CONFLICT", path, binding.component(), "Assignments to the same field must agree"));
             }
         }
+        if (diagnostics.isEmpty() && saveEdits) components(model).forEach(CircuitConfiguration::preserveSourceLayout);
         if (diagnostics.isEmpty()) assignments.forEach((binding, value) -> {
             write(binding.component().data(), binding.field(), value);
+            if (saveEdits) saveAssignment(binding, value);
             String prefix = binding.component().data().getName() + ".";
             model.getImportIssues().removeIf(issue -> isNormalizationIssue(issue)
                     && binding.component().domain().equals(issue.domain())
@@ -350,6 +352,50 @@ public final class CircuitConfiguration {
                     && binding.field().matches(issue.parameterPath().substring(prefix.length())));
         });
         return diagnostics;
+    }
+
+    private static void preserveSourceLayout(Component component) {
+        var data = component.data();
+        if (!data.isParsedInput()) return;
+        var tokens = data.getImportTokens();
+        double[] values = data.getNumericParameters();
+        if (isSource(component)) {
+            // Legacy readers take amplitude from the shared DC slot unless it has a named value.
+            if (!tokens.containsKey("amplitude")) {
+                tokens.put("amplitude", Double.toString(values[20]));
+                String binding = legacyBinding(data, 1);
+                if (!binding.isEmpty()) tokens.put("amplitude$ParameterName", binding);
+            }
+            if (!tokens.containsKey("phase")) tokens.putIfAbsent("phaseDegrees", Double.toString(values[4]));
+        } else if (isSignal(component)) {
+            // Native CONTROL SIGNAL arrays store offset before phase. The normalized array reverses them.
+            if (!tokens.containsKey("phase")) tokens.putIfAbsent("phaseDegrees", Double.toString(Math.toDegrees(values[3])));
+            if (!tokens.containsKey("anteilDC")) tokens.putIfAbsent("offset", Double.toString(values[4]));
+        }
+    }
+
+    private static void saveAssignment(Binding binding, double value) {
+        var component = binding.component();
+        var field = binding.field();
+        var tokens = component.data().getImportTokens();
+        boolean signal = isSignal(component);
+        double savedValue = signal && field.slot() == 3 ? Math.toDegrees(value) : value;
+        String encoded = field.rule() == Rule.BOOLEAN ? Boolean.toString(value != 0) : Double.toString(savedValue);
+        var names = new ArrayList<>(field.aliases());
+        names.add(field.name());
+        for (String name : names) {
+            if (name.equals(field.name()) || tokens.containsKey(name)) tokens.put(name, encoded);
+            if (tokens.containsKey(name + "$ParameterName")) tokens.put(name + "$ParameterName", "");
+        }
+        int savedSlot = signal && field.slot() == 3 ? 4 : signal && field.slot() == 4 ? 3 : field.slot();
+        String raw = tokens.get("nameOpt[]");
+        if (raw == null || raw.equals("null")) return;
+        String slots = raw.startsWith("/") ? raw.substring(1) : raw;
+        String[] namesBySlot = slots.contains("/") ? slots.split("/", -1) : slots.split("\\s+", -1);
+        if (savedSlot < namesBySlot.length) {
+            namesBySlot[savedSlot] = "NIX_NIX_NIX";
+            tokens.put("nameOpt[]", "/" + String.join("/", namesBySlot));
+        }
     }
 
     static boolean isNormalizationIssue(ImportIssue issue) {

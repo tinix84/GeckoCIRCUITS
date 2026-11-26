@@ -27,7 +27,7 @@ function extents(components: Component[], connections: Connection[]): View {
 }
 
 function rotation(orientation = 503) {
-  return ({ 503: 0, 502: 90, 501: 180, 500: 270 } as Record<number, number>)[orientation] ?? orientation;
+  return ({ 503: 0, 502: -90, 501: 180, 504: 90 } as Record<number, number>)[orientation] ?? orientation;
 }
 
 export const symbols: Record<number, string> = {
