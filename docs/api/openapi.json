@@ -1577,6 +1577,19 @@
               }
             },
             "description": "API is healthy"
+          },
+          "503": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "example": {
+                    "status": "DOWN",
+                    "version": "1.0.0"
+                  }
+                }
+              }
+            },
+            "description": "API lost PostgreSQL simulation ownership"
           }
         },
         "security": [],
