@@ -40,6 +40,13 @@ public final class PreparationCircuitFixtures {
         return gzip(resistorElements(resistance, "source", voltage));
     }
 
+    /** Creates a saved resistor with a named value and an optional optimizer binding. */
+    public static byte[] namedResistorCircuit(boolean bound) throws IOException {
+        String text = resistorElements(10).replace("parameter[] 10.0\n",
+                "parameter[] 10.0\nresistance 30\n" + (bound ? "nameOpt[] /resistorValue\n" : ""));
+        return gzip(text + "optimizerName[] /resistorValue\noptimizerValue[] 20\n");
+    }
+
     private static String resistorElements(double resistance) {
         return resistorElements(resistance, "source");
     }

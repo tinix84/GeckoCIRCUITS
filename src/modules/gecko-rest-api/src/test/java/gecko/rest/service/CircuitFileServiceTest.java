@@ -200,6 +200,30 @@ class CircuitFileServiceTest {
     }
 
     @Test
+    void savedEditsSurviveNativeRoundTripWithNamedValuesAndBindings() throws IOException {
+        for (boolean bound : new boolean[]{false, true}) {
+            byte[] fixture = gecko.rest.support.PreparationCircuitFixtures.namedResistorCircuit(bound);
+            String id = service.loadCircuit(Base64.getEncoder().encodeToString(fixture), "resistor.ipes").circuitId();
+            assertEquals(bound ? 20.0 : 30.0, resistance(id));
+            var update = new CircuitParameterUpdate();
+            update.setComponentParameters(Map.of("R.1.resistance", 60.0));
+            service.updateCircuitParameters(id, update);
+
+            byte[] exported = service.exportCircuit(id);
+            String reopened = service.loadCircuit(Base64.getEncoder().encodeToString(exported), "reopened.ipes").circuitId();
+            assertEquals(60.0, resistance(reopened));
+            assertEquals(20.0, service.resolveSource(reopened, null).snapshot().toModel()
+                    .getOptimizerParameters().get("resistorValue"));
+        }
+    }
+
+    private Object resistance(String id) {
+        return service.getComponents(id).components().stream()
+                .filter(component -> "R.1".equals(component.name())).findFirst().orElseThrow()
+                .parameters().get("resistance");
+    }
+
+    @Test
     void testGetAllCircuits() {
         // Load multiple circuits
         CircuitLoadResponse response1 = service.loadCircuit(validIpesBase64, "circuit1.ipes");
