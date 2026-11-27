@@ -32,6 +32,7 @@ import java.util.regex.Pattern;
 public final class SpiceImporter {
     private final boolean exponentialAcDiodes;
     private final boolean bipolarAcTransistors;
+    private final boolean levelOneMosfets;
 
     public SpiceImporter() {
         this(false);
@@ -42,8 +43,13 @@ public final class SpiceImporter {
     }
 
     public SpiceImporter(boolean exponentialAcDiodes, boolean bipolarAcTransistors) {
+        this(exponentialAcDiodes, bipolarAcTransistors, false);
+    }
+
+    public SpiceImporter(boolean exponentialAcDiodes, boolean bipolarAcTransistors, boolean levelOneMosfets) {
         this.exponentialAcDiodes = exponentialAcDiodes;
         this.bipolarAcTransistors = bipolarAcTransistors;
+        this.levelOneMosfets = levelOneMosfets;
     }
 
     record Line(int number, String text) { }
@@ -194,7 +200,8 @@ public final class SpiceImporter {
                     continue;
                 }
                 if (descriptor == null || descriptor == SpicePorts.E && !ac
-                        || descriptor == SpicePorts.BJT && (!ac || !bipolarAcTransistors || child != null)) {
+                        || descriptor == SpicePorts.BJT && (!ac || !bipolarAcTransistors)
+                        || descriptor == SpicePorts.MOSFET && (ac || !transientParsed || !levelOneMosfets || child != null)) {
                     issue(model, line, "UNSUPPORTED_ELEMENT", name, "Unsupported SPICE element: " + name);
                     continue;
                 }
@@ -275,8 +282,8 @@ public final class SpiceImporter {
                         String modelName = fields[3].strip();
                         String definition = definitions.get(modelName.toLowerCase(Locale.ROOT));
                         if ((ac || transientParsed) && exponentialAcDiodes && !isIdealDiodeModel(".model " + modelName + " " + definition)) {
-                            if (child != null || origin.tested()) {
-                                throw new IllegalArgumentException("Use the exponential diode only with flat, unselected SPICE import.");
+                            if (origin.tested()) {
+                                throw new IllegalArgumentException("Use the exponential diode with unselected SPICE import.");
                             }
                             law = exponentialDiode(modelName, definition, !ac);
                         } else if (ac) {
@@ -300,6 +307,30 @@ public final class SpiceImporter {
                                 issue(model, line, "DIODE_MODEL_APPROXIMATION", name, "The diode model uses unsupported exponential behavior.");
                             }
                         }
+                    }
+                    case 'M' -> {
+                        var args = arguments(fields[3]);
+                        if (args.length < 4 || !args[0].equalsIgnoreCase(args[1])) {
+                            throw new IllegalArgumentException("Require an explicit source-tied MOSFET bulk and W and L.");
+                        }
+                        String modelName = args[2];
+                        String definition = definitions.get(modelName.toLowerCase(Locale.ROOT));
+                        if (definition == null || !List.of("nmos", "pmos").contains(modelType(definition))) {
+                            throw new IllegalArgumentException("Require a local NMOS or PMOS Level 1 model.");
+                        }
+                        var dimensions = CircuitHierarchy.parameters(parameterAssignments(
+                                String.join(" ", Arrays.copyOfRange(args, 3, args.length))));
+                        if (!dimensions.keySet().equals(java.util.Set.of("w", "l"))) {
+                            throw new IllegalArgumentException("Require MOSFET instance dimensions W and L.");
+                        }
+                        var transistor = new AcComponent.Mosfet(modelName, modelType(definition).equals("pmos"),
+                                dimensions.get("w"), dimensions.get("l"),
+                                CircuitHierarchy.parameters(parameterAssignments(modelArguments(definition))));
+                        transistor.evaluate(parameters);
+                        aliases = List.of(positive, negative, node(nodes, args[0]));
+                        assignPorts(data, descriptor, aliases);
+                        data.setNumericParameters(new double[]{1e12, 0, 1e-6, 1e12, 0, 0, 0, 0, 0, 0, 0, 0, 1});
+                        law = transistor;
                     }
                     case 'Q' -> {
                         var args = arguments(fields[3]);
@@ -340,7 +371,7 @@ public final class SpiceImporter {
                 }
                 model.addCircuitComponent(data);
                 if (placement == null) {
-                    if (ac && law != null) acTerminalWires(model, data, descriptor, aliases);
+                    if (law instanceof AcComponent.Mosfet || ac && law != null) acTerminalWires(model, data, descriptor, aliases);
                     else terminalWires(model, data);
                 }
             } catch (IllegalArgumentException | IndexOutOfBoundsException error) {
@@ -773,7 +804,7 @@ public final class SpiceImporter {
         return trimmed.substring(1, trimmed.length() - 1);
     }
 
-    private static List<Line> lines(String source) {
+    static List<Line> lines(String source) {
         var result = new ArrayList<Line>();
         int number = 0;
         for (String raw : source.split("\\R")) {

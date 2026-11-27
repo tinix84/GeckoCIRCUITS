@@ -13,10 +13,14 @@ public enum SpicePorts {
     CURRENT(5, 'I', two(0, 0, 0, 80)),
     DIODE(6, 'D', two(16, 0, 16, 64)),
     SW(7, 'S', switchPorts()),
-    BJT(33, 'Q', List.of(
+    MOSFET(28, 'M', List.of(
             new PortSpec(1, Side.INPUT, 0, new Point(48, 0), new Point(0, -2)),
             new PortSpec(2, Side.INPUT, 1, new Point(0, 48), new Point(-2, 0)),
             new PortSpec(3, Side.OUTPUT, 0, new Point(48, 96), new Point(0, 2)))),
+    BJT(33, 'Q', List.of(
+            new PortSpec(1, Side.INPUT, 0, new Point(64, 0), new Point(0, -2)),
+            new PortSpec(2, Side.INPUT, 1, new Point(0, 48), new Point(-2, 0)),
+            new PortSpec(3, Side.OUTPUT, 0, new Point(64, 96), new Point(0, 2)))),
     E(53, 'E', List.of(
             new PortSpec(1, Side.OUTPUT, 0, new Point(0, 16), new Point(0, -2)),
             new PortSpec(2, Side.OUTPUT, 1, new Point(0, 96), new Point(0, 2)),
