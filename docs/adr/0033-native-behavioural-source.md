@@ -26,7 +26,9 @@ A behavioural source is an LK voltage or current source that carries the law `Be
 
 The expression uses the `SpiceValue` grammar, extended with `v(a)`, `v(a,b)`, `i(source)`, `if(c,a,b)`, `atan2`, comparisons, `&` and `|`. Probes are valid only in a behavioural law. Scalar parameters bind once, at session start. A label resolves like a voltage probe on the same sheet; a current names a voltage source and reads its branch unknown, in the SPICE sign.
 
-The source joins the iteration in `TransientSemiconductors`. The netlist sees a 0 V or 0 A source. Each iteration stamps the gradient into the source row, or into both KCL rows, and the value minus the gradient term into the right-hand side. The residual check, the 50-iteration limit and the adaptive halving of [ADR-0018](0018-adaptive-electrical-step.md) stay unchanged.
+The source joins the iteration in `TransientSemiconductors`. The netlist sees a 0 V or 0 A source. Each iteration stamps the gradient into the source row, or into both KCL rows, and the value minus the gradient term into the right-hand side. The 50-iteration limit and the adaptive halving of [ADR-0018](0018-adaptive-electrical-step.md) stay unchanged.
+
+The residual check gains a rounding floor, for all members of the iteration. A row is scaled by the larger of 1, its right-hand side, and 1 % of the sum of its absolute terms. The authored 1 µΩ resistor of the archive's transformer model otherwise holds the residual above 10⁻¹² A by rounding alone, and a linear law never converges. The solution-change criterion is unchanged.
 
 Derivatives are exact. The parse tree evaluates value and gradient together, in forward mode. Finite differences were rejected: across a threshold they return the jump divided by the step.
 

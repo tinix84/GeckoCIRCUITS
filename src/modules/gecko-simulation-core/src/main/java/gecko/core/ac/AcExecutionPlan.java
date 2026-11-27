@@ -279,6 +279,7 @@ public final class AcExecutionPlan {
                             -1, null, 0, null, Complex.ZERO, 0));
                 }
                 case AcComponent.Mosfet law -> throw wrongLaw(owned);
+                case AcComponent.Behavioural law -> throw wrongLaw(owned);
                 case AcComponent.Bipolar law -> {
                     if (type != SpicePorts.BJT || model.getAcProvenance() != null
                             && model.getAcProvenance().origin().tested()) throw wrongLaw(owned);
