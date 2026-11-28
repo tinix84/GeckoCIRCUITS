@@ -22,7 +22,7 @@ The archive uses 281 distinct expressions: node voltages, branch currents, `if` 
 
 ## Decision and rationale
 
-A behavioural source is an LK voltage or current source that carries the law `Behavioural(expression, current)`. The law is the opt-in: only an explicit import option creates it. A circuit without the law builds no device iteration and runs the unchanged step, as for the Shockley diode ([ADR-0029](0029-shockley-diode.md)) and the MOSFET ([ADR-0030](0030-native-transistor-laws.md)).
+A behavioural source is an LK voltage or current source that carries the law `Behavioural(expression, current)`. The law is the opt-in: only the import option `--behavioural-sources` creates it, from a netlist `B` element or a stock `bv` or `bi` symbol. Without the option these stay unsupported, with the same diagnostics as before. In a child schematic, each `{name}` of the expression binds as a required input of the definition. A circuit without the law builds no device iteration and runs the unchanged step, as for the Shockley diode ([ADR-0029](0029-shockley-diode.md)) and the MOSFET ([ADR-0030](0030-native-transistor-laws.md)).
 
 The expression uses the `SpiceValue` grammar, extended with `v(a)`, `v(a,b)`, `i(source)`, `if(c,a,b)`, `atan2`, comparisons, `&` and `|`. Probes are valid only in a behavioural law. Scalar parameters bind once, at session start. A label resolves like a voltage probe on the same sheet; a current names a voltage source and reads its branch unknown, in the SPICE sign.
 
