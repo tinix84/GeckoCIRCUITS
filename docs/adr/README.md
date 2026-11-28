@@ -29,3 +29,8 @@
 | 2026-11-25 | [ADR-0026: Use registered LTI platforms and course-scoped identities](0026-lti-registration-and-course-identity.md) |
 | 2026-11-25 | [ADR-0027: Bind Probe outputs to electrical components](0027-bind-probe-outputs-to-electrical-components.md) |
 | 2026-11-25 | [ADR-0028: Track PostgreSQL simulation replica ownership](0028-track-postgres-simulation-replica-ownership.md) |
+| 2026-11-27 | [ADR-0029: Shockley diode](0029-shockley-diode.md) |
+| 2026-11-27 | [ADR-0030: Native transistor laws](0030-native-transistor-laws.md) |
+| 2026-11-27 | [ADR-0031: Compare the authored recording with pinned evidence](0031-authored-recording-verification.md) |
+| 2026-11-27 | [ADR-0032: Native transient occurrence execution](0032-native-transient-occurrence-execution.md) |
+| 2026-11-28 | [ADR-0033: Solve behavioural sources inside the electrical step](0033-native-behavioural-source.md) |

@@ -11,9 +11,13 @@ import gecko.core.io.SavedCircuitBlock;
 import gecko.core.io.ImportIssue;
 import gecko.core.io.ArtifactDigest;
 import gecko.core.io.BuildIdentity;
+import gecko.core.ac.AcInputOrigin;
+import gecko.core.io.AcOriginMembership;
 import gecko.core.io.AcProvenance;
+import gecko.core.io.HierarchyIndex;
 import gecko.core.io.SpicePorts;
 import gecko.core.ac.AcComponent;
+import gecko.core.ac.ParameterDefinition;
 import gecko.core.io.importer.SpiceImporter.Line;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -36,6 +40,40 @@ import java.util.Set;
 
 /** Imports standard LTspice symbols and preserves the source wire geometry. */
 public final class LtspiceImporter {
+    private final SpiceImporter spiceImporter;
+    private final List<Line> modelCards;
+    private final String modelCardDigest;
+    private boolean behaviouralSources;
+
+    /** Selects the opt-in behavioural source law for the stock bv and bi symbols (ADR-0033). */
+    public LtspiceImporter withBehaviouralSources() {
+        behaviouralSources = true;
+        spiceImporter.withBehaviouralSources();
+        return this;
+    }
+
+    public LtspiceImporter() {
+        this(false);
+    }
+
+    public LtspiceImporter(boolean exponentialAcDiodes) {
+        spiceImporter = new SpiceImporter(exponentialAcDiodes);
+        modelCards = List.of();
+        modelCardDigest = null;
+    }
+
+    /** Use an explicit local model-card file for unselected AC schematic imports. */
+    public LtspiceImporter(boolean exponentialAcDiodes, Path bipolarModelCards) throws IOException {
+        byte[] cards = Files.readAllBytes(bipolarModelCards);
+        modelCards = List.copyOf(SpiceImporter.lines(decode(cards)));
+        if (modelCards.isEmpty() || modelCards.stream()
+                .anyMatch(line -> !line.text().matches("(?i)^\\.model\\s+.+"))) {
+            throw new IllegalArgumentException("Require only local .model cards in the semiconductor model file.");
+        }
+        modelCardDigest = ArtifactDigest.sha256(cards);
+        spiceImporter = new SpiceImporter(exponentialAcDiodes, true);
+    }
+
     private record Point(int x, int y) {
         int[] coordinates() { return new int[]{x, y}; }
     }
@@ -82,7 +120,8 @@ public final class LtspiceImporter {
         }
     }
 
-    private record Symbol(int line, String kind, Point origin, String rotation, Map<String, String> attributes) {
+    private record Symbol(int line, String kind, Point origin, String rotation, Map<String, String> attributes,
+                          Map<String, Integer> attributeLines) {
         String name() { return attributes.getOrDefault("instname", kind); }
     }
 
@@ -129,7 +168,12 @@ public final class LtspiceImporter {
     private record Layout(Grid grid, Map<ComponentData, Point> centers, List<ConnectionData> connections, String conflict) { }
     private record Pin(String name, int order, Point position) { }
     private record Call(Symbol symbol, Path schematic, List<Pin> pins) { }
-    private record SheetImport(CircuitModel model, Grid grid, List<Call> calls, List<Flag> flags) { }
+    private record SheetImport(CircuitModel model, Grid grid, List<Call> calls, List<Flag> flags,
+                               List<Wire> wires, List<PlacedSymbol> primitives,
+                               List<ParameterDefinition> parameters, Map<String, String> scope,
+                               List<CircuitHierarchy.RequiredInput> requiredInputs) { }
+
+    public record ImportResult(CircuitModel model, LtspiceImportReceipt receipt) { }
 
     private static final Set<String> DRAWING_RECORDS = Set.of(
             "VERSION", "SHEET", "WINDOW", "LINE", "RECTANGLE", "CIRCLE", "ARC", "IOPIN", "DATAFLAG");
@@ -146,49 +190,135 @@ public final class LtspiceImporter {
         return convert(decode(Files.readAllBytes(path)), path.toString());
     }
 
-    /** Verifies the stock symbol definition of each supported AC component. */
+    /** Verifies the stock symbol definitions used by the schematic. */
     public CircuitModel convert(Path path, Path symbols) throws IOException {
         return convert(path, symbols, List.of());
     }
 
     /** Imports an ASC hierarchy using explicit search roots for its source dependencies. */
     public CircuitModel convert(Path path, Path symbols, List<Path> sourceRoots) throws IOException {
+        return convert(path, symbols, sourceRoots, AcInputOrigin.UNSELECTED_ASC);
+    }
+
+    /** Imports an ASC using an explicitly selected source profile. */
+    public CircuitModel convert(Path path, Path symbols, List<Path> sourceRoots, AcInputOrigin origin) throws IOException {
+        return convertWithReceipt(path, symbols, sourceRoots, origin).model();
+    }
+
+    /** Returns the native document and its source geometry mapping before any solve. */
+    public ImportResult convertWithReceipt(Path path, Path symbols, List<Path> sourceRoots, AcInputOrigin origin)
+            throws IOException {
+        if (origin != AcInputOrigin.UNSELECTED_ASC && !origin.tested()
+                || origin.tested() && !path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".asc")) {
+            throw new IllegalArgumentException("Select the LTspice profile only for an ASC file.");
+        }
+        if (modelCardDigest != null && origin.tested()) {
+            throw new IllegalArgumentException("Use local semiconductor models with unselected AC input.");
+        }
         var build = BuildIdentity.current();
         byte[] source = Files.readAllBytes(path);
         var dependencies = new LinkedHashMap<String, String>();
+        if (modelCardDigest != null) dependencies.put("semiconductor-model-cards", modelCardDigest);
         String text = decode(source);
-        CircuitModel model;
-        if (sourceRoots.isEmpty()) {
-            model = convert(text, path.toString());
-        } else {
-            var state = new HierarchyImport(sourceRoots, dependencies);
-            model = state.convert(path, text);
-        }
-        if (model.getAcSettings() == null) throw new IllegalArgumentException("Stock-symbol verification requires an AC schematic.");
+        var state = new HierarchyImport(sourceRoots, dependencies, origin);
+        SheetImport rootSheet = sourceRoots.isEmpty()
+                ? convertSheet(text, path.toString(), null, null, null, origin)
+                : state.convert(path, text);
+        CircuitModel model = rootSheet.model();
         var names = Map.of(SpicePorts.RES, "res.asy", SpicePorts.CAP, "cap.asy",
                 SpicePorts.VOLTAGE, "voltage.asy", SpicePorts.E, "e.asy",
-                SpicePorts.IND, "ind.asy", SpicePorts.CURRENT, "current.asy");
+                SpicePorts.IND, "ind.asy", SpicePorts.CURRENT, "current.asy", SpicePorts.G, "g.asy",
+                SpicePorts.DIODE, "diode.asy");
+        var checkedStock = new HashSet<String>();
         for (var component : model.getCircuitComponents()) {
             var descriptor = SpicePorts.find("LK", component.getType());
             String name = descriptor == null ? null : names.get(descriptor);
-            if (name == null || dependencies.containsKey(name)) continue;
+            String prefix = descriptor == null ? "" : Character.toString(descriptor.designator());
+            if (descriptor == SpicePorts.BJT && component.getAcComponent() != null
+                    && component.getAcComponent().law() instanceof AcComponent.Bipolar bipolar) {
+                name = bipolar.pnp() ? "pnp.asy" : "npn.asy";
+                prefix = bipolar.pnp() ? "QP" : "QN";
+            }
+            boolean acDiode = component.getAcComponent() != null
+                    && (component.getAcComponent().law() instanceof AcComponent.IdealDiode
+                    || component.getAcComponent().law() instanceof AcComponent.ExponentialDiode);
+            if (descriptor == SpicePorts.DIODE && !acDiode || descriptor == SpicePorts.SW) {
+                model.addConversionIssue(new ImportIssue("UNSUPPORTED_STOCK_SYMBOL_VERIFICATION", "LTSPICE",
+                        component.getName(), "Stock symbol verification is unsupported for this component.",
+                        component.getSourceLocation() == null ? path.toString() : component.getSourceLocation(), true));
+            }
+            if (name == null || descriptor == SpicePorts.DIODE && !acDiode || !checkedStock.add(name)) continue;
             Path symbolPath = symbols.resolve(name);
             byte[] symbol = Files.readAllBytes(symbolPath);
-            checkSymbol(decode(symbol), descriptor, symbolPath);
-            dependencies.put(name, ArtifactDigest.sha256(symbol));
+            checkSymbol(decode(symbol), descriptor, symbolPath, prefix);
+            String digest = ArtifactDigest.sha256(symbol);
+            String previous = dependencies.putIfAbsent(name, digest);
+            if (previous != null && !previous.equals(digest)) {
+                throw new IllegalArgumentException("Conflicting stock symbol source " + name);
+            }
         }
-        model.setAcProvenance(new AcProvenance(ArtifactDigest.sha256(source), build.revision(), build.dirty(),
-                build.sourceSnapshotSha256(), build.jarSha256(), dependencies));
-        return model;
+        String sourceDigest = ArtifactDigest.sha256(source);
+        if (origin.tested() && !model.getImportIssues().isEmpty()) {
+            var issue = model.getImportIssues().getFirst();
+            throw new IllegalArgumentException("The ASC profile requires a complete import. "
+                    + issue.sourceLocation() + " " + issue.message());
+        }
+        if (origin.tested() && model.getAcSettings() == null) {
+            throw new IllegalArgumentException("The selected ASC profile requires an AC analysis in " + path);
+        }
+        var definitionSources = origin.tested() ? state.definitionSources : Map.<String, String>of();
+        var members = origin.tested() ? AcOriginMembership.bind(model, new HierarchyIndex(model),
+                origin, sourceDigest, definitionSources) : Map.<Long, String>of();
+        model.setAcProvenance(new AcProvenance(sourceDigest, build.revision(), build.dirty(),
+                build.sourceSnapshotSha256(), build.jarSha256(), dependencies, origin, definitionSources, members));
+        return new ImportResult(model, origin.tested() ? receipt(rootSheet, sourceDigest, origin) : null);
     }
 
-    private static void checkSymbol(String text, SpicePorts descriptor, Path path) {
+    private static LtspiceImportReceipt receipt(SheetImport root, String sourceDigest, AcInputOrigin origin) {
+        var byName = new HashMap<String, ComponentData>();
+        for (var nativeComponent : root.model().getCircuitComponents()) {
+            if (HierarchyIndex.parent(nativeComponent.getSavedBlock()) == 0) {
+                byName.put(nativeComponent.getName(), nativeComponent);
+            }
+        }
+        var devices = new ArrayList<LtspiceImportReceipt.Device>();
+        for (var placed : root.primitives()) {
+            var symbol = placed.symbol();
+            var component = byName.get(symbol.name());
+            var pins = new ArrayList<LtspiceImportReceipt.Pin>();
+            for (var port : placed.type().ports()) {
+                Point transformed = placed.pins().get(port.order() - 1);
+                Point gridPoint = root.grid().position(transformed);
+                var offset = port.nativeOffset(component.getOrientation(), placed.mirrored());
+                var position = component.getPosition();
+                pins.add(new LtspiceImportReceipt.Pin(port.order(),
+                        new LtspiceImportReceipt.Point(port.sourceLocalPoint().x(), port.sourceLocalPoint().y()),
+                        receiptPoint(transformed), receiptPoint(gridPoint),
+                        new LtspiceImportReceipt.Point(position[0] + offset.x(), position[1] + offset.y()),
+                        port.side().name(), port.port()));
+            }
+            devices.add(new LtspiceImportReceipt.Device(symbol.line(), symbol.name(), placed.type().name(),
+                    AcOriginMembership.nativeIdentifier(component), receiptPoint(symbol.origin()), symbol.rotation(), pins));
+        }
+        var wires = root.wires().stream().map(wire -> new LtspiceImportReceipt.Wire(receiptPoint(wire.start()),
+                receiptPoint(wire.end()), receiptPoint(root.grid().position(wire.start())),
+                receiptPoint(root.grid().position(wire.end())))).toList();
+        var flags = root.flags().stream().map(flag -> new LtspiceImportReceipt.Flag(flag.label(),
+                receiptPoint(flag.point()), receiptPoint(root.grid().position(flag.point())))).toList();
+        return new LtspiceImportReceipt(sourceDigest, origin.profileId(), origin.configurationSha256(), devices, wires, flags);
+    }
+
+    private static LtspiceImportReceipt.Point receiptPoint(Point point) {
+        return new LtspiceImportReceipt.Point(point.x(), point.y());
+    }
+
+    private static void checkSymbol(String text, SpicePorts descriptor, Path path, String prefix) {
         var order = new HashMap<Integer, SpicePorts.Point>();
         SpicePorts.Point pin = null;
         int lineNumber = 0;
         for (String line : text.split("\\R")) {
             lineNumber++;
-            checkSymbolAttribute(line, path, lineNumber, Character.toString(descriptor.designator()), true);
+            checkSymbolAttribute(line, path, lineNumber, prefix, true);
             String[] fields = line.strip().split("\\s+");
             if (fields.length >= 3 && fields[0].equals("PIN")) {
                 pin = new SpicePorts.Point(Integer.parseInt(fields[1]), Integer.parseInt(fields[2]));
@@ -213,10 +343,12 @@ public final class LtspiceImporter {
      * @return the converted circuit and its import issues
      */
     public CircuitModel convert(String source, String sourceName) {
-        return convertSheet(source, sourceName, null, null, false).model();
+        if (modelCardDigest != null) throw new IllegalArgumentException("Require stock symbols for local semiconductor models.");
+        return convertSheet(source, sourceName, null, null, null, AcInputOrigin.UNSELECTED_ASC).model();
     }
 
-    private SheetImport convertSheet(String source, String sourceName, Path path, HierarchyImport hierarchy, boolean child) {
+    private SheetImport convertSheet(String source, String sourceName, Path path, HierarchyImport hierarchy,
+                                     SpiceImporter.ChildContext childContext, AcInputOrigin origin) {
         if (source.isBlank() || source.indexOf('\0') >= 0) {
             throw new IllegalArgumentException("Require a nonempty LTspice schematic.");
         }
@@ -225,7 +357,8 @@ public final class LtspiceImporter {
         var wires = new ArrayList<Wire>();
         var flags = new ArrayList<Flag>();
         var directives = new ArrayList<Line>();
-        parse(source, sourceName, symbols, wires, flags, directives, issues);
+        parse(source, sourceName, symbols, wires, flags, directives, issues, origin);
+        boolean child = childContext != null;
         List<Call> calls = hierarchy == null ? List.of() : hierarchy.resolveCalls(path, symbols, sourceName, issues);
         if (hierarchy != null && (child || !calls.isEmpty())) {
             var namesAtPoint = new HashMap<Point, String>();
@@ -240,7 +373,8 @@ public final class LtspiceImporter {
                 }
             }
         }
-        List<PlacedSymbol> placed = placeSymbols(symbols, sourceName, issues);
+        List<PlacedSymbol> placed = placeSymbols(symbols, sourceName, issues, origin);
+        var scalarReads = child ? HierarchyImport.scalarReads(placed, path.toString()) : List.<CircuitHierarchy.RequiredInput>of();
         var markers = new LinkedHashMap<Point, ComponentData>();
         var topologyInput = new CircuitModel();
         var aliases = new LinkedHashMap<String, String>();
@@ -271,7 +405,7 @@ public final class LtspiceImporter {
         Map<Point, String> nodeKeys = new HashMap<>();
         Map<String, String> nodeLabels = nodeLabels(markers, topology, aliases, nodeKeys);
         Grid grid = Grid.fit(markers.keySet());
-        var statements = new ArrayList<Line>();
+        var statements = new ArrayList<>(modelCards);
         var placements = new HashMap<String, ComponentData>();
         var symbolByName = new HashMap<String, PlacedSymbol>();
         for (PlacedSymbol symbol : placed) {
@@ -283,18 +417,33 @@ public final class LtspiceImporter {
         }
         for (Line directive : directives) {
             String name = directive.text().split("\\s+", 2)[0].toLowerCase(Locale.ROOT);
-            if (hierarchy != null && (name.equals(".model") || child && !name.equals(".param"))) {
+            boolean idealModel = name.equals(".model") && (childContext != null ? childContext.ac()
+                    : directives.stream().anyMatch(line -> line.text().toLowerCase(Locale.ROOT).matches("^\\.ac\\s+.*")))
+                    && SpiceImporter.isIdealDiodeModel(directive.text());
+            if (hierarchy != null && !idealModel && (name.equals(".model") || child && !name.equals(".param"))) {
                 issue(issues, "UNSUPPORTED_HIERARCHY_DIRECTIVE", name,
                         "This directive is unsupported in an ASC hierarchy.", sourceName, directive.number());
             } else {
                 statements.add(normalizeDirective(directive, sourceName, issues));
             }
         }
-        if (child) statements.add(new Line(0, ".ac dec 1 1 10"));
-        var model = new SpiceImporter().convert(sourceName, source.hashCode(), statements, nodeLabels, placements);
+        var converted = spiceImporter.convert(sourceName, source.hashCode(), statements, nodeLabels,
+                placements, origin, childContext, scalarReads);
+        var model = converted.model();
         issues.forEach(model::addConversionIssue);
+        for (var component : model.getCircuitComponents()) {
+            if (component.getAcComponent() != null && component.getAcComponent().law() instanceof AcComponent.Bipolar bipolar) {
+                Symbol symbol = symbolByName.get(component.getName()).symbol();
+                if (!symbol.kind().equalsIgnoreCase(bipolar.pnp() ? "pnp" : "npn")) {
+                    model.addConversionIssue(new ImportIssue("BIPOLAR_POLARITY_MISMATCH", "LTSPICE", component.getName(),
+                            "The stock bipolar symbol and its model have different polarity.", component.getSourceLocation(), true));
+                }
+            }
+        }
         boolean ac = model.getAcSettings() != null;
-        Layout layout = planLayout(grid, model, symbolByName, wireVertices, nodeKeys, nodeLabels, ac ? flags : null, anchors);
+        boolean useFlagGeometry = ac || child || !calls.isEmpty();
+        Layout layout = planLayout(grid, model, symbolByName, wireVertices, nodeKeys, nodeLabels,
+                useFlagGeometry ? flags : null, anchors);
         layout.centers.forEach((component, center) -> {
             component.getPosition()[0] = center.x;
             component.getPosition()[1] = center.y;
@@ -307,14 +456,15 @@ public final class LtspiceImporter {
         for (int i = 0; i < model.getControlComponents().size(); i++) {
             model.getControlComponents().get(i).getPosition()[1] = Math.addExact(bottom, 12 + i / 6 * 12);
         }
-        return new SheetImport(model, layout.grid(), calls, flags);
+        return new SheetImport(model, layout.grid(), calls, flags, wires, placed, converted.parameters(),
+                converted.scope(), converted.requiredInputs());
     }
 
     private static Layout planLayout(Grid grid, CircuitModel model, Map<String, PlacedSymbol> symbols,
                                      List<List<Point>> wireVertices, Map<Point, String> nodeKeys, Map<String, String> nodeLabels,
                                      List<Flag> flags, List<Point> anchors) {
         Layout original = flags == null ? layout(grid, model, symbols, wireVertices, nodeKeys, nodeLabels)
-                : acLayout(grid, model, symbols, wireVertices, nodeKeys, flags, anchors);
+                : flagLayout(grid, model, symbols, wireVertices, nodeKeys, flags, anchors);
         Layout candidate = original;
         // At this scale, a native terminal cannot reach a distinct source point
         // or a terminal from a distinct center.
@@ -322,7 +472,7 @@ public final class LtspiceImporter {
             try {
                 Grid finer = candidate.grid.refine();
                 candidate = flags == null ? layout(finer, model, symbols, wireVertices, nodeKeys, nodeLabels)
-                        : acLayout(finer, model, symbols, wireVertices, nodeKeys, flags, anchors);
+                        : flagLayout(finer, model, symbols, wireVertices, nodeKeys, flags, anchors);
             } catch (ArithmeticException error) {
                 break;
             }
@@ -332,7 +482,7 @@ public final class LtspiceImporter {
 
     private record Witness(ComponentData marker, String sourceGroup) { }
 
-    private static Layout acLayout(Grid grid, CircuitModel model, Map<String, PlacedSymbol> symbols,
+    private static Layout flagLayout(Grid grid, CircuitModel model, Map<String, PlacedSymbol> symbols,
                                    List<List<Point>> wireVertices, Map<Point, String> nodeKeys, List<Flag> flags, List<Point> anchors) {
         var drawing = new CircuitModel();
         var centers = new LinkedHashMap<ComponentData, Point>();
@@ -350,7 +500,7 @@ public final class LtspiceImporter {
         for (var vertices : wireVertices) {
             for (int i = 1; i < vertices.size(); i++) {
                 Point a = grid.position(vertices.get(i - 1)), b = grid.position(vertices.get(i));
-                acWire(drawing, flagLabels, a, b);
+                flagWire(drawing, flagLabels, a, b);
             }
         }
         for (ComponentData data : model.getCircuitComponents()) {
@@ -365,7 +515,7 @@ public final class LtspiceImporter {
             for (var port : symbol.type.nativePorts()) {
                 Point sourcePin = symbol.pins.get(port.order() - 1);
                 Point pin = grid.position(sourcePin);
-                var offset = port.nativeOffset(data.getOrientation(), symbol.mirrored());
+                var offset = port.nativeOffset(data.getOrientation(), owned != null && symbol.mirrored());
                 Point nativePin = new Point(center.x + offset.x(), center.y + offset.y());
                 witnesses.add(new Witness(addMarker(drawing, nativePin, ""), nodeKeys.get(sourcePin)));
                 if (nativePin.equals(pin)) continue;
@@ -378,7 +528,7 @@ public final class LtspiceImporter {
                     drawing.addConnection(label == null ? connection(List.of(nativePin, elbow, pin), "")
                             : connection(List.of(pin, elbow, nativePin), label));
                 } else {
-                    acWire(drawing, flagLabels, nativePin, pin);
+                    flagWire(drawing, flagLabels, nativePin, pin);
                 }
             }
         }
@@ -399,7 +549,7 @@ public final class LtspiceImporter {
         return new Layout(grid, centers, drawing.getConnections(), null);
     }
 
-    private static void acWire(CircuitModel drawing, Map<Point, String> flags, Point a, Point b) {
+    private static void flagWire(CircuitModel drawing, Map<Point, String> flags, Point a, Point b) {
         String label = flags.remove(a);
         if (label != null) {
             drawing.addConnection(connection(List.of(a, b), label));
@@ -443,7 +593,7 @@ public final class LtspiceImporter {
     }
 
     private static void parse(String source, String sourceName, List<Symbol> symbols, List<Wire> wires,
-                              List<Flag> flags, List<Line> directives, List<ImportIssue> issues) {
+                              List<Flag> flags, List<Line> directives, List<ImportIssue> issues, AcInputOrigin origin) {
         Symbol active = null;
         int line = 0;
         for (String raw : source.split("\\R")) {
@@ -458,14 +608,20 @@ public final class LtspiceImporter {
                 switch (record) {
                     case "SYMBOL" -> {
                         requireLength(fields, 5);
-                        active = new Symbol(line, fields[1], point(fields, 2), fields[4], new HashMap<>());
+                        active = new Symbol(line, fields[1], point(fields, 2), fields[4], new HashMap<>(), new HashMap<>());
                         symbols.add(active);
                     }
                     case "SYMATTR" -> {
                         String[] attribute = text.split("\\s+", 3);
                         requireLength(attribute, 3);
                         if (active == null) throw new IllegalArgumentException("Place the attribute after a symbol.");
-                        active.attributes.put(attribute[1].toLowerCase(Locale.ROOT), attribute[2]);
+                        String key = attribute[1].toLowerCase(Locale.ROOT);
+                        if (origin.tested() && active.kind().equalsIgnoreCase("ind")
+                                && active.attributes.containsKey(key)) {
+                            throw new IllegalArgumentException("Use each inductor attribute once.");
+                        }
+                        active.attributes.put(key, attribute[2]);
+                        active.attributeLines.put(key, line);
                     }
                     case "WIRE" -> {
                         requireLength(fields, 5);
@@ -517,6 +673,8 @@ public final class LtspiceImporter {
         } catch (IllegalArgumentException error) {
             return directive; // The SPICE importer records the malformed argument list.
         }
+        boolean uic = arguments.length > 0 && arguments[arguments.length - 1].equalsIgnoreCase("uic");
+        if (uic) arguments = java.util.Arrays.copyOf(arguments, arguments.length - 1);
         var times = new ArrayList<String>();
         boolean hasOptions = false;
         for (String argument : arguments) {
@@ -528,16 +686,17 @@ public final class LtspiceImporter {
             } else times.add(argument);
         }
         if (times.size() == 1) times.addFirst("0");
-        return new Line(directive.number(), ".tran " + String.join(" ", times));
+        return new Line(directive.number(), ".tran " + String.join(" ", times) + (uic ? " uic" : ""));
     }
 
-    private static List<PlacedSymbol> placeSymbols(List<Symbol> symbols, String sourceName, List<ImportIssue> issues) {
+    private List<PlacedSymbol> placeSymbols(List<Symbol> symbols, String sourceName,
+                                                   List<ImportIssue> issues, AcInputOrigin origin) {
         var result = new ArrayList<PlacedSymbol>();
         var names = new HashSet<String>();
         for (Symbol symbol : symbols) {
             SpicePorts type;
             try {
-                type = SpicePorts.valueOf(symbol.kind.toUpperCase(Locale.ROOT));
+                type = symbolType(symbol);
             } catch (IllegalArgumentException error) {
                 issue(issues, "UNSUPPORTED_SYMBOL", symbol.name(), "Unsupported LTspice symbol: " + symbol.kind,
                         sourceName, symbol.line);
@@ -552,13 +711,19 @@ public final class LtspiceImporter {
                 List<Point> pins = type.ports().stream().map(SpicePorts.PortSpec::sourceLocalPoint)
                         .map(pin -> orientation.place(symbol.origin, new Point(pin.x(), pin.y()))).toList();
                 if (!names.add(name.toLowerCase(Locale.ROOT))) throw new IllegalArgumentException("Require a unique instance name.");
+                String prefix = type == SpicePorts.BJT ? (symbol.kind.equalsIgnoreCase("pnp") ? "QP" : "QN")
+                        : Character.toString(type.designator());
                 if (symbol.attributes.containsKey("modelfile")
                         || symbol.attributes.containsKey("spicemodel")
-                        || !Character.toString(type.designator()).equalsIgnoreCase(
-                                symbol.attributes.getOrDefault("prefix", Character.toString(type.designator())))) {
+                        || !prefix.equalsIgnoreCase(symbol.attributes.getOrDefault("prefix", prefix))) {
                     issue(issues, "UNSUPPORTED_SYMBOL_ATTRIBUTE", name, "The symbol overrides its standard model or prefix.",
                             sourceName, symbol.line);
                     continue;
+                }
+                if (origin.tested() && type == SpicePorts.IND && !Set.of(
+                        "instname", "value", "value2", "spiceline", "spiceline2", "prefix")
+                        .containsAll(symbol.attributes.keySet())) {
+                    throw new IllegalArgumentException("Unsupported ASC inductor attribute.");
                 }
                 result.add(new PlacedSymbol(symbol, type, pins));
             } catch (IllegalArgumentException | ArithmeticException error) {
@@ -566,6 +731,18 @@ public final class LtspiceImporter {
             }
         }
         return result;
+    }
+
+    private SpicePorts symbolType(Symbol symbol) {
+        if (modelCardDigest != null && (symbol.kind().equalsIgnoreCase("npn") || symbol.kind().equalsIgnoreCase("pnp"))) {
+            return SpicePorts.BJT;
+        }
+        // The stock bv and bi symbols have the pins of the voltage and current symbols.
+        if (behaviouralSources && symbol.kind().equalsIgnoreCase("bv")) return SpicePorts.VOLTAGE;
+        if (behaviouralSources && symbol.kind().equalsIgnoreCase("bi")) return SpicePorts.CURRENT;
+        var type = SpicePorts.valueOf(symbol.kind().toUpperCase(Locale.ROOT));
+        if (type == SpicePorts.BJT) throw new IllegalArgumentException("Select a stock NPN or PNP symbol.");
+        return type;
     }
 
     private static String value(Symbol symbol) {
@@ -630,29 +807,66 @@ public final class LtspiceImporter {
     }
 
     private final class HierarchyImport {
+        private static final java.util.regex.Pattern SCALAR_VALUE =
+                java.util.regex.Pattern.compile("\\{\\s*([A-Za-z_][A-Za-z_0-9]*)\\s*}");
+
+        private static List<CircuitHierarchy.RequiredInput> scalarReads(List<PlacedSymbol> placed, String source) {
+            var spellings = new LinkedHashMap<String, String>();
+            var uses = new LinkedHashMap<String, List<CircuitHierarchy.ScalarUse>>();
+            for (var device : placed) {
+                var symbol = device.symbol();
+                if (symbol.kind().equalsIgnoreCase("bv") || symbol.kind().equalsIgnoreCase("bi")) {
+                    // A behavioural law reads its parameters inside the expression (#204).
+                    var reference = SCALAR_VALUE.matcher(symbol.attributes().getOrDefault("value", ""));
+                    while (reference.find()) {
+                        String key = reference.group(1).toLowerCase(Locale.ROOT);
+                        if (key.equals("pi")) continue;
+                        spellings.putIfAbsent(key, reference.group(1));
+                        uses.computeIfAbsent(key, ignored -> new ArrayList<>()).add(new CircuitHierarchy.ScalarUse(
+                                source, symbol.name(), "Value", symbol.attributeLines().get("value")));
+                    }
+                    continue;
+                }
+                if (!List.of(SpicePorts.RES, SpicePorts.CAP, SpicePorts.VOLTAGE).contains(device.type())) continue;
+                String raw = symbol.attributes().getOrDefault("value", "").strip();
+                var match = SCALAR_VALUE.matcher(raw);
+                if (!match.matches() || !value(symbol).equals(raw)) continue;
+                String spelling = match.group(1);
+                String key = spelling.toLowerCase(Locale.ROOT);
+                if (key.equals("pi")) continue;
+                spellings.putIfAbsent(key, spelling);
+                uses.computeIfAbsent(key, ignored -> new ArrayList<>()).add(new CircuitHierarchy.ScalarUse(
+                        source, symbol.name(), "Value", symbol.attributeLines().get("value")));
+            }
+            return uses.entrySet().stream().map(entry ->
+                    new CircuitHierarchy.RequiredInput(spellings.get(entry.getKey()), entry.getValue())).toList();
+        }
+
         private final List<Path> sourceRoots;
         private final Map<String, String> dependencies;
+        private final Map<String, String> definitionSources = new LinkedHashMap<>();
+        private final AcInputOrigin origin;
         private final Map<Path, String> dependencyKeys = new HashMap<>();
         private final Map<String, CircuitHierarchy.Definition> definitions = new LinkedHashMap<>();
         private final Set<Path> active = new HashSet<>();
         private long nextIdentifier = 1_000_000;
 
-        HierarchyImport(List<Path> sourceRoots, Map<String, String> dependencies) {
+        HierarchyImport(List<Path> sourceRoots, Map<String, String> dependencies, AcInputOrigin origin) {
+            this.origin = origin;
             this.sourceRoots = List.copyOf(sourceRoots);
             this.dependencies = dependencies;
         }
 
-        CircuitModel convert(Path path, String source) throws IOException {
+        SheetImport convert(Path path, String source) throws IOException {
             Path root = path.toRealPath();
             active.add(root);
-            var sheet = convertSheet(source, path.toString(), root, this, false);
+            var sheet = convertSheet(source, path.toString(), root, this, null, origin);
             CircuitModel document = sheet.model();
-            if (!sheet.calls().isEmpty() && document.getAcSettings() == null) {
-                throw new IllegalArgumentException("Select a root AC analysis in " + path);
-            }
-            for (var call : sheet.calls()) appendCall(document, sheet, call, 0, List.of());
+            var rootScope = document.rootParameterMap();
+            for (var call : sheet.calls()) appendCall(document, sheet, call, 0, List.of(), rootScope);
             if (!definitions.isEmpty()) document.setHierarchy(new CircuitHierarchy(List.copyOf(definitions.values())));
-            return document;
+            document.materializeScalarBindings();
+            return sheet;
         }
 
         List<Call> resolveCalls(Path path, List<Symbol> symbols, String sourceName, List<ImportIssue> issues) {
@@ -661,7 +875,7 @@ public final class LtspiceImporter {
             for (var symbol : List.copyOf(symbols)) {
                 boolean primitive;
                 try {
-                    SpicePorts.valueOf(symbol.kind().toUpperCase(Locale.ROOT));
+                    symbolType(symbol);
                     primitive = true;
                 } catch (IllegalArgumentException error) {
                     primitive = false;
@@ -722,8 +936,8 @@ public final class LtspiceImporter {
             return matches.getFirst();
         }
 
-        private void appendCall(CircuitModel document, SheetImport parent, Call call, long parentId, List<String> parentPath)
-                throws IOException {
+        private void appendCall(CircuitModel document, SheetImport parent, Call call, long parentId,
+                                List<String> parentPath, Map<String, String> callerParameters) throws IOException {
             var path = new ArrayList<>(parentPath);
             path.add(call.symbol().name());
             String context = call.schematic() + " " + path;
@@ -734,20 +948,33 @@ public final class LtspiceImporter {
             try {
                 byte[] childSource = Files.readAllBytes(call.schematic());
                 recordDependency(call.schematic(), call.symbol().kind() + ".asc", childSource);
-                var child = convertSheet(decode(childSource), context, call.schematic(), this, true);
-                child.model().getConversionIssues().forEach(document::addConversionIssue);
                 String definitionId = call.schematic().toString();
+                definitionSources.putIfAbsent(definitionId, ArtifactDigest.sha256(childSource));
                 var formals = call.pins().stream().map(pin -> new CircuitHierarchy.Formal(pin.order(), pin.name(),
                         "formal:" + pin.name().toLowerCase(Locale.ROOT))).toList();
-                var definition = new CircuitHierarchy.Definition(definitionId, call.schematic().toString(), formals,
-                        child.model().getAcSettings().parameters());
+                var occurrence = new CircuitHierarchy.Occurrence(definitionId, call.symbol().name(),
+                        SpiceImporter.parameterAssignments(value(call.symbol())));
+                boolean ac = document.getAcSettings() != null;
+                var childContext = new SpiceImporter.ChildContext(ac, (parameters, requiredInputs) -> {
+                    try {
+                        return new CircuitHierarchy.Definition(definitionId, definitionId, formals, parameters, requiredInputs)
+                                .bind(callerParameters, occurrence);
+                    } catch (IllegalArgumentException error) {
+                        throw new IllegalArgumentException(context + " " + error.getMessage(), error);
+                    }
+                });
+                var child = convertSheet(decode(childSource), context, call.schematic(), this, childContext, origin);
+                child.model().getConversionIssues().forEach(document::addConversionIssue);
+                if (!child.model().getControlComponents().isEmpty() || !child.model().getResources().isEmpty()) {
+                    document.addConversionIssue(new ImportIssue("UNSUPPORTED_HIERARCHY_CONTROL", "LTSPICE",
+                            occurrence.instance(), "Child CONTROL components or resources are unsupported.", context, true));
+                }
+                var definition = new CircuitHierarchy.Definition(definitionId, definitionId, formals,
+                        child.parameters(), child.requiredInputs());
                 var existing = definitions.putIfAbsent(definitionId, definition);
                 if (existing != null && !existing.equals(definition)) {
                     throw new IllegalArgumentException("Conflicting ASC interfaces in " + context);
                 }
-                String attributes = value(call.symbol());
-                var occurrence = new CircuitHierarchy.Occurrence(definitionId, call.symbol().name(),
-                        SpiceImporter.parameterAssignments(attributes));
                 long id = nextIdentifier++;
                 var placedPins = call.pins().stream().map(Pin::position).map(parent.grid()::position).toList();
                 int minX = placedPins.stream().mapToInt(Point::x).min().orElseThrow();
@@ -803,7 +1030,7 @@ public final class LtspiceImporter {
                     terminal.setSavedBlock(saved("ElementLK", nextIdentifier++, id, tokens));
                     document.addCircuitComponent(terminal);
                 }
-                for (var nested : child.calls()) appendCall(document, child, nested, id, path);
+                for (var nested : child.calls()) appendCall(document, child, nested, id, path, child.scope());
             } finally {
                 active.remove(call.schematic());
             }
@@ -908,7 +1135,11 @@ public final class LtspiceImporter {
         if (!fields[0].equalsIgnoreCase("SYMATTR")) return;
         if (fields.length == 3 && (fields[1].equalsIgnoreCase("Description")
                 || fields[1].equalsIgnoreCase("Prefix") && fields[2].equalsIgnoreCase(prefix)
-                || stock && fields[1].equalsIgnoreCase("Value") && fields[2].equalsIgnoreCase(prefix))) return;
+                || stock && fields[1].equalsIgnoreCase("Value") && fields[2].equalsIgnoreCase(switch (prefix) {
+                    case "QN" -> "NPN";
+                    case "QP" -> "PNP";
+                    default -> prefix;
+                }))) return;
         throw new IllegalArgumentException(path + ":" + lineNumber + " Unsupported ASY electrical attribute " + line.strip());
     }
 

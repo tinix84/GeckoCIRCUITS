@@ -57,6 +57,7 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
           python3 -m unittest discover -s tools/reference-capture -p 'test_analyze.py' -v
+          python3 -B -m unittest discover -s scripts/m6 -p 'test_*.py' -v
           bash scripts/verify-ci.sh
 
       - name: Verify application traces

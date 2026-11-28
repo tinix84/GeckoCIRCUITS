@@ -213,6 +213,9 @@ abstract public class DialogCircuitComponent<T extends AbstractBlockInterface> e
             if (!canApplyChanges()) {
                 return;
             }
+            if (!validateInputIndividual()) {
+                return;
+            }
             try {
                 setNewElementName();
             } catch (NameAlreadyExistsException ex) {
@@ -243,6 +246,10 @@ abstract public class DialogCircuitComponent<T extends AbstractBlockInterface> e
 
     public void processInputIndividual() {
         // no-op
+    }
+
+    protected boolean validateInputIndividual() {
+        return true;
     }
 
     @Override

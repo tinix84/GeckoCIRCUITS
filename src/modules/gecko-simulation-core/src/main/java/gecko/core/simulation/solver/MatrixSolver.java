@@ -159,6 +159,36 @@ public class MatrixSolver {
         return sparse == null ? a : sparse.toDense();
     }
 
+    /** Calculate the full, unpermuted residual A*x minus b of the currently stamped system. */
+    public double[] residual(double[] solution) {
+        double[] result = bVector.clone();
+        for (int row = 0; row < matrixSize; row++) result[row] = -result[row];
+        if (sparse != null) {
+            sparse.accumulateProduct(solution, result);
+        } else {
+            for (int row = 0; row < matrixSize; row++) {
+                for (int column = 0; column < matrixSize; column++) {
+                    result[row] = Math.fma(a[row][column], solution[column], result[row]);
+                }
+            }
+        }
+        return result;
+    }
+
+    /** Per row, the sum of the absolute terms of A*x and of |b|: the scale at which rounding limits the residual. */
+    public double[] residualScale(double[] solution) {
+        double[] result = new double[matrixSize];
+        for (int row = 0; row < matrixSize; row++) result[row] = Math.abs(bVector[row]);
+        if (sparse != null) {
+            sparse.accumulateAbsoluteProduct(solution, result);
+        } else {
+            for (int row = 0; row < matrixSize; row++) {
+                for (int column = 0; column < matrixSize; column++) result[row] += Math.abs(a[row][column] * solution[column]);
+            }
+        }
+        return result;
+    }
+
     /**
      * Adds a value to one system-matrix coefficient on either backend. It does not mark the matrix changed;
      * call {@link #setMatrixChanged()} afterwards, as for a direct array patch.
@@ -625,6 +655,10 @@ public class MatrixSolver {
                     double offset;
 
                     switch (sourceType) {
+                        case SourceType.PWL_NEW:
+                        case SourceType.PWL:
+                            bContribution = -netlist.getPwlWaveform(elementIdx).calculate(time, dt);
+                            break;
                         case SourceType.QUELLE_DC_NEW:
                         case SourceType.QUELLE_DC:
                             bContribution = -params[1];
@@ -665,6 +699,10 @@ public class MatrixSolver {
                     int sourceType = (int) params[0];
 
                     switch (sourceType) {
+                        case SourceType.PWL_NEW:
+                        case SourceType.PWL:
+                            bVector[voltageSourceIdx] += netlist.getPwlWaveform(elementIdx).calculate(time, dt);
+                            break;
                         case SourceType.QUELLE_DC_NEW:
                         case SourceType.QUELLE_DC:
                             bVector[voltageSourceIdx] += params[1];

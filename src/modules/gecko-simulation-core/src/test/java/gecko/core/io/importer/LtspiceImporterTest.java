@@ -1,10 +1,18 @@
 package gecko.core.io.importer;
 
+import gecko.core.ac.AcComponent;
+import gecko.core.ac.AcInputOrigin;
+import gecko.core.ac.ParameterDefinition;
+import gecko.core.io.AcMetadataCodec;
+import gecko.core.io.ArtifactDigest;
 import gecko.core.io.CircuitFileParser;
 import gecko.core.io.CircuitFileWriter;
+import gecko.core.io.CircuitHierarchy;
 import gecko.core.io.CircuitModel;
 import gecko.core.io.CircuitTopology;
 import gecko.core.io.CircuitTopology.Side;
+import gecko.core.io.HierarchyIndex;
+import gecko.core.io.HierarchyMetadataCodec;
 import gecko.core.simulation.HeadlessSimulationEngine;
 import gecko.core.simulation.SimulationConfig;
 import java.io.ByteArrayInputStream;
@@ -25,6 +33,215 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class LtspiceImporterTest {
     @TempDir Path directory;
+
+    @Test void retainsTheWitnessedBlockInputsAndPinOrderWithoutImportingItsPhysicalModel() throws Exception {
+        for (String name : List.of("res.asy", "cap.asy", "voltage.asy")) {
+            try (var input = java.util.Objects.requireNonNull(getClass().getResourceAsStream("/ltspice-hierarchy/" + name))) {
+                Files.copy(input, directory.resolve(name));
+            }
+        }
+        Files.writeString(directory.resolve("stage.asy"), """
+                Version 4
+                SymbolType BLOCK
+                PIN -64 0 LEFT 8
+                PINATTR PinName -
+                PINATTR SpiceOrder 1
+                PIN -64 32 LEFT 5
+                PINATTR PinName +
+                PINATTR SpiceOrder 2
+                PIN 0 16 NONE 8
+                PINATTR PinName OUT
+                PINATTR SpiceOrder 3
+                """);
+        String child = """
+                Version 4
+                SHEET 1 880 680
+                FLAG 16 16 -
+                FLAG 112 0 +
+                FLAG 192 16 OUT
+                FLAG 16 96 0
+                FLAG 112 64 0
+                FLAG 192 96 0
+                FLAG 288 96 0
+                FLAG 288 16 NodeOnly
+                SYMBOL res 0 0 R0
+                SYMATTR InstName R1
+                SYMATTR Value {ROL}
+                SYMBOL cap 96 0 R0
+                SYMATTR InstName C1
+                SYMATTR Value {COL}
+                SYMBOL voltage 192 0 R0
+                SYMATTR InstName V1
+                SYMATTR Value {VLOW}
+                SYMBOL voltage 288 0 R0
+                SYMATTR InstName V2
+                SYMATTR Value {VHIGH}
+                TEXT 40 256 Left 2 ;{CommentOnly}
+                TEXT 40 272 Left 2 !.model ModelOnly D
+                """;
+        var childPath = Files.writeString(directory.resolve("stage.asc"), child).toRealPath();
+        var root = Files.writeString(directory.resolve("root.asc"), """
+                Version 4
+                SHEET 1 880 680
+                FLAG 64 128 N005
+                FLAG 64 160 N007
+                FLAG 128 144 op
+                SYMBOL stage 128 128 R0
+                SYMATTR InstName X1
+                SYMATTR SpiceLine Vhigh={VHIGH} Vlow={VLOW} Col={COL} Rol={ROL}
+                TEXT 40 256 Left 2 !.param VHIGH=12 VLOW=-12 COL=100p ROL=100k
+                TEXT 40 272 Left 2 !.ac dec 2 10 100
+                """);
+        var model = new LtspiceImporter().convert(root, directory, List.of(directory));
+        var definition = model.getHierarchy().definitions().getFirst();
+        assertEquals(List.of("-", "+", "OUT"), definition.formals().stream().map(CircuitHierarchy.Formal::name).toList());
+        assertTrue(definition.defaults().isEmpty());
+        assertEquals(List.of("ROL", "COL", "VLOW", "VHIGH"),
+                definition.requiredInputs().stream().map(CircuitHierarchy.RequiredInput::name).toList());
+        for (var input : definition.requiredInputs()) {
+            var use = input.uses().getFirst();
+            assertEquals(childPath.toString(), use.source());
+            assertEquals("Value", use.attribute());
+            assertEquals("SYMATTR Value {" + input.name() + "}", child.lines().toList().get(use.line() - 1));
+        }
+        assertEquals(List.of("{ROL}", "{COL}", "{VLOW}", "{VHIGH}"),
+                model.getCircuitComponents().stream().map(CircuitModel.ComponentData::getAcComponent)
+                        .filter(java.util.Objects::nonNull).map(component -> switch (component.law()) {
+                            case AcComponent.Passive law -> law.expression();
+                            case AcComponent.Voltage law -> law.dc();
+                            default -> throw new AssertionError(component);
+                        }).toList());
+        var numeric = model.getCircuitComponents().stream().filter(component -> component.getAcComponent() != null)
+                .map(CircuitModel.ComponentData::getNumericParameters).toList();
+        assertEquals(100_000, numeric.get(0)[0]);
+        assertEquals(100e-12, numeric.get(1)[0], 1e-22);
+        assertEquals(-12, numeric.get(2)[1]);
+        assertEquals(12, numeric.get(3)[1]);
+        assertTrue(numeric.stream().allMatch(values -> java.util.Arrays.stream(values).allMatch(Double::isFinite)));
+        var index = new HierarchyIndex(model);
+        var owner = model.getSpecialComponents().getFirst();
+        var sheet = index.sheet(owner.getSavedBlock().uniqueObjectIdentifier());
+        assertEquals(List.of(new ParameterDefinition("Vhigh", "{VHIGH}"), new ParameterDefinition("Vlow", "{VLOW}"),
+                new ParameterDefinition("Col", "{COL}"), new ParameterDefinition("Rol", "{ROL}")), sheet.call().overrides());
+        for (int pin = 0; pin < 3; pin++) {
+            var boundary = index.boundaries().get(pin);
+            var offset = HierarchyMetadataCodec.decodeBoundaryLocation(boundary.terminal().getSavedBlock().tokens()
+                    .get(HierarchyMetadataCodec.BOUNDARY_LOCATION));
+            int[] position = owner.getPosition();
+            String expectedNode = List.of("N005", "N007", "op").get(pin);
+            assertTrue(model.getConnections().stream().anyMatch(wire ->
+                    HierarchyIndex.parent(wire.getSavedBlock()) == 0 && wire.getLabel().equals(expectedNode)
+                            && java.util.Arrays.stream(wire.getPoints()).anyMatch(point ->
+                                    point[0] == position[0] + offset.x() && point[1] == position[1] + offset.y())),
+                    expectedNode);
+        }
+        assertTrue(model.getConversionIssues().stream().anyMatch(issue -> issue.code().equals("UNSUPPORTED_HIERARCHY_DIRECTIVE")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "SYMATTR SpiceLine Rser=0\\nSYMATTR SpiceLine Rser=1m",
+        "SYMATTR SpiceLine Rser=0\\nSYMATTR Value2 Rser=1m",
+        "SYMATTR SpiceLine Rpar=1k",
+        "SYMATTR SpiceLine Cpar=1p",
+        "SYMATTR ModelFile model.lib",
+        "SYMATTR SpiceModel model",
+        "SYMATTR Value2 Flux=I",
+        "TEXT 0 264 Left 2 !.option temp=85",
+        "TEXT 0 264 Left 2 !.options logparams temp=85",
+        "TEXT 0 264 Left 2 !.options logparams gfarad=1p",
+        "TEXT 0 264 Left 2 !.options logparams=1",
+        "TEXT 0 264 Left 2 !.options unknown",
+        "TEXT 0 264 Left 2 !.model test IND",
+        "TEXT 0 264 Left 2 !K1 L1 L2 .99",
+        "SYMBOL diode 320 0 R0\\nSYMATTR InstName D1\\nSYMATTR Value D"
+    })
+    void rejectsProfiledInductorsWithUnsupportedElectricalInput(String extra) throws Exception {
+        var input = writeProfileFixture(extra.replace("\\n", "\n"));
+        assertThrows(IllegalArgumentException.class, () -> new LtspiceImporter().convert(input, directory, List.of(),
+                AcInputOrigin.LTSPICE_26_1_1_NORMAL_27C));
+    }
+
+    @Test void acceptsBareLogparamsInProfiledAcAndPreservesImportProvenance() throws Exception {
+        var input = writeProfileFixture("TEXT 0 264 Left 2 !.OPTIONS LogParams");
+        byte[] authoredSource = Files.readAllBytes(input);
+        var origin = AcInputOrigin.LTSPICE_26_1_1_NORMAL_27C;
+        var model = new LtspiceImporter().convert(input, directory, List.of(), origin);
+        assertTrue(model.getConversionIssues().isEmpty(), model.getConversionIssues().toString());
+        assertEquals(origin, model.getAcProvenance().origin());
+        assertEquals(ArtifactDigest.sha256(authoredSource), model.getAcProvenance().sourceSha256());
+        var reopened = roundTrip(model);
+        assertTrue(reopened.getConversionIssues().isEmpty(), reopened.getConversionIssues().toString());
+        assertEquals(model.getAcSettings(), reopened.getAcSettings());
+        assertEquals(model.getAcProvenance(), reopened.getAcProvenance());
+        assertArrayEquals(authoredSource, Files.readAllBytes(input));
+    }
+
+    @Test void rejectsProfileOnPortableOrWrongVersionAndKeepsUnselectedAsc() throws Exception {
+        var input = writeProfileFixture("");
+        var converted = new LtspiceImporter().convert(input, directory);
+        assertFalse(converted.getConversionIssues().isEmpty());
+        assertEquals(AcInputOrigin.UNSELECTED_ASC, converted.getAcProvenance().origin());
+        var portable = Files.writeString(directory.resolve("portable.cir"), ".ac dec 1 80 80\nL1 n 0 1u");
+        var bytes = new ByteArrayOutputStream();
+        try (var output = new PrintStream(bytes)) {
+            Path target = directory.resolve("no-import.ipes");
+            assertEquals(1, Main.run(new String[]{portable.toString(), target.toString(), "--symbols",
+                    directory.toString(), "--profile", AcInputOrigin.LTSPICE_26_1_1_NORMAL_27C.profileId()}, output, output));
+            assertEquals(1, Main.run(new String[]{input.toString(), target.toString(), "--symbols", directory.toString(),
+                    "--profile", "ltspice-26.1.1-normal-27c-v2"}, output, output));
+            assertFalse(Files.exists(target));
+            assertEquals(0, Main.run(new String[]{input.toString(), target.toString(), "--symbols", directory.toString(),
+                    "--profile", AcInputOrigin.LTSPICE_26_1_1_NORMAL_27C.profileId()}, output, output), bytes.toString());
+            assertTrue(new CircuitFileParser().parse(target.toString()).getAcProvenance().origin().tested());
+        }
+    }
+
+    @Test void keepsLegacyAliasOffsetAndRejectsMalformedProfiledRecords() {
+        var origin = AcInputOrigin.LTSPICE_26_1_1_NORMAL_27C;
+        var legacy = new AcComponent("L1", List.of("A", "B", "extra"), false, new AcComponent.Inductance("1u", "4m"));
+        assertEquals(legacy, AcMetadataCodec.decodeComponent(AcMetadataCodec.encode(legacy)));
+        var valid = new AcComponent("L1", List.of("A", "B"), false, new AcComponent.Inductance("1u",
+                new AcComponent.ImportedDefault(), origin));
+        var fields = AcMetadataCodec.encode(valid).split("\\.", -1);
+        for (String[] mutation : List.of(
+                new String[]{"4", "INDUCTANCE_ORIGIN_V2"},
+                new String[]{"7", "unknown-profile"},
+                new String[]{"8", "0".repeat(64)},
+                new String[]{"9", "UNKNOWN"},
+                new String[]{"9", "EXPLICIT"},
+                new String[]{"10", "1m"})) {
+            String[] invalid = fields.clone();
+            invalid[Integer.parseInt(mutation[0])] = java.util.Base64.getUrlEncoder().withoutPadding()
+                    .encodeToString(mutation[1].getBytes(StandardCharsets.UTF_8));
+            assertThrows(IllegalArgumentException.class, () -> AcMetadataCodec.decodeComponent(String.join(".", invalid)));
+        }
+        assertThrows(IllegalArgumentException.class,
+                () -> AcMetadataCodec.decodeComponent(AcMetadataCodec.encode(valid) + "."));
+    }
+
+    private Path writeProfileFixture(String extra) throws Exception {
+        for (String name : List.of("voltage", "ind")) {
+            try (var resource = getClass().getResourceAsStream("/ltspice-hierarchy/" + name + ".asy")) {
+                Files.copy(java.util.Objects.requireNonNull(resource), directory.resolve(name + ".asy"));
+            }
+        }
+        return Files.writeString(directory.resolve("inductor.asc"), """
+                Version 4
+                SHEET 1 640 480
+                WIRE 0 16 160 16
+                FLAG 0 96 0
+                FLAG 160 96 0
+                SYMBOL voltage 0 0 R0
+                SYMATTR InstName V1
+                SYMATTR Value AC 1
+                SYMBOL ind 144 0 R0
+                SYMATTR InstName L1
+                SYMATTR Value 1u
+                %s
+                TEXT 32 180 Left 2 !.ac dec 1 80 80
+                """.formatted(extra));
+    }
 
     @Test void importsTheSameRcWaveformAsTheSpiceNetlistAndKeepsItsLayout() throws Exception {
         var schematic = convert(fixture("rc.asc"));
@@ -238,6 +455,79 @@ class LtspiceImporterTest {
     }
 
     @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void acceptsBareTransientParameterLoggingAndPreservesSourceProvenance(boolean optionFirst) throws Exception {
+        for (String symbol : List.of("voltage.asy", "res.asy", "cap.asy")) {
+            try (var resource = getClass().getResourceAsStream("/ltspice-hierarchy/" + symbol)) {
+                Files.copy(java.util.Objects.requireNonNull(resource), directory.resolve(symbol));
+            }
+        }
+        String analysis = "TEXT 0 192 Left 2 !.tran 1u 2m 1m";
+        String option = "TEXT 0 224 Left 2 !.OpTiOnS LoGpArAmS";
+        String source = fixture("rc.asc").replace("TEXT 0 192 Left 2 !.tran 1u 6m",
+                optionFirst ? option + "\n" + analysis : analysis + "\n" + option);
+        Path input = Files.writeString(directory.resolve("transient.asc"), source);
+        var model = new LtspiceImporter().convert(input, directory);
+        var reopened = roundTrip(model);
+        assertTrue(reopened.getConversionIssues().isEmpty(), reopened.getConversionIssues().toString());
+        assertNull(reopened.getAcSettings());
+        assertEquals(1e-6, reopened.getTimeStep());
+        assertEquals(2e-3, reopened.getSimulationDuration());
+        assertEquals(1e-3, reopened.getOutputStartTime());
+        assertEquals(ArtifactDigest.sha256(Files.readAllBytes(input)), reopened.getAcProvenance().sourceSha256());
+        assertEquals(model.getAcProvenance(), reopened.getAcProvenance());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"logparams temp=85", "logparams gfarad=1p", "logparams=1", "logparams unknown", "unknown"})
+    void transientParameterLoggingDoesNotAdmitMixedAssignedOrUnknownOptions(String options) throws Exception {
+        var model = roundTrip(convert(fixture("rc.asc") + "\nTEXT 0 224 Left 2 !.options " + options));
+        assertEquals(List.of("UNSUPPORTED_DIRECTIVE"), model.getConversionIssues().stream().map(issue -> issue.code()).toList());
+    }
+
+    @Test void bareParameterLoggingStillRequiresAnAdmittedAnalysis() throws Exception {
+        String source = fixture("rc.asc");
+        String option = "\nTEXT 0 224 Left 2 !.options logparams";
+        var noAnalysis = convert(source.replace("!.tran 1u 6m", ";no analysis") + option);
+        assertEquals(List.of("UNSUPPORTED_DIRECTIVE"), noAnalysis.getConversionIssues().stream().map(issue -> issue.code()).toList());
+        var invalid = convert(source.replace(".tran 1u 6m", ".tran -1u 6m") + option);
+        assertEquals(List.of("INVALID_TRANSIENT", "UNSUPPORTED_DIRECTIVE"),
+                invalid.getConversionIssues().stream().map(issue -> issue.code()).toList());
+        var startup = convert(source.replace(".tran 1u 6m", ".tran 1u 6m startup") + option);
+        assertEquals(List.of("UNSUPPORTED_TRANSIENT_OPTION"),
+                startup.getConversionIssues().stream().map(issue -> issue.code()).toList());
+        var mixed = convert(source + option + "\nTEXT 0 256 Left 2 !.ac dec 10 1 100");
+        assertTrue(mixed.getConversionIssues().stream().anyMatch(issue -> issue.code().equals("MULTIPLE_ANALYSES")));
+    }
+
+    @Test void preservesAuthoredUicAndOutputWindowThroughNativeIO() throws Exception {
+        var model = roundTrip(convert(fixture("rc.asc").replace("PULSE(0 5 100u 1u 1u 8m 20m)", "1")
+                .replace(".tran 1u 6m", ".tran 0 2m 1m 1u uic")));
+        assertTrue(model.getConversionIssues().isEmpty(), model.getConversionIssues().toString());
+        assertTrue(model.isTransientUic());
+        assertEquals(1e-3, model.getOutputStartTime());
+        assertEquals(1e-6, model.getTimeStep());
+    }
+
+    @Test void childTransientWithoutRootAnalysisDoesNotEnableParameterLogging() {
+        var child = new SpiceImporter.ChildContext(false, (definitions, required) -> java.util.Map.of());
+        var model = new SpiceImporter().convert("child.asc", 0,
+                List.of(new SpiceImporter.Line(1, ".tran 1u 2m"),
+                        new SpiceImporter.Line(2, ".options logparams")),
+                new java.util.LinkedHashMap<>(), java.util.Map.of(), AcInputOrigin.UNSELECTED_ASC, child, List.of())
+                .model();
+        assertEquals(List.of("UNSUPPORTED_DIRECTIVE"), model.getConversionIssues().stream().map(issue -> issue.code()).toList());
+    }
+
+    @Test void nativeRoundTripPreservesTransientOutputStartAndMaximumStep() throws Exception {
+        var model = roundTrip(convert(fixture("rc.asc").replace(".tran 1u 6m", ".tran 1u 2m 1m 500n")));
+        assertTrue(model.getConversionIssues().isEmpty(), model.getConversionIssues().toString());
+        assertEquals(0.001, model.getOutputStartTime());
+        assertEquals(0.002, model.getSimulationDuration());
+        assertEquals(5e-7, model.getTimeStep(), Math.ulp(5e-7));
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"1u 4u 0 1u loadstate=previous.ic", "4u loadstate=previous.ic", "4u\\n+ loadstate=previous.ic"})
     void retainsTheTransientStateModifierAsAnUnsupportedIssue(String arguments) throws Exception {
         var source = fixture("rc.asc").replace(".tran 1u 6m", ".tran " + arguments);
@@ -316,6 +606,40 @@ class LtspiceImporterTest {
         }
         assertTrue(messages.toString(StandardCharsets.UTF_8).contains("\"code\":\"UNSUPPORTED_SYMBOL\""));
         assertEquals(3, new CircuitFileParser().parse(target.toString()).getCircuitComponents().size());
+    }
+
+    @Test void checksStockSymbolsForTransientImportAndKeepsUnsupportedOptions() throws Exception {
+        Path input = writeProfileFixture("");
+        String source = Files.readString(input).replace("Value AC 1", "Value 1")
+                .replaceFirst("(?m)!\\.ac[^\\r\\n]*", "!.tran 0 6m 1m 1u uic");
+        Files.writeString(input, source);
+        var importer = new LtspiceImporter();
+        var model = importer.convert(input, directory);
+        assertNull(model.getAcSettings());
+        assertEquals(2, model.getAcProvenance().dependencySha256().size());
+        assertEquals(0.001, model.getOutputStartTime());
+        var issues = model.getConversionIssues();
+        assertEquals(1, issues.size(), issues.toString());
+        assertEquals("UNSUPPORTED_TRANSIENT_OPTION", issues.getFirst().code());
+        assertTrue(issues.getFirst().message().toLowerCase(java.util.Locale.ROOT).contains("uic"));
+        var profile = assertThrows(IllegalArgumentException.class, () -> importer.convert(input, directory, List.of(),
+                AcInputOrigin.LTSPICE_26_1_1_NORMAL_27C));
+        assertTrue(profile.getMessage().contains("requires a complete import"));
+
+        Files.writeString(directory.resolve("ind.asy"), "Version 4\nSymbolType CELL\n");
+        assertThrows(IllegalArgumentException.class, () -> importer.convert(input, directory));
+    }
+
+    @Test void reportsAnExplicitStockVerificationFindingForDiodes() throws Exception {
+        Path input = writeProfileFixture("");
+        String source = Files.readString(input).replace("Value AC 1", "Value 1")
+                .replaceFirst("(?m)!\\.ac[^\\r\\n]*", "!.tran 1u 6m")
+                + "\nSYMBOL diode 320 16 R0\nSYMATTR InstName D1\nSYMATTR Value D\n";
+        Files.writeString(input, source);
+        var model = new LtspiceImporter().convert(input, directory);
+        assertTrue(model.getConversionIssues().stream().anyMatch(issue ->
+                issue.code().equals("UNSUPPORTED_STOCK_SYMBOL_VERIFICATION") && issue.component().equals("D1")
+                        && issue.sourceLocation().startsWith(input + ":")));
     }
 
     private record Trace(List<Double> times, List<Double> values) { }

@@ -37,7 +37,7 @@ import java.util.zip.GZIPInputStream;
  * }</pre>
  */
 public class CircuitFileParser {
-    enum ResourceAccess { SUPPLIED_BYTES_ONLY, LOCAL_FILES }
+    enum ResourceAccess { SUPPLIED_BYTES_ONLY, LOCAL_FILES, HIERARCHY_ONLY }
 
     private static final String NIX = "NIX_NIX_NIX";
     private static final String SEPARATOR_ASCII_STRINGARRAY = "/";
@@ -70,6 +70,12 @@ public class CircuitFileParser {
      */
     public CircuitModel parse(BufferedReader reader, String sourceName) throws IOException, CircuitParseException {
         return parse(reader, sourceName, ResourceAccess.SUPPLIED_BYTES_ONLY);
+    }
+
+    /** Inspects editor geometry before the document resources are assembled. */
+    public HierarchyIndex inspectHierarchy(BufferedReader reader, String sourceName)
+            throws IOException, CircuitParseException {
+        return new HierarchyIndex(parse(reader, sourceName, ResourceAccess.HIERARCHY_ONLY));
     }
 
     private CircuitModel parse(BufferedReader reader, String sourceName, ResourceAccess resourceAccess)
@@ -125,6 +131,11 @@ public class CircuitFileParser {
             if (tokenMap.containsKey(AcMetadataCodec.SETTINGS)) {
                 model.setAcSettings(AcMetadataCodec.decodeSettings(savedSettingValue(lines, tokenMap, AcMetadataCodec.SETTINGS)));
             }
+            if (tokenMap.containsKey(HierarchyMetadataCodec.ROOT_PARAMETERS)) {
+                if (model.getAcSettings() != null) throw new IllegalArgumentException("Use one root parameter definition field.");
+                model.setRootParameterDefinitions(HierarchyMetadataCodec.decodeRootParameters(
+                        savedSettingValue(lines, tokenMap, HierarchyMetadataCodec.ROOT_PARAMETERS)));
+            }
             if (tokenMap.containsKey(HierarchyMetadataCodec.DOCUMENT)) {
                 model.setHierarchy(HierarchyMetadataCodec.decodeDocument(
                         savedSettingValue(lines, tokenMap, HierarchyMetadataCodec.DOCUMENT)));
@@ -165,11 +176,20 @@ public class CircuitFileParser {
         HierarchyIndex hierarchy = null;
         try {
             hierarchy = new HierarchyIndex(model);
+            AcOriginMembership.validate(model, hierarchy);
+            model.materializeScalarBindings(hierarchy);
+            model.materializeRequiredAcValues(hierarchy);
         } catch (IllegalArgumentException error) {
             throw new CircuitParseException(filePath + ": " + error.getMessage(), error);
         }
         inspectUnrecognizedSimulationBlocks(simulationLines, model, hierarchy);
-        CircuitResourceReader.retain(model, lines, simulationLines, resourceAccess);
+        try {
+            if (resourceAccess != ResourceAccess.HIERARCHY_ONLY) {
+                CircuitResourceReader.retain(model, lines, simulationLines, resourceAccess);
+            }
+        } catch (IllegalArgumentException error) {
+            throw new CircuitParseException(filePath + ": " + error.getMessage(), error);
+        }
 
         // Validate pre-simulation time step
         if (model.getPreSimulationTimeStep() <= 0) {
@@ -225,6 +245,22 @@ public class CircuitFileParser {
                                            Map<String, Integer> tokenMap) throws CircuitParseException {
         if (tokenMap.containsKey("tDURATION")) {
             model.setSimulationDuration(readSavedTiming(model, lines, tokenMap, "tDURATION", "duration", 0.02));
+        }
+
+        if (tokenMap.containsKey("transientUic")) {
+            long count = java.util.Arrays.stream(lines).filter(line ->
+                    line.strip().split("\\s+", 2)[0].equals("transientUic")).count();
+            String[] marker = lines[tokenMap.get("transientUic")].strip().split("\\s+");
+            String value = marker.length == 2 ? marker[1] : "";
+            if (count != 1 || !List.of("0", "1").contains(value)) {
+                throw new CircuitParseException(model.getFilePath() + ": invalid or repeated transientUic setting.");
+            }
+            model.setTransientUic(value.equals("1"));
+        }
+        if (tokenMap.containsKey("tOUTPUT_START")) {
+            double outputStart = readSavedTiming(model, lines, tokenMap, "tOUTPUT_START", "outputStartTime", 0);
+            if (outputStart < 0) addInvalidSavedSetting(model, tokenMap, "tOUTPUT_START", "outputStartTime");
+            else model.setOutputStartTime(outputStart);
         }
 
         if (tokenMap.containsKey("dt")) {
@@ -399,6 +435,10 @@ public class CircuitFileParser {
                 if (elementBlock.containsToken(AcMetadataCodec.COMPONENT)) {
                     comp.setAcComponent(AcMetadataCodec.decodeComponent(
                             elementBlock.readDataLine(AcMetadataCodec.COMPONENT, "")));
+                }
+                if (elementBlock.containsToken(HierarchyMetadataCodec.SCALAR_BINDINGS)) {
+                    comp.setScalarBindings(HierarchyMetadataCodec.decodeScalarBindings(
+                            elementBlock.readDataLine(HierarchyMetadataCodec.SCALAR_BINDINGS, "")));
                 }
 
                 // Store numeric parameters by index
@@ -821,7 +861,7 @@ public class CircuitFileParser {
     /**
      * Returns the semantic parameter key for the primary value of a component type.
      */
-    private static String resolveParameterKey(int type) {
+    static String resolveParameterKey(int type) {
         return switch (type) {
             case 1 -> "resistance";     // LK_R
             case 2 -> "inductance";     // LK_L

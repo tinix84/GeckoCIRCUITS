@@ -27,9 +27,13 @@ final class AcHierarchyTraces {
         this.hierarchy = hierarchy;
     }
 
-    void addPrimitive(CircuitTopology.TerminalIdentity terminal, List<String> path, String key, String name, int order) {
-        members.put(terminal, new AcResult.SourceMember(path, key, name, order, AcResult.TerminalKind.PRIMITIVE));
+    void addPrimitive(CircuitTopology.TerminalIdentity terminal, AcResult.SourceMember source) {
+        members.put(terminal, source);
     }
+
+    AcResult.SourceMember positive(int branch) { return branches.get(branch).positive(); }
+
+    AcResult.SourceMember negative(int branch) { return branches.get(branch).negative(); }
 
     void addBranch(CircuitTopology.TerminalIdentity positive, CircuitTopology.TerminalIdentity negative) {
         var branch = new Branch(members.get(positive), members.get(negative));
@@ -73,7 +77,8 @@ final class AcHierarchyTraces {
         }
     }
 
-    AcResult.HierarchyResult result(List<List<Complex>> currents, int pointCount) {
+    AcResult.HierarchyResult result(List<List<Complex>> currents,
+            Map<AcResult.SourceMember, List<Complex>> terminalCurrents, int pointCount) {
         var finalGroups = topology.groups().values().stream()
                 .sorted(java.util.Comparator.comparingInt(CircuitTopology.Group::id))
                 .map(group -> new AcResult.PhysicalGroup("runtime-group-" + group.id(), group.canonicalLabel().equals("0"),
@@ -91,22 +96,23 @@ final class AcHierarchyTraces {
         for (int i = 0; i < ports.size(); i++) {
             var port = ports.get(i);
             portTraces.add(new AcResult.PortTrace(port.external(), port.internal(), port.externalGroup(), port.internalGroup(),
-                    portCurrent(i, portIndices, currents, pointCount, completed)));
+                    portCurrent(i, portIndices, currents, terminalCurrents, pointCount, completed)));
         }
         return new AcResult.HierarchyResult(finalGroups, List.copyOf(localGroups.values()), branchTraces, portTraces);
     }
 
     private List<Complex> portCurrent(int index, Map<AcResult.SourceMember, Integer> portIndices,
-                                     List<List<Complex>> currents, int pointCount, Map<Integer, List<Complex>> completed) {
+                                     List<List<Complex>> currents, Map<AcResult.SourceMember, List<Complex>> terminalCurrents,
+                                     int pointCount, Map<Integer, List<Complex>> completed) {
         var cached = completed.get(index);
         if (cached != null) return cached;
         var result = new ArrayList<>(java.util.Collections.nCopies(pointCount, Complex.ZERO));
         for (var terminal : ports.get(index).internalGroup().members()) {
             int sign = branchSigns.getOrDefault(terminal, 0);
             Integer nested = portIndices.get(terminal);
-            if (sign == 0 && nested == null) continue;
-            var values = nested == null ? currents.get(Math.abs(sign) - 1)
-                    : portCurrent(nested, portIndices, currents, pointCount, completed);
+            var values = nested != null ? portCurrent(nested, portIndices, currents, terminalCurrents, pointCount, completed)
+                    : sign == 0 ? terminalCurrents.get(terminal) : currents.get(Math.abs(sign) - 1);
+            if (values == null) continue;
             for (int i = 0; i < pointCount; i++) {
                 result.set(i, sign < 0 ? result.get(i).subtract(values.get(i)) : result.get(i).add(values.get(i)));
             }
@@ -116,7 +122,7 @@ final class AcHierarchyTraces {
         return immutable;
     }
 
-    private List<AcResult.SourceMember> sourceMembers(List<CircuitTopology.TerminalIdentity> terminals) {
+    List<AcResult.SourceMember> sourceMembers(List<CircuitTopology.TerminalIdentity> terminals) {
         return terminals.stream().map(members::get).filter(java.util.Objects::nonNull).toList();
     }
 }

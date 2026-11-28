@@ -311,10 +311,10 @@ public class ControlCalculatorFactory {
                     int nodeA = 0;
                     int nodeB = 0;
                     if (paramStrings.length >= 1 && !paramStrings[0].isEmpty()) {
-                        nodeA = resolveProbeNode(model, electricalNetlist, entry.component, paramStrings[0]);
+                        nodeA = resolveProbeNode(model, topology, electricalNetlist, entry.component, paramStrings[0]);
                     }
                     if (paramStrings.length >= 2 && !paramStrings[1].isEmpty()) {
-                        nodeB = resolveProbeNode(model, electricalNetlist, entry.component, paramStrings[1]);
+                        nodeB = resolveProbeNode(model, topology, electricalNetlist, entry.component, paramStrings[1]);
                     }
                     mapping.addVoltProbe(entry.calculator, nodeA, nodeB, entry.component.getName());
                 }
@@ -525,22 +525,28 @@ public class ControlCalculatorFactory {
         }
     }
 
-    /** The one thermal component whose saved identifier equals the saved reference, or null. Names repeat across copies. */
+    /** The one thermal component whose saved identifier equals the saved reference, or null when none or several match. */
     private static CircuitModel.ComponentData coupledThermal(CircuitModel model, CircuitModel.ComponentData control) {
         String reference = control.getImportTokens().get("coupledReferenceID[]");
-        if (reference == null || reference.isBlank()) return null;
-        long identifier;
-        try { identifier = Long.parseLong(reference.trim().split("\\s+")[0]); }
-        catch (NumberFormatException error) { return null; }
-        CircuitModel.ComponentData match = null;
-        for (var thermal : model.getThermalComponents()) {
-            if (thermal.getParameters().get("uniqueObjectIdentifier") instanceof Number number
-                    && number.longValue() == identifier) {
-                if (match != null) return null;
-                match = thermal;
+        if (reference != null && !reference.isBlank()) {
+            long identifier;
+            try { identifier = Long.parseLong(reference.trim().split("\\s+")[0]); }
+            catch (NumberFormatException ignored) { return null; }
+            CircuitModel.ComponentData match = null;
+            for (var thermal : model.getThermalComponents()) {
+                if (thermal.getParameters().get("uniqueObjectIdentifier") instanceof Number number
+                        && number.longValue() == identifier) {
+                    if (match != null) return null;
+                    match = thermal;
+                }
             }
+            return match;
         }
-        return match;
+        String[] names = control.getParameterStrings();
+        if (names.length > 0) {
+            for (var thermal : model.getThermalComponents()) if (names[0].equals(thermal.getName())) return thermal;
+        }
+        return null;
     }
 
     /** The thermal netlist node of a label on the probe's sheet, like the legacy findIndexFromLabelInSheet. */
@@ -562,10 +568,15 @@ public class ControlCalculatorFactory {
         throw new ThermalProbeException("INVALID_THERMAL_PROBE", probe, "The thermal label '" + label + "' is unknown.");
     }
 
-    private static int resolveProbeNode(CircuitModel model, CircuitNetlist electricalNetlist,
+    private static int resolveProbeNode(CircuitModel model, CircuitTopology topology, CircuitNetlist electricalNetlist,
             CircuitModel.ComponentData measurement, String label) {
         if (electricalNetlist == null) return parseNodeLabel(label);
         long sheet = measurement.getSavedBlock() == null ? 0 : measurement.getSavedBlock().parentSheetIdentifier();
+        if (model.getHierarchy() != null) {
+            Integer node = electricalNetlist.getHierarchyGroupNode(topology.labelGroup("LK", sheet, label));
+            if (node != null) return node;
+            throw unknownProbeLabel(measurement, label);
+        }
         for (CircuitModel.ComponentData component : model.getCircuitComponents()) {
             long componentSheet = component.getSavedBlock() == null ? 0 : component.getSavedBlock().parentSheetIdentifier();
             if (componentSheet != sheet) continue;
@@ -578,7 +589,11 @@ public class ControlCalculatorFactory {
                 if (Objects.equals(terminalLabel, label)) return electricalNetlist.getNodeY(element);
             }
         }
-        throw new IllegalArgumentException("Voltage probe '" + measurement.getName()
+        throw unknownProbeLabel(measurement, label);
+    }
+
+    private static IllegalArgumentException unknownProbeLabel(CircuitModel.ComponentData measurement, String label) {
+        return new IllegalArgumentException("Voltage probe '" + measurement.getName()
                 + "' references an unknown electrical terminal label '" + label + "'");
     }
 

@@ -2,7 +2,9 @@ package gecko.geckocircuits.circuit;
 
 import gecko.core.allg.GeckoFile;
 import gecko.core.ac.AcDocumentSettings;
+import gecko.core.ac.ParameterDefinition;
 import gecko.core.io.AcProvenance;
+import gecko.core.io.AcMetadataCodec;
 import gecko.core.io.CircuitFileParser;
 import gecko.core.io.CircuitHierarchy;
 import gecko.core.io.HierarchyIndex;
@@ -17,6 +19,7 @@ import gecko.core.preparation.CircuitSnapshot;
 import gecko.geckocircuits.allg.GeckoFileManager;
 import gecko.geckocircuits.allg.OptimizerParameterData;
 import gecko.geckocircuits.allg.ProjectData;
+import gecko.geckocircuits.circuit.circuitcomponents.AbstractCircuitSource;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
@@ -68,9 +71,25 @@ public final class EditorCircuitCapture {
             ScriptSources scripts, String sourceName, AcDocumentSettings acSettings, AcProvenance provenance,
             List<ImportIssue> conversionIssues, CircuitHierarchy hierarchy)
             throws IOException, CircuitFileParser.CircuitParseException {
+        return capture(elements, settings, optimizer, files, scripts, sourceName, acSettings, provenance, conversionIssues,
+                hierarchy, List.of());
+    }
+
+    public CircuitSnapshot capture(Iterable<? extends AbstractCircuitSheetComponent> elements,
+            SolverSettings settings, OptimizerParameterData optimizer, GeckoFileManager files,
+            ScriptSources scripts, String sourceName, AcDocumentSettings acSettings, AcProvenance provenance,
+            List<ImportIssue> conversionIssues, CircuitHierarchy hierarchy, List<ParameterDefinition> rootParameters)
+            throws IOException, CircuitFileParser.CircuitParseException {
         var ascii = new StringBuffer();
         var blocks = new ArrayList<AbstractBlockInterface>();
+        var pwlResources = new java.util.LinkedHashSet<GeckoFile>();
         for (var element : elements) {
+            if (element instanceof AbstractCircuitSource source && source.hasPwlConfiguration()) {
+                source.validatePwlOwner(elements);
+                source.validatePwlResource(files);
+                files._allAvailableFiles.stream()
+                        .filter(file -> source.referencesPwlResource(file.getHashValue())).forEach(pwlResources::add);
+            }
             ascii.append('\n').append(element.getExportImportCharacters()).append('\n');
             if (element instanceof AbstractBlockInterface block) {
                 block.exportForCapture(ascii, acSettings);
@@ -86,19 +105,31 @@ public final class EditorCircuitCapture {
         section(ascii, "scripterDeclarations", scripts.declarations());
         section(ascii, "extraScriptSourceFiles", scripts.extraFiles());
         ascii.append("\ntDURATION ").append(settings._tDURATION.getValue());
+        if (settings.transientUic.getValue()) {
+            ascii.append("\ntransientUic 1");
+        }
+        if (settings.outputStartTime.getValue() != 0) {
+            ascii.append("\ntOUTPUT_START ").append(settings.outputStartTime.getValue());
+        }
         ascii.append("\ndt ").append(settings.dt.getValue());
         ascii.append("\ntPAUSE ").append(settings._tPAUSE.getValue());
         ascii.append("\nT_pre ").append(settings._T_pre.getValue());
         ascii.append("\ndt_pre ").append(settings._dt_pre.getValue());
         ascii.append("\nsolverType ").append(settings.SOLVER_TYPE.getValue().getOldGeckoIndex());
+        appendAc(ascii, acSettings, provenance);
         appendHierarchy(ascii, hierarchy);
+        appendRootParameters(ascii, rootParameters);
+        if (!pwlResources.isEmpty()) {
+            ascii.append("\n<GeckoFileManager>");
+            pwlResources.forEach(file -> file.exportASCII(ascii));
+            ascii.append("\n<\\GeckoFileManager>");
+        }
         var model = new CircuitFileParser().parse(new BufferedReader(new StringReader(ascii.toString())), sourceName);
         conversionIssues.forEach(model::addConversionIssue);
-        model.setAcSettings(acSettings);
-        model.setAcProvenance(provenance);
-        model.setHierarchy(hierarchy);
         for (var file : files._allAvailableFiles) {
-            captureResource(model, file);
+            if (!pwlResources.contains(file)) {
+                captureResource(model, file);
+            }
         }
         var ordinals = new HashMap<String, Integer>();
         for (var block : blocks) {
@@ -120,19 +151,31 @@ public final class EditorCircuitCapture {
     }
 
     static HierarchyIndex inspectHierarchy(Iterable<? extends AbstractCircuitSheetComponent> elements,
-                                           CircuitHierarchy hierarchy) {
+                                           CircuitHierarchy hierarchy, AcDocumentSettings settings,
+                                           AcProvenance provenance, List<ParameterDefinition> rootParameters) {
         var ascii = new StringBuffer();
         for (var element : elements) {
             ascii.append('\n').append(element.getExportImportCharacters()).append('\n');
             element.exportASCII(ascii);
         }
+        appendAc(ascii, settings, provenance);
         appendHierarchy(ascii, hierarchy);
+        appendRootParameters(ascii, rootParameters);
         try {
-            var model = new CircuitFileParser().parse(new BufferedReader(new StringReader(ascii.toString())), "editor");
-            model.setHierarchy(hierarchy);
-            return new HierarchyIndex(model);
+            return new CircuitFileParser().inspectHierarchy(new BufferedReader(new StringReader(ascii.toString())), "editor");
         } catch (IOException | CircuitFileParser.CircuitParseException error) {
             throw new IllegalArgumentException(error.getMessage(), error);
+        }
+    }
+
+    private static void appendAc(StringBuffer ascii, AcDocumentSettings settings, AcProvenance provenance) {
+        if (settings != null) {
+            ascii.append('\n').append(AcMetadataCodec.SETTINGS).append(' ')
+                    .append(AcMetadataCodec.encode(settings));
+        }
+        if (provenance != null) {
+            ascii.append('\n').append(AcMetadataCodec.PROVENANCE).append(' ')
+                    .append(AcMetadataCodec.encode(provenance));
         }
     }
 
@@ -140,6 +183,13 @@ public final class EditorCircuitCapture {
         if (hierarchy != null) {
             ascii.append('\n').append(HierarchyMetadataCodec.DOCUMENT).append(' ')
                     .append(HierarchyMetadataCodec.encode(hierarchy));
+        }
+    }
+
+    private static void appendRootParameters(StringBuffer ascii, List<ParameterDefinition> rootParameters) {
+        if (!rootParameters.isEmpty()) {
+            ascii.append('\n').append(HierarchyMetadataCodec.ROOT_PARAMETERS).append(' ')
+                    .append(HierarchyMetadataCodec.encodeRootParameters(rootParameters));
         }
     }
 

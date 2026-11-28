@@ -16,6 +16,10 @@ package gecko.geckocircuits.allg;
 import gecko.ExternalGeckoCustom;
 import gecko.GeckoCustomMMF;
 import gecko.GeckoSim;
+import gecko.core.ac.AcInputOrigin;
+import gecko.core.io.CircuitFileWriter;
+import gecko.core.io.importer.LtspiceImporter;
+import gecko.core.io.importer.LtspiceImportReceipt;
 import gecko.geckocircuits.circuit.*;
 import gecko.geckocircuits.control.*;
 import gecko.geckocircuits.datacontainer.DataJunkCompressable;
@@ -39,6 +43,7 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.*;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -55,6 +60,7 @@ import java.util.zip.ZipOutputStream;
 import javax.swing.ImageIcon;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JFrame;
+import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
@@ -64,6 +70,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.KeyStroke;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.ProgressMonitor;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
@@ -127,6 +134,8 @@ public final class MainWindow extends JFrame
     //-------------------------
     private int uniqueFileID = 0;
     private final AtomicLong documentGeneration = new AtomicLong();
+    record ImportedAsc(long generation, LtspiceImportReceipt receipt) { }
+    private ImportedAsc importedAsc;
     public static SimulationAccess _scripter = null;
     public static final SolverSettings _solverSettings = new SolverSettings();
     private JMenuItem _mItemScriptingTool;
@@ -300,6 +309,10 @@ public final class MainWindow extends JFrame
         fileMenu.add(mItemNew);
         mItemNew.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_N, KeyEvent.CTRL_DOWN_MASK));
         fileMenu.add(mItemOpen);
+        var importLtspice = new JMenuItem("Import LTspice ASC…");
+        importLtspice.setActionCommand("Import LTspice ASC");
+        importLtspice.addActionListener(this);
+        fileMenu.add(importLtspice);
         mItemOpen.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_O, KeyEvent.CTRL_DOWN_MASK));
         fileMenu.add(mItemSave);
         mItemSave.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, KeyEvent.CTRL_DOWN_MASK));
@@ -969,7 +982,7 @@ public final class MainWindow extends JFrame
             try (OutputStream fileOut = open.open(staged);
                  GZIPOutputStream gzip = new GZIPOutputStream(fileOut);
                  BufferedWriter out = new BufferedWriter(new OutputStreamWriter(gzip,
-                         java.nio.charset.StandardCharsets.UTF_8))) {
+                         StandardCharsets.UTF_8))) {
                 out.write(project);
             }
             try (var fileIn = Files.newInputStream(staged);
@@ -1020,6 +1033,7 @@ public final class MainWindow extends JFrame
     public void createNewFile() {
         documentGeneration.incrementAndGet();
         _simRunner.cancelAcAnalysis();
+        _solverSettings.transientUic.setValueWithoutUndo(false);
         optimizerParameterData.clear();
         aktuellerDateiName = UNTITLED;
         this.setTitle(aktuellerDateiName + spTitleX + "GeckoCIRCUITS");
@@ -1056,6 +1070,57 @@ public final class MainWindow extends JFrame
         }
     }
 
+    private void importLtspiceDialog() {
+        var source = new JFileChooser();
+        source.setDialogTitle("Select an LTspice schematic");
+        source.setFileFilter(new FileNameExtensionFilter("LTspice schematic (*.asc)", "asc"));
+        if (source.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        var symbols = new JFileChooser(source.getCurrentDirectory());
+        symbols.setDialogTitle("Select the LTspice stock symbols directory");
+        symbols.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        if (symbols.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        String tested = "LTspice 26.1.1, Normal solver, 27 °C";
+        Object selection = JOptionPane.showInputDialog(this, "Select the originating AC configuration.",
+                "LTspice import profile", JOptionPane.QUESTION_MESSAGE, null,
+                new String[]{"Unselected", tested}, "Unselected");
+        if (selection == null) {
+            return;
+        }
+        var origin = tested.equals(selection) ? AcInputOrigin.LTSPICE_26_1_1_NORMAL_27C : AcInputOrigin.UNSELECTED_ASC;
+        try {
+            importLtspice(source.getSelectedFile().toPath(), symbols.getSelectedFile().toPath(), origin);
+            setAnsicht();
+        } catch (IOException | IllegalArgumentException error) {
+            JOptionPane.showMessageDialog(this, error.getMessage(), "LTspice import", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    ImportedAsc currentAscImport() {
+        return importedAsc != null && importedAsc.generation() == documentGeneration.get() ? importedAsc : null;
+    }
+
+    private void importLtspice(Path source, Path symbols, AcInputOrigin origin) throws IOException {
+        var result = new LtspiceImporter().convertWithReceipt(source, symbols,
+                List.of(source.toAbsolutePath().getParent()), origin);
+        byte[] document = new CircuitFileWriter().write(result.model());
+        ProjectData project;
+        try (var input = new BufferedReader(new InputStreamReader(
+                new GZIPInputStream(new ByteArrayInputStream(document)), StandardCharsets.UTF_8))) {
+            project = readProject(input);
+        }
+        createNewFile();
+        _se.setConnectorTestMode(false);
+        loadProject(project);
+        _se.setDirtyFlag();
+        if (result.receipt() != null) {
+            importedAsc = new ImportedAsc(documentGeneration.get(), result.receipt());
+        }
+    }
+
     private void setAnsicht() {
         // set view menu accordingly
         vItemShowNameLK.setState(SchematicEditor2._lkDisplayMode.showName);
@@ -1072,23 +1137,27 @@ public final class MainWindow extends JFrame
     }
 
     public void openFile(BufferedReader in) throws IOException {
+        ProjectData project;
+        try (in) {
+            project = readProject(in);
+        }
         documentGeneration.incrementAndGet();
         _simRunner.cancelAcAnalysis();
         _se.resetCircuitSheetsForNewFile();
-        List<String> datVec = new Vector<>();
-        String z = null;
-        while ((z = in.readLine()) != null) {
-            datVec.add(z);
-        }
-        in.close();
-        String[] zeile = new String[datVec.size()];
-        for (int i1 = 0; i1 < datVec.size(); i1++) {
-            zeile[i1] = datVec.get(i1);
-            //System.out.println("zeile[i1]= "+zeile[i1]);
-        }
+        loadProject(project);
+    }
 
-        ProjectData daten = new ProjectData(zeile, false, null);
-        _se.resetCircuitSheetsForNewFile();
+    private static ProjectData readProject(BufferedReader input) throws IOException {
+        var lines = new ArrayList<String>();
+        String line = input.readLine();
+        while (line != null) {
+            lines.add(line);
+            line = input.readLine();
+        }
+        return new ProjectData(lines.toArray(String[]::new), false, null);
+    }
+
+    private void loadProject(ProjectData daten) {
         optimizerParameterData.clearAndInitializeWithoutUndo(daten._optimizerNames, daten._optimizerData);
         _se.ladeGespeicherteNetzlisteVonProjectData(daten, null);
         AbstractCircuitSheetComponent.dpixValue.setValueWithoutUndo(daten.dpix);
@@ -1118,12 +1187,18 @@ public final class MainWindow extends JFrame
     }
 
     public void openFile(String dateiName) throws FileNotFoundException {
+        if (!new File(dateiName).exists()) {
+            throw new FileNotFoundException(dateiName);
+        }
+        String[] lines = getLinesArrayFromIpesFile(dateiName);
+        ProjectData.preflightTransientSettings(lines);
+        var validatedAcValues = ProjectData.preflightRequiredAc(lines, dateiName);
         documentGeneration.incrementAndGet();
         _simRunner.cancelAcAnalysis();
         _se.resetCircuitSheetsForNewFile();
         GlobalFilePathes.DATNAM = dateiName;
         _se.resetCircuitSheetsForNewFile();
-        ProjectData daten = loadProjectDataFromFile(dateiName, false, optimizerParameterData);
+        ProjectData daten = new ProjectData(lines, false, optimizerParameterData, dateiName, validatedAcValues);
         daten.updateSolverSettings(_solverSettings);
         _se.ladeGespeicherteNetzlisteVonProjectData(daten, null);
 
@@ -1199,6 +1274,10 @@ public final class MainWindow extends JFrame
                     _se.setConnectorTestMode(false);
                     openFileDialog();
                     setAnsicht();
+                }
+            } else if (befehl.equals("Import LTspice ASC")) {
+                if (canLeaveDocument("Import LTspice ASC", SAVE_CHANGES)) {
+                    importLtspiceDialog();
                 }
             } else if (befehl.equals("Save")) {
                 this.saveFile();
@@ -1961,7 +2040,7 @@ public final class MainWindow extends JFrame
         // GZIP format (March 2009) - completely new! -->
         try (FileInputStream fileIn = new FileInputStream(dateiName);
              GZIPInputStream in1 = new GZIPInputStream(fileIn);
-             InputStreamReader streamReader = new InputStreamReader(in1, java.nio.charset.StandardCharsets.UTF_8);
+             InputStreamReader streamReader = new InputStreamReader(in1, StandardCharsets.UTF_8);
              BufferedReader in = new BufferedReader(streamReader)) {
             List<String> datVec = new Vector<>();
             String z = null;
@@ -1980,9 +2059,9 @@ public final class MainWindow extends JFrame
             System.out.println("openFile() - GZIP >> " + e);
             e.printStackTrace();
             // new version 'gzipped' -->
-            try (FileInputStream fileIn = new FileInputStream(GlobalFilePathes.DATNAM);
+            try (FileInputStream fileIn = new FileInputStream(dateiName);
                  InflaterInputStream in1 = new InflaterInputStream(fileIn);
-                 InputStreamReader streamReader = new InputStreamReader(in1, java.nio.charset.StandardCharsets.UTF_8);
+                 InputStreamReader streamReader = new InputStreamReader(in1, StandardCharsets.UTF_8);
                  BufferedReader in = new BufferedReader(streamReader)) {
                 List<String> datVec = new Vector<>();
                 String z = null;

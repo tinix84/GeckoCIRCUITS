@@ -170,6 +170,18 @@ final class SparseSystem implements MatrixCoefficients {
         return slot < 0 ? 0.0 : values[slot];
     }
 
+    /** Add the sparse matrix-vector product to an existing result vector. */
+    void accumulateProduct(double[] solution, double[] result) {
+        for (int slot = 0; slot < count; slot++) {
+            int row = rows[slot];
+            result[row] = Math.fma(values[slot], solution[cols[slot]], result[row]);
+        }
+    }
+
+    void accumulateAbsoluteProduct(double[] solution, double[] result) {
+        for (int slot = 0; slot < count; slot++) result[rows[slot]] += Math.abs(values[slot] * solution[cols[slot]]);
+    }
+
     /** @return a new dense copy of the coefficients */
     double[][] toDense() {
         double[][] dense = new double[order][order];
