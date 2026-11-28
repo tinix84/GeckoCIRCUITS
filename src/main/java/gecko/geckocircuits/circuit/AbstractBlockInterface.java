@@ -275,11 +275,11 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
 
     }
 
-    private java.util.Map<Integer, String> scalarBindings = java.util.Map.of();
+    private Map<Integer, String> scalarBindings = Map.of();
 
-    final java.util.Map<Integer, String> scalarBindings() { return scalarBindings; }
+    final Map<Integer, String> scalarBindings() { return scalarBindings; }
 
-    final double[] scopedScalarValues(java.util.Map<String, String> scope) {
+    final double[] scopedScalarValues(Map<String, String> scope) {
         return ScalarParameterBindings.values(getTypeEnum().getTypeNumber(), getParameter(), scalarBindings, scope);
     }
 
@@ -456,11 +456,13 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
     public final void exportASCII(StringBuffer ascii, AcDocumentSettings settings) {
         AcComponent owned = settings == null || !scalarBindings.isEmpty() ? getAcComponent() : getAcComponentOrLiteral();
         double[] values = owned == null ? parameter : AcMetadataCodec.compatibilityValues(owned, getParameter(), settings);
-        if (settings != null && !scalarBindings.isEmpty()) values = scopedScalarValues(settings.parameterMap());
+        if (settings != null && !scalarBindings.isEmpty()) {
+            values = scopedScalarValues(settings.parameterMap());
+        }
         writeASCII(ascii, owned, values);
     }
 
-    public final void exportScopedAcASCII(StringBuffer ascii, java.util.Map<String, String> scope, boolean ac) {
+    public final void exportScopedAcASCII(StringBuffer ascii, Map<String, String> scope, boolean ac) {
         AcComponent owned = ac && scalarBindings.isEmpty() ? getAcComponentOrLiteral() : getAcComponent();
         double[] values = owned == null ? scopedScalarValues(scope)
                 : AcMetadataCodec.compatibilityValues(owned, getParameter(), scope);
@@ -483,7 +485,9 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
     }
 
     /** Adds any additional graphical terminals owned by an imported semiconductor law. */
-    protected void onAcComponentInstalled(AcComponent owned) { }
+    protected void onAcComponentInstalled(AcComponent owned) {
+        // no-op: only semiconductor laws with extra terminals override this.
+    }
 
     public final AcComponent getAcComponentOrLiteral() {
         var owned = getAcComponent();
@@ -518,7 +522,7 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
             }
             if (editor == null || editor.getHierarchy() == null || getHierarchyMember() == null) {
                 inductor.evaluate(editor == null || editor.getAcSettings() == null
-                        ? java.util.Map.of() : editor.getAcSettings().parameterMap());
+                        ? Map.of() : editor.getAcSettings().parameterMap());
             }
         }
         if (editor != null && (law instanceof AcComponent.IdealDiode
@@ -564,9 +568,13 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
         ProjectData.appendAsString(ascii.append("\nx"), getSheetPosition().x);
         ProjectData.appendAsString(ascii.append("\ny"), getSheetPosition().y);
         ProjectData.appendAsString(ascii.append("\nparameter"), values);
-        if (owned != null) ascii.append('\n').append(AcMetadataCodec.COMPONENT).append(' ').append(AcMetadataCodec.encode(owned));
-        if (!scalarBindings.isEmpty()) ascii.append('\n').append(HierarchyMetadataCodec.SCALAR_BINDINGS).append(' ')
-                .append(HierarchyMetadataCodec.encodeScalarBindings(scalarBindings));
+        if (owned != null) {
+            ascii.append('\n').append(AcMetadataCodec.COMPONENT).append(' ').append(AcMetadataCodec.encode(owned));
+        }
+        if (!scalarBindings.isEmpty()) {
+            ascii.append('\n').append(HierarchyMetadataCodec.SCALAR_BINDINGS).append(' ')
+                    .append(HierarchyMetadataCodec.encodeScalarBindings(scalarBindings));
+        }
 
         ProjectData.appendAsString(ascii.append("\nparameterString"), parameterString);
         updateNameOptArray();
@@ -580,7 +588,9 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
         }
 
         for (UserParameter par : getRegisteredParameters()) {
-            if (scalarBindings.containsKey(par.getParameterIndex())) continue;
+            if (scalarBindings.containsKey(par.getParameterIndex())) {
+                continue;
+            }
             if (owned != null && ((owned.law() instanceof AcComponent.Passive || owned.law() instanceof AcComponent.Inductance)
                     && par.getParameterIndex() == 0 || (owned.law() instanceof AcComponent.Voltage
                     || owned.law() instanceof AcComponent.Current) && par.getParameterIndex() == 1)) {

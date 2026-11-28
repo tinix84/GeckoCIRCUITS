@@ -129,7 +129,9 @@ public final class ProjectData implements Serializable {
         this.acSettings = se.getAcSettings();
         this.rootParameterDefinitions = se.getRootParameterDefinitions();
         this.hierarchy = se.getHierarchy();
-        if (hierarchy != null) this.hierarchyScopes = se.inspectHierarchy().parameterScopes(se.rootParameterMap());
+        if (hierarchy != null) {
+            this.hierarchyScopes = se.inspectHierarchy().parameterScopes(se.rootParameterMap());
+        }
         this.acProvenance = se.getAcProvenance();
         this.conversionIssues = se.getConversionIssues();
         this._dt = solverSettings.dt.getValue();
@@ -186,8 +188,10 @@ public final class ProjectData implements Serializable {
     }
 
     private static boolean readTransientUic(String[] ascii, TokenMap tokens) {
-        if (!tokens.containsToken("transientUic")) return false;
-        long count = java.util.Arrays.stream(ascii).filter(line ->
+        if (!tokens.containsToken("transientUic")) {
+            return false;
+        }
+        long count = Arrays.stream(ascii).filter(line ->
                 line.strip().split("\\s+", 2)[0].equals("transientUic")).count();
         String value = tokens.readDataLine("transientUic", "");
         if (count != 1 || !List.of("0", "1").contains(value)) {
@@ -197,7 +201,9 @@ public final class ProjectData implements Serializable {
     }
 
     private static double readOutputStart(TokenMap tokens) {
-        if (!tokens.containsToken("tOUTPUT_START")) return 0;
+        if (!tokens.containsToken("tOUTPUT_START")) {
+            return 0;
+        }
         double start = tokens.readDataLine("tOUTPUT_START", Double.NaN);
         double stop = tokens.readDataLine("tDURATION", Double.NaN);
         if (!gecko.core.simulation.SimulationTiming.validOutputStart(start, stop)) {
@@ -208,7 +214,9 @@ public final class ProjectData implements Serializable {
 
     static Map<Long, double[]> preflightRequiredAc(String[] ascii, String modelFileName) {
         var tokens = new TokenMap(ascii, true);
-        if (!tokens.containsToken(AcMetadataCodec.SETTINGS)) return Map.of();
+        if (!tokens.containsToken(AcMetadataCodec.SETTINGS)) {
+            return Map.of();
+        }
         boolean validate = false;
         if (tokens.containsToken(HierarchyMetadataCodec.DOCUMENT)) {
             var hierarchy = HierarchyMetadataCodec.decodeDocument(tokens.readDataLine(HierarchyMetadataCodec.DOCUMENT, ""));
@@ -221,7 +229,9 @@ public final class ProjectData implements Serializable {
                     && AcMetadataCodec.decodeComponent(block.readDataLine(AcMetadataCodec.COMPONENT, ""))
                             .law() instanceof gecko.core.ac.AcComponent.IdealDiode;
         }
-        if (!validate) return Map.of();
+        if (!validate) {
+            return Map.of();
+        }
         try (var reader = new BufferedReader(new StringReader(String.join("\n", ascii)))) {
             var sourceName = modelFileName == null ? "native circuit" : modelFileName;
             var model = new CircuitFileParser().parse(reader, sourceName);
@@ -266,10 +276,10 @@ public final class ProjectData implements Serializable {
                 tokens.readDataLine(AcMetadataCodec.PROVENANCE, "")).origin().tested()) {
             throw new IllegalArgumentException("Open the profiled ASC as a separate circuit document.");
         }
-        if (tokens.containsToken(gecko.core.io.HierarchyMetadataCodec.DOCUMENT)
-                || tokens.containsToken(gecko.core.io.HierarchyMetadataCodec.MEMBER)
-                || tokens.containsToken(gecko.core.io.HierarchyMetadataCodec.OCCURRENCE)
-                || tokens.containsToken(gecko.core.io.HierarchyMetadataCodec.BOUNDARY_LOCATION)) {
+        if (tokens.containsToken(HierarchyMetadataCodec.DOCUMENT)
+                || tokens.containsToken(HierarchyMetadataCodec.MEMBER)
+                || tokens.containsToken(HierarchyMetadataCodec.OCCURRENCE)
+                || tokens.containsToken(HierarchyMetadataCodec.BOUNDARY_LOCATION)) {
             throw new IllegalArgumentException("Open the imported hierarchy as a separate circuit document.");
         }
     }
@@ -327,21 +337,33 @@ public final class ProjectData implements Serializable {
         //------------------
         // Simulations-Einstellungen:
         asc.append("\ntDURATION ").append(_tDURATION);
-        if (outputStartTime != 0) asc.append("\ntOUTPUT_START ").append(outputStartTime);
-        if (transientUic) asc.append("\ntransientUic 1");
+        if (outputStartTime != 0) {
+            asc.append("\ntOUTPUT_START ").append(outputStartTime);
+        }
+        if (transientUic) {
+            asc.append("\ntransientUic 1");
+        }
         asc.append("\ndt ").append(_dt);
         asc.append("\ntPAUSE ").append(_tPAUSE);
         asc.append("\nT_pre ").append(_T_pre);
         asc.append("\ndt_pre ").append(_dt_pre);
         asc.append("\nsolverType ").append(solverType);
-        if (acSettings != null) asc.append('\n').append(AcMetadataCodec.SETTINGS).append(' ')
-                .append(AcMetadataCodec.encode(acSettings));
-        if (!rootParameterDefinitions.isEmpty()) asc.append('\n').append(HierarchyMetadataCodec.ROOT_PARAMETERS).append(' ')
-                .append(HierarchyMetadataCodec.encodeRootParameters(rootParameterDefinitions));
-        if (hierarchy != null) asc.append('\n').append(gecko.core.io.HierarchyMetadataCodec.DOCUMENT).append(' ')
-                .append(gecko.core.io.HierarchyMetadataCodec.encode(hierarchy));
-        if (acProvenance != null) asc.append('\n').append(AcMetadataCodec.PROVENANCE).append(' ')
-                .append(AcMetadataCodec.encode(acProvenance));
+        if (acSettings != null) {
+            asc.append('\n').append(AcMetadataCodec.SETTINGS).append(' ')
+                    .append(AcMetadataCodec.encode(acSettings));
+        }
+        if (!rootParameterDefinitions.isEmpty()) {
+            asc.append('\n').append(HierarchyMetadataCodec.ROOT_PARAMETERS).append(' ')
+                    .append(HierarchyMetadataCodec.encodeRootParameters(rootParameterDefinitions));
+        }
+        if (hierarchy != null) {
+            asc.append('\n').append(HierarchyMetadataCodec.DOCUMENT).append(' ')
+                    .append(HierarchyMetadataCodec.encode(hierarchy));
+        }
+        if (acProvenance != null) {
+            asc.append('\n').append(AcMetadataCodec.PROVENANCE).append(' ')
+                    .append(AcMetadataCodec.encode(acProvenance));
+        }
         asc.append("\npath ").append(modelPath);
         //
         asc.append("\n\ndpix ").append(dpix);
@@ -403,14 +425,16 @@ public final class ProjectData implements Serializable {
             acSettings = AcMetadataCodec.decodeSettings(tokenMap.readDataLine(AcMetadataCodec.SETTINGS, ""));
         }
         if (tokenMap.containsToken(HierarchyMetadataCodec.ROOT_PARAMETERS)) {
-            if (acSettings != null) throw new IllegalArgumentException("Use one root parameter definition field.");
+            if (acSettings != null) {
+                throw new IllegalArgumentException("Use one root parameter definition field.");
+            }
             rootParameterDefinitions = HierarchyMetadataCodec.decodeRootParameters(
                     tokenMap.readDataLine(HierarchyMetadataCodec.ROOT_PARAMETERS, ""));
             gecko.core.io.CircuitHierarchy.parameters(rootParameterDefinitions);
         }
-        String hierarchyToken = gecko.core.io.HierarchyMetadataCodec.DOCUMENT;
+        String hierarchyToken = HierarchyMetadataCodec.DOCUMENT;
         if (tokenMap.containsToken(hierarchyToken)) {
-            hierarchy = gecko.core.io.HierarchyMetadataCodec.decodeDocument(tokenMap.readDataLine(hierarchyToken, ""));
+            hierarchy = HierarchyMetadataCodec.decodeDocument(tokenMap.readDataLine(hierarchyToken, ""));
         }
         if (tokenMap.containsToken(AcMetadataCodec.PROVENANCE)) {
             acProvenance = AcMetadataCodec.decodeProvenance(tokenMap.readDataLine(AcMetadataCodec.PROVENANCE, ""));
@@ -596,13 +620,17 @@ public final class ProjectData implements Serializable {
             int typ = elementLKMap.readDataLine("typ", -1);
             var savedPwl = SavedPwlResources.source(elementLKMap.getLines(),
                     typ == CircuitTyp.LK_U.getTypeNumber() || typ == CircuitTyp.LK_I.getTypeNumber());
-            if (savedPwl != null) savedPwlSources.add(savedPwl);
+            if (savedPwl != null) {
+                savedPwlSources.add(savedPwl);
+            }
             AbstractBlockInterface newBlock = AbstractTypeInfo.fabricFromFile(CircuitTyp.getFromIntNumber(typ), elementLKMap);
             var values = validatedAcValues.get(newBlock.getUniqueObjectIdentifier());
             var ac = newBlock.getAcComponent();
             if (values != null && ac != null) {
                 double[] staged = newBlock.getParameter().clone();
-                for (int slot : AcMetadataCodec.compatibilitySlots(ac.law())) staged[slot] = values[slot];
+                for (int slot : AcMetadataCodec.compatibilitySlots(ac.law())) {
+                    staged[slot] = values[slot];
+                }
                 newBlock.setParameterWithoutUnDo(staged);
             }
             _allSheetComponents.add(newBlock);

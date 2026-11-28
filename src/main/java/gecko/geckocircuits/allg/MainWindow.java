@@ -982,7 +982,7 @@ public final class MainWindow extends JFrame
             try (OutputStream fileOut = open.open(staged);
                  GZIPOutputStream gzip = new GZIPOutputStream(fileOut);
                  BufferedWriter out = new BufferedWriter(new OutputStreamWriter(gzip,
-                         java.nio.charset.StandardCharsets.UTF_8))) {
+                         StandardCharsets.UTF_8))) {
                 out.write(project);
             }
             try (var fileIn = Files.newInputStream(staged);
@@ -1074,16 +1074,22 @@ public final class MainWindow extends JFrame
         var source = new JFileChooser();
         source.setDialogTitle("Select an LTspice schematic");
         source.setFileFilter(new FileNameExtensionFilter("LTspice schematic (*.asc)", "asc"));
-        if (source.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        if (source.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
         var symbols = new JFileChooser(source.getCurrentDirectory());
         symbols.setDialogTitle("Select the LTspice stock symbols directory");
         symbols.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        if (symbols.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        if (symbols.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
         String tested = "LTspice 26.1.1, Normal solver, 27 °C";
         Object selection = JOptionPane.showInputDialog(this, "Select the originating AC configuration.",
                 "LTspice import profile", JOptionPane.QUESTION_MESSAGE, null,
                 new String[]{"Unselected", tested}, "Unselected");
-        if (selection == null) return;
+        if (selection == null) {
+            return;
+        }
         var origin = tested.equals(selection) ? AcInputOrigin.LTSPICE_26_1_1_NORMAL_27C : AcInputOrigin.UNSELECTED_ASC;
         try {
             importLtspice(source.getSelectedFile().toPath(), symbols.getSelectedFile().toPath(), origin);
@@ -1110,7 +1116,9 @@ public final class MainWindow extends JFrame
         _se.setConnectorTestMode(false);
         loadProject(project);
         _se.setDirtyFlag();
-        if (result.receipt() != null) importedAsc = new ImportedAsc(documentGeneration.get(), result.receipt());
+        if (result.receipt() != null) {
+            importedAsc = new ImportedAsc(documentGeneration.get(), result.receipt());
+        }
     }
 
     private void setAnsicht() {
@@ -1141,7 +1149,11 @@ public final class MainWindow extends JFrame
 
     private static ProjectData readProject(BufferedReader input) throws IOException {
         var lines = new ArrayList<String>();
-        for (String line; (line = input.readLine()) != null;) lines.add(line);
+        String line = input.readLine();
+        while (line != null) {
+            lines.add(line);
+            line = input.readLine();
+        }
         return new ProjectData(lines.toArray(String[]::new), false, null);
     }
 
@@ -1175,7 +1187,9 @@ public final class MainWindow extends JFrame
     }
 
     public void openFile(String dateiName) throws FileNotFoundException {
-        if (!new File(dateiName).exists()) throw new FileNotFoundException(dateiName);
+        if (!new File(dateiName).exists()) {
+            throw new FileNotFoundException(dateiName);
+        }
         String[] lines = getLinesArrayFromIpesFile(dateiName);
         ProjectData.preflightTransientSettings(lines);
         var validatedAcValues = ProjectData.preflightRequiredAc(lines, dateiName);
@@ -1262,7 +1276,9 @@ public final class MainWindow extends JFrame
                     setAnsicht();
                 }
             } else if (befehl.equals("Import LTspice ASC")) {
-                if (canLeaveDocument("Import LTspice ASC", SAVE_CHANGES)) importLtspiceDialog();
+                if (canLeaveDocument("Import LTspice ASC", SAVE_CHANGES)) {
+                    importLtspiceDialog();
+                }
             } else if (befehl.equals("Save")) {
                 this.saveFile();
             } else if (befehl.equals("Save As")) {
@@ -2024,7 +2040,7 @@ public final class MainWindow extends JFrame
         // GZIP format (March 2009) - completely new! -->
         try (FileInputStream fileIn = new FileInputStream(dateiName);
              GZIPInputStream in1 = new GZIPInputStream(fileIn);
-             InputStreamReader streamReader = new InputStreamReader(in1, java.nio.charset.StandardCharsets.UTF_8);
+             InputStreamReader streamReader = new InputStreamReader(in1, StandardCharsets.UTF_8);
              BufferedReader in = new BufferedReader(streamReader)) {
             List<String> datVec = new Vector<>();
             String z = null;
@@ -2045,7 +2061,7 @@ public final class MainWindow extends JFrame
             // new version 'gzipped' -->
             try (FileInputStream fileIn = new FileInputStream(dateiName);
                  InflaterInputStream in1 = new InflaterInputStream(fileIn);
-                 InputStreamReader streamReader = new InputStreamReader(in1, java.nio.charset.StandardCharsets.UTF_8);
+                 InputStreamReader streamReader = new InputStreamReader(in1, StandardCharsets.UTF_8);
                  BufferedReader in = new BufferedReader(streamReader)) {
                 List<String> datVec = new Vector<>();
                 String z = null;

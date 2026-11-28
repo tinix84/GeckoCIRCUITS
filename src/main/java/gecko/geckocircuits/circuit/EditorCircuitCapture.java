@@ -105,7 +105,9 @@ public final class EditorCircuitCapture {
         section(ascii, "scripterDeclarations", scripts.declarations());
         section(ascii, "extraScriptSourceFiles", scripts.extraFiles());
         ascii.append("\ntDURATION ").append(settings._tDURATION.getValue());
-        if (settings.transientUic.getValue()) ascii.append("\ntransientUic 1");
+        if (settings.transientUic.getValue()) {
+            ascii.append("\ntransientUic 1");
+        }
         if (settings.outputStartTime.getValue() != 0) {
             ascii.append("\ntOUTPUT_START ").append(settings.outputStartTime.getValue());
         }
@@ -125,7 +127,9 @@ public final class EditorCircuitCapture {
         var model = new CircuitFileParser().parse(new BufferedReader(new StringReader(ascii.toString())), sourceName);
         conversionIssues.forEach(model::addConversionIssue);
         for (var file : files._allAvailableFiles) {
-            if (!pwlResources.contains(file)) captureResource(model, file);
+            if (!pwlResources.contains(file)) {
+                captureResource(model, file);
+            }
         }
         var ordinals = new HashMap<String, Integer>();
         for (var block : blocks) {
@@ -165,10 +169,14 @@ public final class EditorCircuitCapture {
     }
 
     private static void appendAc(StringBuffer ascii, AcDocumentSettings settings, AcProvenance provenance) {
-        if (settings != null) ascii.append('\n').append(AcMetadataCodec.SETTINGS).append(' ')
-                .append(AcMetadataCodec.encode(settings));
-        if (provenance != null) ascii.append('\n').append(AcMetadataCodec.PROVENANCE).append(' ')
-                .append(AcMetadataCodec.encode(provenance));
+        if (settings != null) {
+            ascii.append('\n').append(AcMetadataCodec.SETTINGS).append(' ')
+                    .append(AcMetadataCodec.encode(settings));
+        }
+        if (provenance != null) {
+            ascii.append('\n').append(AcMetadataCodec.PROVENANCE).append(' ')
+                    .append(AcMetadataCodec.encode(provenance));
+        }
     }
 
     private static void appendHierarchy(StringBuffer ascii, CircuitHierarchy hierarchy) {
@@ -179,8 +187,10 @@ public final class EditorCircuitCapture {
     }
 
     private static void appendRootParameters(StringBuffer ascii, List<ParameterDefinition> rootParameters) {
-        if (!rootParameters.isEmpty()) ascii.append('\n').append(HierarchyMetadataCodec.ROOT_PARAMETERS).append(' ')
-                .append(HierarchyMetadataCodec.encodeRootParameters(rootParameters));
+        if (!rootParameters.isEmpty()) {
+            ascii.append('\n').append(HierarchyMetadataCodec.ROOT_PARAMETERS).append(' ')
+                    .append(HierarchyMetadataCodec.encodeRootParameters(rootParameters));
+        }
     }
 
     private static void captureTerminals(CircuitModel.ComponentData component, List<AbstractTerminal> terminals,

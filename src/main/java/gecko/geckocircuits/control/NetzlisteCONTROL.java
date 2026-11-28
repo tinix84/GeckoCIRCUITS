@@ -381,7 +381,9 @@ public final class NetzlisteCONTROL {
 //                }
 //            }
 //        }
-        if (recordingWindow.includes(time)) writeData(time);
+        if (recordingWindow.includes(time)) {
+            writeData(time);
+        }
     }
 
     static int counter = 0;

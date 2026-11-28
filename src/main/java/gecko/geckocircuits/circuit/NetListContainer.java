@@ -47,7 +47,9 @@ public final class NetListContainer {
     }
 
     public static NetListContainer fabricStartSimulation(final SchematicEditor2 schematicEntry, SimulationsKern simKern) {
-        if (simKern != null) requireLegacySourceSupport(schematicEntry);
+        if (simKern != null) {
+            requireLegacySourceSupport(schematicEntry);
+        }
         schematicEntry.checkNameOptParameters();
         NetzlisteAllg nlC1 =
                 NetzlisteAllg.fabricNetzlistDisabledParentSubsRemoved(
@@ -75,7 +77,9 @@ public final class NetListContainer {
 
     public static NetListContainer fabricContinueSimulation(final SchematicEditor2 schematicEntry, SimulationsKern simKern,
             NetListContainer oldNetlist) {
-        if (simKern != null) requireLegacySourceSupport(schematicEntry);
+        if (simKern != null) {
+            requireLegacySourceSupport(schematicEntry);
+        }
         schematicEntry.checkNameOptParameters();
         return new NetListContainer(NetzlisteCONTROL.fabricContinueSimulation(oldNetlist._nlControl), oldNetlist._nlLK, oldNetlist._nlTH);
     }

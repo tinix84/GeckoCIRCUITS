@@ -82,7 +82,7 @@ public final class SchematicEditor2 implements MouseListener, MouseMotionListene
         return getAcSettings() == null ? rootParameterDefinitions : List.of();
     }
 
-    public java.util.Map<String, String> rootParameterMap() {
+    public Map<String, String> rootParameterMap() {
         var settings = getAcSettings();
         return settings == null ? gecko.core.io.CircuitHierarchy.parameters(rootParameterDefinitions)
                 : settings.parameterMap();

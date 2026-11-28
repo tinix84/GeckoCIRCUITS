@@ -172,7 +172,9 @@ public final class SimulationRunner {
 
     public void startCalculation(boolean createNewSimThread, SolverSettings settings) throws Exception {
         _se.requireCompleteConversion();
-        if (_se.getAcSettings() == null) controller.requireExplicitLegacySourceSupport();
+        if (_se.getAcSettings() == null) {
+            controller.requireExplicitLegacySourceSupport();
+        }
         controller.reset();
         if (_se.getAcSettings() != null) {
             acAnalysis.start(_se, settings, createNewSimThread);

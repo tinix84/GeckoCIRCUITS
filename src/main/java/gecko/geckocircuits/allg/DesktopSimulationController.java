@@ -131,7 +131,9 @@ public final class DesktopSimulationController {
     }
 
     void requireExplicitLegacySourceSupport() {
-        if (selectedBackend() == Backend.LEGACY) NetListContainer.requireLegacySourceSupport(editor);
+        if (selectedBackend() == Backend.LEGACY) {
+            NetListContainer.requireLegacySourceSupport(editor);
+        }
     }
 
     private static Backend selectedBackend() {
@@ -141,7 +143,9 @@ public final class DesktopSimulationController {
     /** Initializes a script-owned core session without advancing its first step. */
     boolean initializeScript(SolverSettings settings, double dt, double end) throws Exception {
         Backend backend = selectedBackend();
-        if (backend == Backend.LEGACY) return false;
+        if (backend == Backend.LEGACY) {
+            return false;
+        }
         Route route = route(editor, settings);
         String circuit = route.circuit();
         if (!route.core()) {
@@ -358,7 +362,9 @@ public final class DesktopSimulationController {
     /** Returns false when GUI execution must use the legacy backend. */
     boolean startAsync(SolverSettings settings) throws Exception {
         Backend backend = selectedBackend();
-        if (backend == Backend.LEGACY) return false;
+        if (backend == Backend.LEGACY) {
+            return false;
+        }
         Route route = route(editor, settings);
         String circuit = route.circuit();
         if (!route.core()) {
@@ -436,18 +442,24 @@ public final class DesktopSimulationController {
 
     boolean continueAsync(SolverSettings settings) {
         CoreAsyncExecution run = asyncExecution;
-        if (run == null) return false;
+        if (run == null) {
+            return false;
+        }
         LegacySimulationFrontend.onEventThread(() -> continuePublishedRun(run, settings));
         return true;
     }
 
     private void continuePublishedRun(CoreAsyncExecution run, SolverSettings settings) {
-        if (asyncExecution != run || run.ending || !run.terminalPublished) return;
+        if (asyncExecution != run || run.ending || !run.terminalPublished) {
+            return;
+        }
         SimulationSession.Status status = run.host.status();
         if (status.state() == SimulationSession.State.CLOSED || status.state() == SimulationSession.State.FAILED) {
             return;
         }
-        if (status.state() == SimulationSession.State.RUNNING) return;
+        if (status.state() == SimulationSession.State.RUNNING) {
+            return;
+        }
 
         double end = status.endTime();
         boolean reachedEnd = status.state() == SimulationSession.State.COMPLETED || status.time() >= end;
@@ -465,7 +477,9 @@ public final class DesktopSimulationController {
         run.origin.accept(ContainerStatus.RUNNING);
         run.presentation.accept(true);
         window.setMenuDuringSimulation(true, false);
-        if (!run.timer.isRunning()) run.timer.start();
+        if (!run.timer.isRunning()) {
+            run.timer.start();
+        }
     }
 
     boolean endAsync() {
@@ -613,10 +627,14 @@ public final class DesktopSimulationController {
     }
 
     private static void recordSample(int[] rows, SimulationSession.Sample sample) {
-        if (!sample.inRecordingWindow()) return;
+        if (!sample.inRecordingWindow()) {
+            return;
+        }
         float[] sourceValues = sample.values();
         float[] values = new float[rows.length];
-        for (int row = 0; row < rows.length; row++) values[row] = sourceValues[rows[row]];
+        for (int row = 0; row < rows.length; row++) {
+            values[row] = sourceValues[rows[row]];
+        }
         NetzlisteCONTROL.globalData.insertValuesAtEnd(values, sample.time());
     }
 
@@ -649,7 +667,9 @@ public final class DesktopSimulationController {
     /** Returns false when the caller must use the existing legacy start path. */
     boolean start(SolverSettings settings) throws Exception {
         Backend backend = selectedBackend();
-        if (backend == Backend.LEGACY) return false;
+        if (backend == Backend.LEGACY) {
+            return false;
+        }
         Route route = route(editor, settings);
         String circuit = route.circuit();
         if (!route.core()) {
@@ -820,7 +840,9 @@ public final class DesktopSimulationController {
     }
 
     private boolean fallback(Backend backend, String circuit, String reason) {
-        if (backend == Backend.CORE) throw new IllegalStateException("Core cannot run " + circuit + ": " + reason);
+        if (backend == Backend.CORE) {
+            throw new IllegalStateException("Core cannot run " + circuit + ": " + reason);
+        }
         NetListContainer.requireLegacySourceSupport(editor);
         FALLBACK.info(circuit + ": " + reason);
         return false;

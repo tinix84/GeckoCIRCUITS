@@ -109,8 +109,12 @@ final class HierarchyEditCoordinator {
             return;
         }
         group(() -> {
-            if (!newDocument.equals(oldDocument)) editor.setHierarchy(newDocument);
-            if (!newCall.equals(existing)) owner.setHierarchyCall(newCall);
+            if (!newDocument.equals(oldDocument)) {
+                editor.setHierarchy(newDocument);
+            }
+            if (!newCall.equals(existing)) {
+                owner.setHierarchyCall(newCall);
+            }
             scalarValues.forEach(AbstractBlockInterface::setParameter);
         });
     }
