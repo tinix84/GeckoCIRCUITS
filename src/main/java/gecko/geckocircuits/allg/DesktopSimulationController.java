@@ -24,6 +24,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
+import java.util.function.Function;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -40,6 +41,7 @@ public final class DesktopSimulationController {
     private final MainWindow window;
     private final SchematicEditor2 editor;
     private final Supplier<NetListContainer> preparePresentation;
+    private final Function<SessionHost, Future<SimulationSession.Status>> submitAsync;
     private volatile SessionHost currentHost;
     private volatile boolean coreExecution;
     private volatile double completedTime;
@@ -77,7 +79,7 @@ public final class DesktopSimulationController {
         private final int[] rows;
         private volatile Timer timer;
         private volatile long startedAtMillis;
-        private volatile boolean awaitingRunAdmission;
+        private boolean terminalPublished;
         private volatile boolean ending;
         private volatile Future<SimulationSession.Status> runFuture;
 
@@ -92,9 +94,15 @@ public final class DesktopSimulationController {
     }
 
     DesktopSimulationController(MainWindow window, SchematicEditor2 editor, Supplier<NetListContainer> preparePresentation) {
+        this(window, editor, preparePresentation, SessionHost::run);
+    }
+
+    DesktopSimulationController(MainWindow window, SchematicEditor2 editor, Supplier<NetListContainer> preparePresentation,
+            Function<SessionHost, Future<SimulationSession.Status>> submitAsync) {
         this.window = window;
         this.editor = editor;
         this.preparePresentation = preparePresentation;
+        this.submitAsync = submitAsync;
     }
 
     void reset() {
@@ -122,13 +130,18 @@ public final class DesktopSimulationController {
         return asyncExecution != null;
     }
 
+    void requireExplicitLegacySourceSupport() {
+        if (selectedBackend() == Backend.LEGACY) NetListContainer.requireLegacySourceSupport(editor);
+    }
+
+    private static Backend selectedBackend() {
+        return Backend.valueOf(System.getProperty("gecko.backend", "auto").trim().toUpperCase(Locale.ROOT));
+    }
+
     /** Initializes a script-owned core session without advancing its first step. */
     boolean initializeScript(SolverSettings settings, double dt, double end) throws Exception {
-        Backend backend = Backend.valueOf(System.getProperty("gecko.backend", "auto")
-                .trim().toUpperCase(Locale.ROOT));
-        if (backend == Backend.LEGACY) {
-            return false;
-        }
+        Backend backend = selectedBackend();
+        if (backend == Backend.LEGACY) return false;
         Route route = route(editor, settings);
         String circuit = route.circuit();
         if (!route.core()) {
@@ -176,6 +189,8 @@ public final class DesktopSimulationController {
         SolverSettings externalSettings = new SolverSettings();
         externalSettings.dt.setValueWithoutUndo(settings.dt.getValue());
         externalSettings._tDURATION.setValueWithoutUndo(end);
+        externalSettings.outputStartTime.setValueWithoutUndo(settings.outputStartTime.getValue());
+        externalSettings.transientUic.setValueWithoutUndo(settings.transientUic.getValue());
         externalSettings._tPAUSE.setValueWithoutUndo(settings._tPAUSE.getValue());
         externalSettings.SOLVER_TYPE.setValueWithoutUndo(settings.SOLVER_TYPE.getValue());
         return initializeScript(externalSettings, settings.dt.getValue(), end);
@@ -311,15 +326,7 @@ public final class DesktopSimulationController {
     }
 
     private static void drainScriptSamples(CoreScriptExecution execution) {
-        execution.host.drainSamples(
-                sample -> {
-                    float[] sourceValues = sample.values();
-                    float[] values = new float[execution.rows.length];
-                    for (int row = 0; row < execution.rows.length; row++) {
-                        values[row] = sourceValues[execution.rows[row]];
-                    }
-                    NetzlisteCONTROL.globalData.insertValuesAtEnd(values, sample.time());
-                });
+        execution.host.drainSamples(sample -> recordSample(execution.rows, sample));
     }
 
     private void retireScriptForReplacement() {
@@ -350,11 +357,8 @@ public final class DesktopSimulationController {
 
     /** Returns false when GUI execution must use the legacy backend. */
     boolean startAsync(SolverSettings settings) throws Exception {
-        Backend backend = Backend.valueOf(System.getProperty("gecko.backend", "auto")
-                .trim().toUpperCase(Locale.ROOT));
-        if (backend == Backend.LEGACY) {
-            return false;
-        }
+        Backend backend = selectedBackend();
+        if (backend == Backend.LEGACY) return false;
         Route route = route(editor, settings);
         String circuit = route.circuit();
         if (!route.core()) {
@@ -393,7 +397,7 @@ public final class DesktopSimulationController {
                 run.origin.accept(ContainerStatus.RUNNING);
                 window.setMenuDuringSimulation(true, false);
                 run.timer = new Timer(40, event -> tick(run));
-                run.runFuture = host.run();
+                run.runFuture = submitAsync.apply(host);
                 run.timer.start();
             });
             statusStarted = true;
@@ -432,16 +436,18 @@ public final class DesktopSimulationController {
 
     boolean continueAsync(SolverSettings settings) {
         CoreAsyncExecution run = asyncExecution;
-        if (run == null) {
-            return false;
-        }
+        if (run == null) return false;
+        LegacySimulationFrontend.onEventThread(() -> continuePublishedRun(run, settings));
+        return true;
+    }
+
+    private void continuePublishedRun(CoreAsyncExecution run, SolverSettings settings) {
+        if (asyncExecution != run || run.ending || !run.terminalPublished) return;
         SimulationSession.Status status = run.host.status();
         if (status.state() == SimulationSession.State.CLOSED || status.state() == SimulationSession.State.FAILED) {
-            return true;
+            return;
         }
-        if (status.state() == SimulationSession.State.RUNNING) {
-            return true;
-        }
+        if (status.state() == SimulationSession.State.RUNNING) return;
 
         double end = status.endTime();
         boolean reachedEnd = status.state() == SimulationSession.State.COMPLETED || status.time() >= end;
@@ -452,21 +458,14 @@ public final class DesktopSimulationController {
         }
         completedTime = 0;
         run.startedAtMillis = System.currentTimeMillis();
-        run.awaitingRunAdmission = true;
-        // Queue the next run before restarting the EDT timer. In the extension case, the
-        // previous COMPLETED status remains visible while extend() copies the recording;
-        // a timer tick in that window would stop itself before the queued run starts.
-        run.runFuture = run.host.run();
-        LegacySimulationFrontend.onEventThread(
-                () -> {
-                    run.origin.accept(ContainerStatus.RUNNING);
-                    run.presentation.accept(true);
-                    window.setMenuDuringSimulation(true, false);
-                    if (!run.timer.isRunning()) {
-                        run.timer.start();
-                    }
-                });
-        return true;
+        run.terminalPublished = false;
+        // The host serializes any queued extension before the next run. The timer waits
+        // for this new command before interpreting the host's terminal status.
+        run.runFuture = submitAsync.apply(run.host);
+        run.origin.accept(ContainerStatus.RUNNING);
+        run.presentation.accept(true);
+        window.setMenuDuringSimulation(true, false);
+        if (!run.timer.isRunning()) run.timer.start();
     }
 
     boolean endAsync() {
@@ -557,21 +556,29 @@ public final class DesktopSimulationController {
             run.timer.stop();
             return;
         }
-        SimulationSession.Status status = run.host.status();
         if (run.ending) {
             if (run.runFuture == null || run.runFuture.isDone()) {
                 finishEnd(run);
             }
             return;
         }
-        if (run.awaitingRunAdmission) {
-            if (run.runFuture != null
-                    && !run.runFuture.isDone()
-                    && status.state() != SimulationSession.State.RUNNING) {
-                return;
-            }
-            run.awaitingRunAdmission = false;
+        var command = run.runFuture;
+        if (!command.isDone()) {
+            drainSamples(run);
+            return;
         }
+        try {
+            // Terminal status can be visible before the owner queues its final sample.
+            command.get(0, TimeUnit.NANOSECONDS);
+        } catch (TimeoutException error) {
+            return;
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            return;
+        } catch (ExecutionException error) {
+            // The session's status determines how failed runs are presented.
+        }
+        SimulationSession.Status status = run.host.status();
         drainSamples(run);
         SimulationSession.State state = status.state();
         if (state != SimulationSession.State.PAUSED
@@ -580,7 +587,6 @@ public final class DesktopSimulationController {
             return;
         }
 
-        drainSamples(run);
         run.timer.stop();
         completedTime = status.time();
         if (state == SimulationSession.State.FAILED) {
@@ -598,6 +604,7 @@ public final class DesktopSimulationController {
             if (state == SimulationSession.State.COMPLETED) {
                 window.jtfStatus.setzeStatusRechenzeit(System.currentTimeMillis() - run.startedAtMillis);
             }
+            run.terminalPublished = true;
         }
     }
 
@@ -605,13 +612,16 @@ public final class DesktopSimulationController {
         run.host.drainSamples(sample -> insertSample(run, sample));
     }
 
-    private static void insertSample(CoreAsyncExecution run, SimulationSession.Sample sample) {
+    private static void recordSample(int[] rows, SimulationSession.Sample sample) {
+        if (!sample.inRecordingWindow()) return;
         float[] sourceValues = sample.values();
-        float[] values = new float[run.rows.length];
-        for (int row = 0; row < run.rows.length; row++) {
-            values[row] = sourceValues[run.rows[row]];
-        }
+        float[] values = new float[rows.length];
+        for (int row = 0; row < rows.length; row++) values[row] = sourceValues[rows[row]];
         NetzlisteCONTROL.globalData.insertValuesAtEnd(values, sample.time());
+    }
+
+    private static void insertSample(CoreAsyncExecution run, SimulationSession.Sample sample) {
+        recordSample(run.rows, sample);
     }
 
     private static void setScopeBoundaries(NetListContainer netlist, double start, double end) {
@@ -638,11 +648,8 @@ public final class DesktopSimulationController {
 
     /** Returns false when the caller must use the existing legacy start path. */
     boolean start(SolverSettings settings) throws Exception {
-        Backend backend = Backend.valueOf(System.getProperty("gecko.backend", "auto")
-                .trim().toUpperCase(Locale.ROOT));
-        if (backend == Backend.LEGACY) {
-            return false;
-        }
+        Backend backend = selectedBackend();
+        if (backend == Backend.LEGACY) return false;
         Route route = route(editor, settings);
         String circuit = route.circuit();
         if (!route.core()) {
@@ -703,15 +710,7 @@ public final class DesktopSimulationController {
                     Thread.currentThread().interrupt();
                     throw error;
                 }
-                host.drainSamples(
-                        sample -> {
-                            float[] sourceValues = sample.values();
-                            float[] values = new float[rows.length];
-                            for (int row = 0; row < rows.length; row++) {
-                                values[row] = sourceValues[rows[row]];
-                            }
-                            NetzlisteCONTROL.globalData.insertValuesAtEnd(values, sample.time());
-                        });
+                host.drainSamples(sample -> recordSample(rows, sample));
                 completed = true;
                 return true;
             } catch (Exception | Error error) {
@@ -783,7 +782,8 @@ public final class DesktopSimulationController {
                 scripts.getDeclarationCode(), scripts.getExtraFilesHashes());
         var snapshot = new EditorCircuitCapture().capture(editor._circuitSheet.getAllElements(), settings,
                 MainWindow.optimizerParameterData, MainWindow._fileManager, sources, source,
-                editor.getAcSettings(), editor.getAcProvenance(), editor.getConversionIssues(), editor.getHierarchy());
+                editor.getAcSettings(), editor.getAcProvenance(), editor.getConversionIssues(), editor.getHierarchy(),
+                editor.getRootParameterDefinitions());
         var preparation = new CircuitPreparation().prepare(snapshot, PreparationRequest.defaults());
         if (preparation instanceof PreparationResult.Ready ready) {
             return new Route(circuit, ready, null);
@@ -819,10 +819,9 @@ public final class DesktopSimulationController {
         return null;
     }
 
-    private static boolean fallback(Backend backend, String circuit, String reason) {
-        if (backend == Backend.CORE) {
-            throw new IllegalStateException("Core cannot run " + circuit + ": " + reason);
-        }
+    private boolean fallback(Backend backend, String circuit, String reason) {
+        if (backend == Backend.CORE) throw new IllegalStateException("Core cannot run " + circuit + ": " + reason);
+        NetListContainer.requireLegacySourceSupport(editor);
         FALLBACK.info(circuit + ": " + reason);
         return false;
     }

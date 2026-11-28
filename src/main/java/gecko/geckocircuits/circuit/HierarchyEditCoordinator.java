@@ -34,14 +34,14 @@ final class HierarchyEditCoordinator {
             return document.definition(call.definitionId()).bind(
                     scope(owner.getParentCircuitSheet(), document, edited, substitute), call);
         }
-        var root = editor.getAcSettings();
-        return root == null ? Map.of() : root.parameterMap();
+        return editor.rootParameterMap();
     }
 
     void setSharedLaw(AbstractBlockInterface selected, AcComponent.Law law) {
         SchematicEditor2.requireEditThread();
         editor.inspectHierarchy();
-        var peers = peers(selected, AbstractBlockInterface.class);
+        var peers = law instanceof AcComponent.IdealDiode diode
+                ? idealDiodeModelPeers(selected, diode) : peers(selected, AbstractBlockInterface.class);
         for (var peer : peers) {
             var owned = peer.getAcComponentOrLiteral();
             if (owned == null || owned.law().getClass() != law.getClass()) {
@@ -52,6 +52,32 @@ final class HierarchyEditCoordinator {
         group(() -> peers.forEach(peer -> peer.setAcLawLocal(law)));
     }
 
+    private List<AbstractBlockInterface> idealDiodeModelPeers(AbstractBlockInterface selected, AcComponent.IdealDiode edited) {
+        var original = selected.getAcComponent();
+        if (original == null || !(original.law() instanceof AcComponent.IdealDiode diode)
+                || !diode.modelName().equals(edited.modelName()) || diode.origin() != edited.origin()) {
+            throw new IllegalArgumentException("Retain the local ideal diode model name and origin.");
+        }
+        String definition = definitionOf(selected);
+        var peers = new ArrayList<AbstractBlockInterface>();
+        for (var element : editor._circuitSheet.getAllElements()) {
+            if (element instanceof AbstractBlockInterface block && block.getAcComponent() != null
+                    && block.getAcComponent().law() instanceof AcComponent.IdealDiode law
+                    && law.modelName().equals(diode.modelName()) && definitionOf(block).equals(definition)) {
+                peers.add(block);
+            }
+        }
+        return peers;
+    }
+
+    private static String definitionOf(AbstractBlockInterface component) {
+        if (component.getParentCircuitSheet() instanceof SubCircuitSheet sheet
+                && sheet._subBlock.getHierarchyCall() != null) {
+            return sheet._subBlock.getHierarchyCall().definitionId();
+        }
+        return "";
+    }
+
     void setParameters(SubcircuitBlock owner, List<ParameterDefinition> defaults,
                        List<ParameterDefinition> overrides) {
         SchematicEditor2.requireEditThread();
@@ -60,28 +86,32 @@ final class HierarchyEditCoordinator {
         var oldDocument = editor.getHierarchy();
         var oldDefinition = oldDocument.definition(existing.definitionId());
         var newDefinition = new CircuitHierarchy.Definition(oldDefinition.id(), oldDefinition.source(),
-                oldDefinition.formals(), defaults);
+                oldDefinition.formals(), defaults, oldDefinition.requiredInputs());
         var newDocument = new CircuitHierarchy(oldDocument.definitions().stream()
                 .map(definition -> definition.id().equals(newDefinition.id()) ? newDefinition : definition).toList());
         var newCall = new CircuitHierarchy.Occurrence(existing.definitionId(), existing.instance(), overrides);
+        var scalarValues = new java.util.LinkedHashMap<AbstractBlockInterface, double[]>();
         for (var element : editor._circuitSheet.getAllElements()) {
             if (element instanceof SubcircuitBlock block && block.getHierarchyCall() != null) {
                 scope(block._myCircuitSheet, newDocument, owner, newCall);
             }
-            if (element instanceof AbstractBlockInterface block && block.getAcComponent() != null) {
-                validateLaw(block.getAcComponent().law(), scope(block.getParentCircuitSheet(), newDocument, owner, newCall));
+            if (element instanceof AbstractBlockInterface block) {
+                if (block.getAcComponent() != null) {
+                    validateLaw(block.getAcComponent().law(), scope(block.getParentCircuitSheet(), newDocument, owner, newCall));
+                }
+                if (!block.scalarBindings().isEmpty()) {
+                    scalarValues.put(block, block.scopedScalarValues(
+                            scope(block.getParentCircuitSheet(), newDocument, owner, newCall)));
+                }
             }
         }
         if (newDocument.equals(oldDocument) && newCall.equals(existing)) {
             return;
         }
         group(() -> {
-            if (!newDocument.equals(oldDocument)) {
-                editor.setHierarchy(newDocument);
-            }
-            if (!newCall.equals(existing)) {
-                owner.setHierarchyCall(newCall);
-            }
+            if (!newDocument.equals(oldDocument)) editor.setHierarchy(newDocument);
+            if (!newCall.equals(existing)) owner.setHierarchyCall(newCall);
+            scalarValues.forEach(AbstractBlockInterface::setParameter);
         });
     }
 
@@ -243,10 +273,14 @@ final class HierarchyEditCoordinator {
                 copy.setAcComponentWithoutUndo(block.getAcComponentOrLiteral());
                 peer = copy;
             }
+            long previousOwner = peer.getUniqueObjectIdentifier();
             do {
                 peer.getIdentifier().createNewIdentifier(0);
                 peer.getIdentifier().createNewIdentifier();
             } while (!used.add(peer.getUniqueObjectIdentifier()));
+            if (peer instanceof gecko.geckocircuits.circuit.circuitcomponents.AbstractCircuitSource sourcePeer) {
+                sourcePeer.rebindPwlOwner(previousOwner);
+            }
             peer.setHierarchyMember(key);
             additions.add(new Placement(peer, owner._myCircuitSheet));
         }
@@ -371,12 +405,14 @@ final class HierarchyEditCoordinator {
     private static void validateLaw(AcComponent.Law law, Map<String, String> scope) {
         switch (law) {
             case AcComponent.Passive passive -> requirePositive(SpiceValue.evaluate(passive.expression(), scope));
-            case AcComponent.Inductance inductor -> {
-                requirePositive(SpiceValue.evaluate(inductor.expression(), scope));
-                requirePositive(SpiceValue.evaluate(inductor.seriesResistance(), scope));
-            }
+            case AcComponent.Inductance inductor -> inductor.evaluate(scope);
             case AcComponent.Voltage voltage -> validateSource(voltage.dc(), voltage.magnitude(), voltage.phaseDegrees(), scope);
             case AcComponent.Current current -> validateSource(current.dc(), current.magnitude(), current.phaseDegrees(), scope);
+            case AcComponent.IdealDiode diode -> diode.evaluate(scope);
+            case AcComponent.ExponentialDiode diode -> diode.validate(scope);
+            case AcComponent.Mosfet transistor -> transistor.evaluate(scope);
+            case AcComponent.Bipolar transistor -> transistor.validate(scope);
+            case AcComponent.Transconductance lawG -> SpiceValue.evaluate(lawG.expression(), scope);
             case AcComponent.Controlled controlled -> {
                 if (controlled.laplace()) {
                     SpiceValue.transfer(controlled.expression(), scope);

@@ -14,6 +14,7 @@
 package gecko.core.circuit.netlist;
 
 import gecko.core.circuit.circuitcomponents.CircuitTypCore;
+import gecko.core.circuit.waveform.PiecewiseLinearWaveform;
 import java.util.*;
 
 /**
@@ -73,11 +74,23 @@ public class CircuitNetlist implements INetList {
 
     // Basic circuit topology
     private CircuitTypCore[] componentTypes;
+    private Map<Integer, Integer> mosfetGateNodes = Map.of();
+
+    void setMosfetGateNodes(Map<Integer, Integer> gateNodes) {
+        mosfetGateNodes = Map.copyOf(gateNodes);
+    }
+
+    /** @return the electrical gate node of a selected native MOSFET, or -1. */
+    public int getMosfetGateNode(int element) {
+        return mosfetGateNodes.getOrDefault(element, -1);
+    }
+
     private int[] nodeX;          // X terminal node indices
     private int[] nodeY;          // Y terminal node indices
     private int[] voltageSourceNumbers;  // Voltage source numbering for extended MNA
     private double[][] parameters;       // Component parameters
     private int[] controlElementIndices = new int[0];
+    private PiecewiseLinearWaveform[] pwlWaveforms = new PiecewiseLinearWaveform[0];
 
     // Netlist metrics
     private int nodeCount;              // Maximum node index (nodes 0 to nodeCount)
@@ -92,6 +105,7 @@ public class CircuitNetlist implements INetList {
 
     // Component name → element index mapping (for AMP probe / gate coupling)
     private Map<String, Integer> componentNameToIndex = Collections.emptyMap();
+    private Map<Integer, Integer> hierarchyGroupToNode = Map.of();
 
     // Result storage (Task 3.6)
     private double[] lastNodeVoltages = new double[0];
@@ -131,7 +145,9 @@ public class CircuitNetlist implements INetList {
         copy.wireReference = wireReference;
         copy.numericalNodeOrder = numericalNodeOrder.clone();
         copy.controlElementIndices = controlElementIndices.clone();
+        copy.pwlWaveforms = pwlWaveforms.clone();
         copy.componentNameToIndex = Collections.unmodifiableMap(new LinkedHashMap<>(componentNameToIndex));
+        copy.hierarchyGroupToNode = hierarchyGroupToNode;
         copy.simulationTime = simulationTime;
         copy.lastNodeVoltages = lastNodeVoltages.clone();
         copy.lastComponentCurrents = lastComponentCurrents.clone();
@@ -140,6 +156,7 @@ public class CircuitNetlist implements INetList {
             copy.couplingRegistry.registerCoupling(coupling.getInductor1Index(), coupling.getInductor2Index(),
                     coupling.getCouplingCoefficient(), coupling.getInductance1(), coupling.getInductance2());
         }
+        copy.mosfetGateNodes = mosfetGateNodes;
         return copy;
     }
 
@@ -214,6 +231,7 @@ public class CircuitNetlist implements INetList {
         this.voltageSourceCount = maxVoltageSourceIndex;
         this.elementCount = elementCount;
         controlElementIndices = new int[elementCount];
+        pwlWaveforms = new PiecewiseLinearWaveform[elementCount];
         Arrays.fill(controlElementIndices, -1);
 
         // A new circuit must not inherit results, probe mappings or simulation history.
@@ -226,6 +244,19 @@ public class CircuitNetlist implements INetList {
         lastComponentCurrents = new double[0];
         consumedGateCommands = new double[elementCount];
         Arrays.fill(consumedGateCommands, Double.NaN);
+    }
+
+    public void setPwlWaveform(int elementIndex, PiecewiseLinearWaveform waveform) {
+        pwlWaveforms[Objects.checkIndex(elementIndex, elementCount)] = Objects.requireNonNull(waveform);
+    }
+
+    @Override
+    public PiecewiseLinearWaveform getPwlWaveform(int elementIndex) {
+        PiecewiseLinearWaveform waveform = pwlWaveforms[Objects.checkIndex(elementIndex, elementCount)];
+        if (waveform == null) {
+            return INetList.super.getPwlWaveform(elementIndex);
+        }
+        return waveform;
     }
 
     /** Assigns a controlling element in this run's netlist. */
@@ -709,6 +740,15 @@ public class CircuitNetlist implements INetList {
         this.componentNameToIndex = nameToIndex != null
                 ? Collections.unmodifiableMap(new LinkedHashMap<>(nameToIndex))
                 : Collections.emptyMap();
+    }
+
+    void setHierarchyGroupNodes(Map<Integer, Integer> nodes) {
+        hierarchyGroupToNode = Map.copyOf(nodes);
+    }
+
+    /** Returns the solver node for a hierarchical electrical terminal group or null if it has no row. */
+    public Integer getHierarchyGroupNode(gecko.core.io.CircuitTopology.Group group) {
+        return group == null ? null : hierarchyGroupToNode.get(group.id());
     }
 
     /**

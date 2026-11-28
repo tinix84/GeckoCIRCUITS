@@ -172,6 +172,7 @@ public final class SimulationRunner {
 
     public void startCalculation(boolean createNewSimThread, SolverSettings settings) throws Exception {
         _se.requireCompleteConversion();
+        if (_se.getAcSettings() == null) controller.requireExplicitLegacySourceSupport();
         controller.reset();
         if (_se.getAcSettings() != null) {
             acAnalysis.start(_se, settings, createNewSimThread);
@@ -191,6 +192,7 @@ public final class SimulationRunner {
             simKern = null;
             return;
         }
+        NetListContainer.requireLegacySourceSupport(_se);
         Execution prepared = prepareExecution(null, false, true, settings, preparation -> prepareStart(preparation, settings));
         if (prepared != null) {
             updatePresentation(prepared, () -> setMenus(prepared, true), prepared.activation());
@@ -209,6 +211,7 @@ public final class SimulationRunner {
     }
 
     private Execution prepareStart(Preparation preparation, SolverSettings settings) {
+        requireOutputStart(settings, settings._tDURATION.getValue());
         Object token = preparation.token();
         LegacySimulationFrontend presentation = new LegacySimulationFrontend(() -> isPreparing(token));
         SimulationsKern kernel = new SimulationsKern(settings.SOLVER_TYPE.getValue(), presentation);
@@ -222,6 +225,7 @@ public final class SimulationRunner {
         }
         settings._dt_ALT = dt;
         NetListContainer netlist = NetListContainer.fabricStartSimulation(_se, kernel);
+        netlist._nlControl.setOutputStartTime(settings.outputStartTime.getValue());
         Consumer<ContainerStatus> originStatus = NetzlisteCONTROL.globalData.captureStatusUpdater();
         if (!isPreparing(token)) {
             ticket.supersede();
@@ -245,6 +249,7 @@ public final class SimulationRunner {
             controller.continueAsync(settings);
             return;
         }
+        NetListContainer.requireLegacySourceSupport(_se);
         Execution prepared = prepareExecution(null, false, false, settings, preparation -> prepareContinuation(preparation, settings));
         activateContinuation(prepared, createNewSimThread);
     }
@@ -331,6 +336,7 @@ public final class SimulationRunner {
 
     public void initSim(double dt, double end) {
         _se.requireCompleteConversion();
+        controller.requireExplicitLegacySourceSupport();
         SolverSettings settings = MainWindow._solverSettings;
         settings._tDURATION.setValueWithoutUndo(end);
         settings.dt.setValueWithoutUndo(dt);
@@ -379,6 +385,7 @@ public final class SimulationRunner {
 
     public void external_init(double end) {
         _se.requireCompleteConversion();
+        controller.requireExplicitLegacySourceSupport();
         SolverSettings settings = MainWindow._solverSettings;
         controller.reset();
         try {
@@ -420,6 +427,7 @@ public final class SimulationRunner {
     }
 
     private void initializeScript(SolverSettings settings, double end, double dt, boolean usePreCalculation) {
+        NetListContainer.requireLegacySourceSupport(_se);
         Execution prepared = prepareExecution(null, false, false, settings,
                 preparation -> prepareScript(preparation, settings, end, dt, usePreCalculation));
         if (prepared != null) {
@@ -434,8 +442,18 @@ public final class SimulationRunner {
         }
     }
 
+    private static void requireOutputStart(SolverSettings settings, double stop) {
+        if (settings.transientUic.getValue()) {
+            throw new IllegalArgumentException("UIC requires the core transient backend.");
+        }
+        if (!gecko.core.simulation.SimulationTiming.validOutputStart(settings.outputStartTime.getValue(), stop)) {
+            throw new IllegalArgumentException("Output start time must be finite and between zero and the stop time.");
+        }
+    }
+
     private Execution prepareScript(Preparation preparation, SolverSettings settings, double end, double dt,
             boolean usePreCalculation) {
+        requireOutputStart(settings, end);
         Object token = preparation.token();
         LegacySimulationFrontend presentation = new LegacySimulationFrontend(() -> isPreparing(token));
         SimulationsKern kernel = new SimulationsKern(settings.SOLVER_TYPE.getValue(), presentation);
@@ -448,6 +466,7 @@ public final class SimulationRunner {
             settings._dt_ALT = dt;
         }
         NetListContainer netlist = NetListContainer.fabricStartSimulation(_se, kernel);
+        netlist._nlControl.setOutputStartTime(settings.outputStartTime.getValue());
         Consumer<ContainerStatus> originStatus = NetzlisteCONTROL.globalData.captureStatusUpdater();
         if (!isPreparing(token)) {
             ticket.supersede();

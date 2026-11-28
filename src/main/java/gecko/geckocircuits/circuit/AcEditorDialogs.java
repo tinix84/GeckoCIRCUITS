@@ -37,9 +37,8 @@ public final class AcEditorDialogs {
         fields.add(new JLabel("Scalar definitions (name = expression)"));
         panel.add(fields, BorderLayout.NORTH);
         var definitions = new JTextArea(10, 42);
-        if (current != null) {
-            current.parameters().forEach(p -> definitions.append(p.name() + " = " + p.expression() + "\n"));
-        }
+        var rootParameters = current == null ? editor.getRootParameterDefinitions() : current.parameters();
+        rootParameters.forEach(p -> definitions.append(p.name() + " = " + p.expression() + "\n"));
         panel.add(new JScrollPane(definitions), BorderLayout.CENTER);
         while (JOptionPane.showConfirmDialog(window, panel, "AC analysis settings",
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {
@@ -110,13 +109,32 @@ public final class AcEditorDialogs {
             }
             case AcComponent.Inductance law -> {
                 var inductance = addField(fields, "Inductance (H)", law.expression());
-                var resistance = addField(fields, "Series resistance (Ω)", law.seriesResistance());
+                String expression = law.resistance() instanceof AcComponent.ExplicitResistance explicit
+                        ? explicit.expression() : "";
+                var resistance = addField(fields, "Series resistance (Ω)", expression);
+                var restore = new JCheckBox("Use imported default", law.resistance() instanceof AcComponent.ImportedDefault);
+                if (law.origin().tested()) {
+                    fields.add(restore);
+                    fields.add(new JLabel("0.001 Ω"));
+                    resistance.setEnabled(!restore.isSelected());
+                    restore.addActionListener(event -> resistance.setEnabled(!restore.isSelected()));
+                }
+                var effective = new JLabel();
+                try {
+                    var evaluated = law.evaluate(parameters);
+                    effective.setText(evaluated.ohms() + " Ω (" + evaluated.mode().label() + ")");
+                } catch (IllegalArgumentException error) {
+                    effective.setText("Invalid value");
+                    effective.setToolTipText(error.getMessage());
+                }
+                fields.add(new JLabel("Effective series resistance"));
+                fields.add(effective);
                 updatedLaw = () -> {
-                    if (SpiceValue.evaluate(inductance.getText(), parameters) <= 0
-                            || SpiceValue.evaluate(resistance.getText(), parameters) <= 0) {
-                        throw new IllegalArgumentException("Require positive inductance and series resistance.");
-                    }
-                    return new AcComponent.Inductance(inductance.getText().strip(), resistance.getText().strip());
+                    AcComponent.Resistance chosen = restore.isSelected() ? new AcComponent.ImportedDefault()
+                            : new AcComponent.ExplicitResistance(resistance.getText().strip());
+                    var updated = new AcComponent.Inductance(inductance.getText().strip(), chosen, law.origin());
+                    updated.evaluate(parameters);
+                    return updated;
                 };
             }
             case AcComponent.Current law -> {
@@ -130,6 +148,40 @@ public final class AcEditorDialogs {
                     }
                     SpiceValue.evaluate(phase.getText(), parameters);
                     return new AcComponent.Current(dc.getText().strip(), magnitude.getText().strip(), phase.getText().strip());
+                };
+            }
+            case AcComponent.IdealDiode law -> {
+                var forward = addField(fields, "Forward threshold (V)", law.forwardVoltage());
+                var on = addField(fields, "On resistance (Ω, blank for default)", law.onResistance());
+                var off = addField(fields, "Off resistance (Ω, blank for profile default)", law.offResistance());
+                updatedLaw = () -> {
+                    var edited = new AcComponent.IdealDiode(law.modelName(), forward.getText().strip(),
+                            on.getText().strip(), off.getText().strip(), law.origin());
+                    edited.evaluate(parameters);
+                    return edited;
+                };
+            }
+            case AcComponent.Mosfet law -> {
+                fields.add(new JLabel(law.pChannel() ? "Imported Level 1 PMOS" : "Imported Level 1 NMOS"));
+                fields.add(new JLabel(law.modelName()));
+                updatedLaw = () -> law;
+            }
+            case AcComponent.Bipolar law -> {
+                fields.add(new JLabel("Imported AC bipolar transistor"));
+                fields.add(new JLabel(law.modelName()));
+                updatedLaw = () -> law;
+            }
+            case AcComponent.ExponentialDiode law -> {
+                fields.add(new JLabel(law.transientLaw() ? "Imported exponential transient diode" : "Imported exponential AC diode"));
+                fields.add(new JLabel(law.modelName()));
+                updatedLaw = () -> law;
+            }
+            case AcComponent.Transconductance law -> {
+                var expression = addField(fields, "Transconductance (S)", law.expression());
+                updatedLaw = () -> {
+                    String text = expression.getText().strip();
+                    SpiceValue.evaluate(text, parameters);
+                    return new AcComponent.Transconductance(text);
                 };
             }
             case AcComponent.Controlled law -> {
@@ -187,9 +239,11 @@ public final class AcEditorDialogs {
         var overrides = new JTextArea(parameterText(call.overrides()), 5, 30);
         var fields = new JPanel(new GridLayout(0, 1, 6, 6));
         fields.add(new JLabel("Definition defaults"));
-        fields.add(new JScrollPane(defaults));
-        fields.add(new JLabel("Overrides for " + call.instance()));
-        fields.add(new JScrollPane(overrides));
+        fields.add(new javax.swing.JScrollPane(defaults));
+        String required = String.join(", ", definition.requiredInputs().stream()
+                .map(gecko.core.io.CircuitHierarchy.RequiredInput::name).toList());
+        fields.add(new JLabel("Overrides for " + call.instance() + (required.isEmpty() ? "" : " (required " + required + ")")));
+        fields.add(new javax.swing.JScrollPane(overrides));
         while (JOptionPane.showConfirmDialog(window, fields, "ASC parameters", JOptionPane.OK_CANCEL_OPTION)
                 == JOptionPane.OK_OPTION) {
             try {

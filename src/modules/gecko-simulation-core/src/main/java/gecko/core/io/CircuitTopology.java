@@ -1,6 +1,7 @@
 package gecko.core.io;
 
 import gecko.core.simulation.ControlBlockDescriptor;
+import gecko.core.circuit.circuitcomponents.CircuitTypCore;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -139,9 +140,11 @@ public final class CircuitTopology {
                 wires.add(new Wire(connection, domain, saved == null ? 0 : saved.parentSheetIdentifier()));
             }
         }
+        // A transient ASC primitive can have two labels and still need geometry to reach an occurrence pin.
         boolean electricalGeometry = wires.stream().anyMatch(wire -> "LK".equals(wire.domain()) || "RELUCTANCE".equals(wire.domain()))
-                && model.getCircuitComponents().stream().anyMatch(component -> twoPort(component.getType())
-                    && (missingLabel(component, Side.INPUT) || missingLabel(component, Side.OUTPUT)));
+                && ((!importedBoundaries.isEmpty() && model.getAcSettings() == null)
+                    || model.getCircuitComponents().stream().anyMatch(component -> twoPort(component.getType())
+                        && (missingLabel(component, Side.INPUT) || missingLabel(component, Side.OUTPUT))));
         addComponents("LK", model.getCircuitComponents(), identities, ports, active, structural, sheets, false,
                 electricalGeometry, importedBoundaries);
         addComponents("CONTROL", model.getControlComponents(), identities, ports, active, structural, sheets, false, false, Map.of());
@@ -306,7 +309,7 @@ public final class CircuitTopology {
                         .map(java.util.Map.Entry::getKey).findFirst().orElse(null);
                 // A loss source may leave its output open: its 10 kOhm resistor ties the node to the thermal zero.
                 boolean openLossSource = owner != null && first.id().component().domain().equals("THERMAL")
-                        && owner.getType() == 41;
+                        && owner.getType() == CircuitTypCore.TH_PvCHIP.getTypeNumber();
                 if (!openLossSource) {
                     String name = owner == null ? "" : java.util.Objects.toString(owner.getName(), "");
                     physicalConnectionIssues.add("Component '" + name + "' has an unconnected "
@@ -651,7 +654,7 @@ public final class CircuitTopology {
             boolean topologyOnly = structuralOnly || shorted || boundary(component, domain) || global(component, domain);
             (topologyOnly ? structural : active).add(identity);
             long sheet = saved == null ? 0 : saved.parentSheetIdentifier();
-            var registry = domain.equals("LK") && (component.getAcComponent() != null || component.getType() == SpicePorts.E.type())
+            var registry = domain.equals("LK") && (component.getAcComponent() != null || component.getType() == SpicePorts.E.type() || component.getType() == SpicePorts.G.type())
                     ? SpicePorts.find(domain, component.getType()) : null;
             var importedBoundary = importedBoundaries.get(component);
             for (Side side : Side.values()) {
@@ -661,7 +664,9 @@ public final class CircuitTopology {
                     int required = (int) registry.nativePorts().stream().filter(pin -> pin.side() == side).count();
                     if (labels.length < required) labels = Arrays.copyOf(labels, required);
                 }
-                boolean lossOrAmbient = domain.equals("THERMAL") && (component.getType() == 41 || component.getType() == 48);
+                boolean lossOrAmbient = domain.equals("THERMAL")
+                        && (component.getType() == CircuitTypCore.TH_PvCHIP.getTypeNumber()
+                        || component.getType() == CircuitTypCore.TH_AMBIENT.getTypeNumber());
                 if (labels.length == 0 && (domain.equals("LK") || domain.equals("THERMAL"))
                         && (twoPort(component.getType()) || lossOrAmbient)) {
                     labels = new String[]{""};
@@ -713,7 +718,8 @@ public final class CircuitTopology {
                         geometry = new CircuitModel.TerminalData(terminalDomain, terminalSheet, side, port, x, y, true);
                     }
                     boolean zeroTerminal = domain.equals("THERMAL") && port == 0
-                            && (component.getType() == 41 && side == Side.INPUT || component.getType() == 48 && side == Side.OUTPUT);
+                            && (component.getType() == CircuitTypCore.TH_PvCHIP.getTypeNumber() && side == Side.INPUT
+                            || component.getType() == CircuitTypCore.TH_AMBIENT.getTypeNumber() && side == Side.OUTPUT);
                     if (zeroTerminal && geometry == null) {
                         geometry = new CircuitModel.TerminalData(terminalDomain, 0, side, port, THERMAL_ZERO, THERMAL_ZERO, true);
                     } else if (geometry != null && geometry.geometric() && geometry.domain().equals("THERMAL")

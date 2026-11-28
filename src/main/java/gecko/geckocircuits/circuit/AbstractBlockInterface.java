@@ -16,6 +16,8 @@ package gecko.geckocircuits.circuit;
 import gecko.core.ac.AcComponent;
 import gecko.core.ac.AcDocumentSettings;
 import gecko.core.io.AcMetadataCodec;
+import gecko.core.io.HierarchyMetadataCodec;
+import gecko.core.io.ScalarParameterBindings;
 import gecko.core.io.SpicePorts;
 import gecko.core.io.importer.SpiceValue;
 import gecko.geckocircuits.allg.TechFormat;
@@ -273,11 +275,22 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
 
     }
 
+    private java.util.Map<Integer, String> scalarBindings = java.util.Map.of();
+
+    final java.util.Map<Integer, String> scalarBindings() { return scalarBindings; }
+
+    final double[] scopedScalarValues(java.util.Map<String, String> scope) {
+        return ScalarParameterBindings.values(getTypeEnum().getTypeNumber(), getParameter(), scalarBindings, scope);
+    }
+
     @Override
     public void importASCII(final TokenMap tokenMap) {
         if (getSimulationDomain() == ConnectorType.LK && tokenMap.containsToken(AcMetadataCodec.COMPONENT)) {
-            acComponent.setValueWithoutUndo(Optional.of(
-                    AcMetadataCodec.decodeComponent(tokenMap.readDataLine(AcMetadataCodec.COMPONENT, ""))));
+            setAcComponentWithoutUndo(AcMetadataCodec.decodeComponent(tokenMap.readDataLine(AcMetadataCodec.COMPONENT, "")));
+        }
+        if (getSimulationDomain() == ConnectorType.LK && tokenMap.containsToken(HierarchyMetadataCodec.SCALAR_BINDINGS)) {
+            scalarBindings = HierarchyMetadataCodec.decodeScalarBindings(
+                    tokenMap.readDataLine(HierarchyMetadataCodec.SCALAR_BINDINGS, ""));
         }
         if (this instanceof SemiconductorLossCalculatable) {
             TokenMap subBlock = tokenMap.getBlockTokenMap("<Verluste>");
@@ -441,19 +454,21 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
 
     /** Exports current law and compatibility fields with the owning document parameters. */
     public final void exportASCII(StringBuffer ascii, AcDocumentSettings settings) {
-        AcComponent owned = settings == null ? getAcComponent() : getAcComponentOrLiteral();
+        AcComponent owned = settings == null || !scalarBindings.isEmpty() ? getAcComponent() : getAcComponentOrLiteral();
         double[] values = owned == null ? parameter : AcMetadataCodec.compatibilityValues(owned, getParameter(), settings);
+        if (settings != null && !scalarBindings.isEmpty()) values = scopedScalarValues(settings.parameterMap());
         writeASCII(ascii, owned, values);
     }
 
-    public final void exportScopedAcASCII(StringBuffer ascii, Map<String, String> scope) {
-        AcComponent owned = getAcComponentOrLiteral();
-        double[] values = owned == null ? parameter : AcMetadataCodec.compatibilityValues(owned, getParameter(), scope);
+    public final void exportScopedAcASCII(StringBuffer ascii, java.util.Map<String, String> scope, boolean ac) {
+        AcComponent owned = ac && scalarBindings.isEmpty() ? getAcComponentOrLiteral() : getAcComponent();
+        double[] values = owned == null ? scopedScalarValues(scope)
+                : AcMetadataCodec.compatibilityValues(owned, getParameter(), scope);
         writeASCII(ascii, owned, values);
     }
 
     final void exportForCapture(StringBuffer ascii, AcDocumentSettings settings) {
-        if (settings == null) {
+        if (settings == null || !scalarBindings.isEmpty()) {
             exportASCII(ascii);
         } else {
             writeASCII(ascii, getAcComponentOrLiteral(), getParameter());
@@ -462,7 +477,13 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
 
     public final AcComponent getAcComponent() { return acComponent.getValue().orElse(null); }
 
-    final void setAcComponentWithoutUndo(AcComponent owned) { acComponent.setValueWithoutUndo(Optional.of(owned)); }
+    final void setAcComponentWithoutUndo(AcComponent owned) {
+        acComponent.setValueWithoutUndo(Optional.of(owned));
+        onAcComponentInstalled(owned);
+    }
+
+    /** Adds any additional graphical terminals owned by an imported semiconductor law. */
+    protected void onAcComponentInstalled(AcComponent owned) { }
 
     public final AcComponent getAcComponentOrLiteral() {
         var owned = getAcComponent();
@@ -481,6 +502,7 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
             case RES, CAP -> new AcComponent.Passive(Double.toString(values[0]));
             case VOLTAGE -> new AcComponent.Voltage(Double.toString(values[1]), "", "0", "0");
             case E -> new AcComponent.Controlled(Double.toString(values[0]), false);
+            case G -> new AcComponent.Transconductance(Double.toString(values[0]));
             default -> null;
         };
         return law == null ? null : new AcComponent(getStringID(), List.of(), false, law);
@@ -488,7 +510,19 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
 
     public final void setAcLaw(AcComponent.Law law) {
         var editor = SchematicEditor2.Singleton;
-        if (editor != null && editor.getHierarchy() != null && getHierarchyMember() != null) {
+        if (law instanceof AcComponent.Inductance inductor) {
+            var current = getAcComponentOrLiteral();
+            if (current == null || !(current.law() instanceof AcComponent.Inductance original)
+                    || original.origin() != inductor.origin()) {
+                throw new IllegalArgumentException("Keep the imported AC inductor origin.");
+            }
+            if (editor == null || editor.getHierarchy() == null || getHierarchyMember() == null) {
+                inductor.evaluate(editor == null || editor.getAcSettings() == null
+                        ? java.util.Map.of() : editor.getAcSettings().parameterMap());
+            }
+        }
+        if (editor != null && (law instanceof AcComponent.IdealDiode
+                || editor.getHierarchy() != null && getHierarchyMember() != null)) {
             editor.hierarchyEdits.setSharedLaw(this, law);
             return;
         }
@@ -530,9 +564,9 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
         ProjectData.appendAsString(ascii.append("\nx"), getSheetPosition().x);
         ProjectData.appendAsString(ascii.append("\ny"), getSheetPosition().y);
         ProjectData.appendAsString(ascii.append("\nparameter"), values);
-        if (owned != null) {
-            ascii.append('\n').append(AcMetadataCodec.COMPONENT).append(' ').append(AcMetadataCodec.encode(owned));
-        }
+        if (owned != null) ascii.append('\n').append(AcMetadataCodec.COMPONENT).append(' ').append(AcMetadataCodec.encode(owned));
+        if (!scalarBindings.isEmpty()) ascii.append('\n').append(HierarchyMetadataCodec.SCALAR_BINDINGS).append(' ')
+                .append(HierarchyMetadataCodec.encodeScalarBindings(scalarBindings));
 
         ProjectData.appendAsString(ascii.append("\nparameterString"), parameterString);
         updateNameOptArray();
@@ -546,6 +580,7 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
         }
 
         for (UserParameter par : getRegisteredParameters()) {
+            if (scalarBindings.containsKey(par.getParameterIndex())) continue;
             if (owned != null && ((owned.law() instanceof AcComponent.Passive || owned.law() instanceof AcComponent.Inductance)
                     && par.getParameterIndex() == 0 || (owned.law() instanceof AcComponent.Voltage
                     || owned.law() instanceof AcComponent.Current) && par.getParameterIndex() == 1)) {
@@ -782,8 +817,8 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
     }
 
     public void copyLKBlockPars(final AbstractBlockInterface copy) {
-        acComponent.getValue().ifPresent(current -> copy.acComponent.setValueWithoutUndo(Optional.of(
-                new AcComponent(copy.getStringID(), current.spiceOrders(), List.of(), current.mirrored(), current.law()))));
+        acComponent.getValue().ifPresent(current -> copy.setAcComponentWithoutUndo(
+                new AcComponent(copy.getStringID(), current.spiceOrders(), List.of(), current.mirrored(), current.law())));
         copy.setSheetPositionWithoutUndo(getSheetPosition());
         copy.setPositionVorVerschieben(getSheetPosition());
         System.arraycopy(parameter, 0, copy.parameter, 0, parameter.length);
@@ -918,14 +953,26 @@ public abstract class AbstractBlockInterface extends AbstractCircuitSheetCompone
                     }
                 }
                 case AcComponent.Inductance law -> {
-                    _textInfo.addParameter("L = " + AC_VALUE_FORMAT.formatENG(SpiceValue.evaluate(law.expression(), parameters), 4)
-                            + " H");
-                    _textInfo.addParameter("Rser = " + AC_VALUE_FORMAT.formatENG(
-                            SpiceValue.evaluate(law.seriesResistance(), parameters), 4) + " Ω");
+                    var value = law.evaluate(parameters);
+                    _textInfo.addParameter("L = " + AC_VALUE_FORMAT.formatENG(value.henries(), 4) + " H");
+                    _textInfo.addParameter("Rser = " + AC_VALUE_FORMAT.formatENG(value.ohms(), 4)
+                            + " Ω (" + value.mode().label() + ")");
                 }
                 case AcComponent.Current law -> {
                     _textInfo.addParameter("AC " + AC_VALUE_FORMAT.formatENG(SpiceValue.evaluate(law.magnitude(), parameters), 4)
                             + " A ∠ " + AC_VALUE_FORMAT.formatENG(SpiceValue.evaluate(law.phaseDegrees(), parameters), 4) + "°");
+                }
+                case AcComponent.IdealDiode law -> {
+                    var model = law.evaluate(parameters);
+                    _textInfo.addParameter(law.modelName() + " Vfwd = "
+                            + AC_VALUE_FORMAT.formatENG(model.forwardVoltage(), 4) + " V");
+                }
+                case AcComponent.Mosfet law -> _textInfo.addParameter(law.modelName() + (law.pChannel() ? " (PMOS)" : " (NMOS)"));
+                case AcComponent.Bipolar law -> _textInfo.addParameter(law.modelName() + " (AC bipolar)");
+                case AcComponent.ExponentialDiode law -> _textInfo.addParameter(law.modelName() + (law.transientLaw() ? " (exponential transient)" : " (exponential AC)"));
+                case AcComponent.Transconductance law -> {
+                    double gm = SpiceValue.evaluate(law.expression(), parameters);
+                    _textInfo.addParameter("gm = " + AC_VALUE_FORMAT.formatENG(gm, 4) + " S");
                 }
                 case AcComponent.Controlled law -> {
                     if (!law.laplace()) {

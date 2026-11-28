@@ -243,10 +243,15 @@ public final class SimulationTiming {
                 issues.add(new SettingIssue("periodicSteadyState.maxPeriods", "Search and main step count is too large."));
             }
         }
-        if (periodValid && positive(samplePeriod)) {
-            double ratio = period / samplePeriod;
-            if (Math.rint(ratio) < 1 || Math.abs(ratio - Math.rint(ratio)) > WHOLE_STEP * ratio) {
-                issues.add(new SettingIssue("periodicSteadyState.period", "Period must be a whole multiple of the CONTROL sample period."));
+        if (periodValid && positive(samplePeriod) && !isWholeMultiple(period, samplePeriod)) {
+            issues.add(new SettingIssue("periodicSteadyState.period", "Period must be a whole multiple of the CONTROL sample period."));
+        }
+        for (var entry : subsystemPeriods.entrySet()) {
+            Double value = entry.getValue();
+            if (!periodValid || value == null || !positive(value)) continue;
+            if (!isWholeMultiple(period, value)) {
+                issues.add(new SettingIssue("periodicSteadyState.period", "Period must be a whole multiple of the CONTROL sample period of '"
+                        + entry.getKey() + "'."));
             }
         }
         for (var entry : subsystemPeriods.entrySet()) {
@@ -259,6 +264,13 @@ public final class SimulationTiming {
             }
         }
         return issues;
+    }
+
+    private static boolean isWholeMultiple(double period, double samplePeriod) {
+        double ratio = period / samplePeriod;
+        double nearest = Math.rint(ratio);
+        // An infinite ratio exceeds the precision of the whole-period tolerance.
+        return nearest >= 1 && (Double.isInfinite(ratio) || Math.abs(ratio - nearest) <= WHOLE_STEP * ratio);
     }
 
     /**
@@ -303,6 +315,11 @@ public final class SimulationTiming {
 
     static void validateTotalSteps(long steps) {
         if (steps > MAXIMUM_STEPS) throw new IllegalArgumentException("Combined simulation step count is too large.");
+    }
+
+    /** Returns whether an optional recording start fits the effective stop time. */
+    public static boolean validOutputStart(double start, double stop) {
+        return start == 0 || Double.isFinite(start) && Double.isFinite(stop) && start > 0 && start <= stop;
     }
 
     static double nextTime(double time, double step) {

@@ -1,5 +1,6 @@
 package gecko.core.io;
 
+import gecko.core.ac.AcComponent;
 import gecko.core.io.CircuitModel.ComponentData;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -47,14 +48,30 @@ public final class HierarchyIndex {
             path(sheet.id(), new HashSet<>());
         }
         var terminalMembers = new HashMap<Long, Map<String, ComponentData>>();
+        var diodeModels = new HashMap<Long, Map<String, AcComponent.IdealDiode>>();
         for (var components : List.of(model.getCircuitComponents(), model.getSpecialComponents(),
                 model.getControlComponents(), model.getThermalComponents())) {
             for (var component : components) {
                 var saved = component.getSavedBlock();
                 validateFieldPlacement(saved, component.getType());
                 long parent = parent(saved);
+                if (component.getAcComponent() != null && component.getAcComponent().law() instanceof AcComponent.IdealDiode diode) {
+                    var previous = diodeModels.computeIfAbsent(parent, ignored -> new HashMap<>())
+                            .putIfAbsent(diode.modelName(), diode);
+                    if (previous != null && !previous.equals(diode)) {
+                        throw invalid("Conflicting ideal diode model " + diode.modelName() + " in " + path(parent));
+                    }
+                }
                 String key = key(saved);
                 var signature = signatures.get(parent);
+                if (!component.getScalarBindings().isEmpty()) {
+                    if (parent != 0 && signature == null || components != model.getCircuitComponents()
+                            || component.getAcComponent() != null) {
+                        throw invalid("Native scalar bindings require an electrical component.");
+                    }
+                    ScalarParameterBindings.validateSlots(component.getType(), component.getNumericParameters(),
+                            component.getScalarBindings());
+                }
                 if (token(saved, HierarchyMetadataCodec.BOUNDARY_LOCATION) != null && (signature == null || key == null)) {
                     throw invalid("A boundary field requires a child member association.");
                 }
@@ -65,7 +82,7 @@ public final class HierarchyIndex {
                 var body = Arrays.asList(component.getType(), Arrays.toString(component.getPosition()),
                         component.getOrientation(), saved.enabledState(), Arrays.toString(component.getTerminalXLabels()),
                         Arrays.toString(component.getTerminalYLabels()), component.getAcComponent() == null
-                                ? Arrays.toString(component.getNumericParameters())
+                                ? scalarSignature(component)
                                 : AcMetadataCodec.encode(component.getAcComponent()), definition);
                 if (signature.putIfAbsent(key, body) != null) throw invalid("Duplicate component member " + key);
                 if (component.getType() == 29 && components == model.getCircuitComponents()) {
@@ -110,8 +127,26 @@ public final class HierarchyIndex {
     }
 
     public List<Boundary> boundaries() { return List.copyOf(boundaries); }
+
+    private static List<Object> scalarSignature(ComponentData component) {
+        double[] values = component.getNumericParameters();
+        var bindings = component.getScalarBindings();
+        var signature = new java.util.ArrayList<Object>(values.length);
+        for (int i = 0; i < values.length; i++) {
+            signature.add(bindings.containsKey(i) ? bindings.get(i) : values[i]);
+        }
+        return signature;
+    }
     public Sheet sheet(long id) { return sheets.get(id); }
     public List<String> path(long id) { return paths.getOrDefault(id, List.of()); }
+
+    /** Names an execution row without altering the component's saved local name. */
+    public String executionName(ComponentData component) {
+        var occurrence = path(parent(component.getSavedBlock()));
+        String name = component.getName();
+        return occurrence.isEmpty() || name == null || name.isEmpty()
+                ? name : String.join(":", occurrence) + ":" + name;
+    }
 
     public Map<Long, Map<String, String>> parameterScopes(Map<String, String> root) {
         var scopes = new LinkedHashMap<Long, Map<String, String>>();
@@ -158,6 +193,8 @@ public final class HierarchyIndex {
     private static void validateFieldPlacement(SavedCircuitBlock saved, int type) {
         if (saved == null) return;
         if (token(saved, HierarchyMetadataCodec.DOCUMENT) != null
+                || token(saved, HierarchyMetadataCodec.ROOT_PARAMETERS) != null
+                || token(saved, HierarchyMetadataCodec.SCALAR_BINDINGS) != null && !saved.tag().equals("ElementLK")
                 || token(saved, HierarchyMetadataCodec.OCCURRENCE) != null && (!saved.tag().equals("ElementSPECIAL") || type != 27)
                 || token(saved, HierarchyMetadataCodec.BOUNDARY_LOCATION) != null && (!saved.tag().equals("ElementLK") || type != 29)
                 || token(saved, HierarchyMetadataCodec.MEMBER) != null && !List.of("ElementLK", "ElementSPECIAL", "Verbindung").contains(saved.tag())) {

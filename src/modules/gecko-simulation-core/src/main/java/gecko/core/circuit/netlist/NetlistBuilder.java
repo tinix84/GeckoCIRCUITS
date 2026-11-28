@@ -13,11 +13,13 @@
  */
 package gecko.core.circuit.netlist;
 
-import gecko.core.circuit.SourceType;
+import gecko.core.circuit.CircuitSourceType;
 import gecko.core.circuit.circuitcomponents.CircuitTypCore;
+import gecko.core.circuit.waveform.PiecewiseLinearWaveform;
 import gecko.core.circuit.matrix.StamperRegistry;
 import gecko.core.io.CircuitModel;
 import gecko.core.io.CircuitTopology;
+import gecko.core.io.HierarchyIndex;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -26,6 +28,7 @@ import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Factory class for building CircuitNetlist from various sources.
@@ -151,14 +154,18 @@ public class NetlistBuilder {
         topology.validatePhysicalConnections();
         Set<CircuitTopology.ComponentIdentity> active = new HashSet<>(topology.activeComponents());
         Set<String> names = new HashSet<>();
+        var hierarchy = model.getHierarchy() == null ? null : new HierarchyIndex(model);
+        Function<CircuitModel.ComponentData, String> executionName =
+                hierarchy == null ? CircuitModel.ComponentData::getName : hierarchy::executionName;
         for (CircuitModel.ComponentData component : model.getCircuitComponents()) {
             if (component == null) {
                 throw new IllegalArgumentException("Circuit component cannot be null");
             }
             if (!active.contains(topology.identity(component))) continue;
-            if (component.getName() != null && !component.getName().isEmpty()
-                    && !names.add(component.getName())) {
-                throw new IllegalArgumentException("Duplicate component name '" + component.getName() + "'");
+            String name = executionName.apply(component);
+            String key = hierarchy == null || name == null ? name : name.toLowerCase(java.util.Locale.ROOT);
+            if (name != null && !name.isEmpty() && !names.add(key)) {
+                throw new IllegalArgumentException("Duplicate component name '" + name + "'");
             }
             if (component.getType() == CircuitTypCore.LK_M.getTypeNumber()) {
                 couplingComponents.add(component);
@@ -189,8 +196,8 @@ public class NetlistBuilder {
             }
         }
 
-        CircuitTopology.Group[][] terminalGroups = new CircuitTopology.Group[allComponents.size()][2];
-        boolean[][] referenceNodes = new boolean[allComponents.size()][2];
+        CircuitTopology.Group[][] terminalGroups = new CircuitTopology.Group[allComponents.size()][3];
+        boolean[][] referenceNodes = new boolean[allComponents.size()][3];
         boolean hasElectricalWires = topology.hasConnections("LK") || topology.hasConnections("RELUCTANCE")
                 || topology.hasConnections("THERMAL");
         for (int i = 0; i < allComponents.size(); i++) {
@@ -202,6 +209,17 @@ public class NetlistBuilder {
                 terminalGroups[i][side] = group;
                 referenceNodes[i][side] = group.canonicalLabel().equals("0") || group.canonicalLabel().equalsIgnoreCase("gnd")
                         || group.canonicalLabel().isEmpty() && !topology.hasConnections(group.domain()) && component.getTerminalData().isEmpty();
+            }
+            if (component.getAcComponent() != null
+                    && component.getAcComponent().law() instanceof gecko.core.ac.AcComponent.Mosfet) {
+                var gate = topology.group(component, CircuitTopology.Side.INPUT, 1);
+                boolean grounded = gate != null && (gate.canonicalLabel().equalsIgnoreCase("gnd")
+                        || gate.canonicalLabel().equals("0"));
+                if (gate == null || !grounded && gate.terminals().size() < 2) {
+                    throw new IllegalArgumentException("Connect the MOSFET gate on " + component.getName() + ".");
+                }
+                terminalGroups[i][2] = gate;
+                referenceNodes[i][2] = grounded;
             }
         }
 
@@ -216,7 +234,16 @@ public class NetlistBuilder {
                     && allComponents.stream().map(component -> component.getSavedBlock() == null
                             ? 0L : component.getSavedBlock().parentSheetIdentifier()).distinct().count() == 1;
             CircuitNetlist netlist = buildFromComponentsWithGroups(allComponents, terminalGroups, referenceNodes,
-                    legacyLabelOnly, topology.connectionGroupOrder());
+                    legacyLabelOnly, topology.connectionGroupOrder(), executionName);
+            if (hierarchy != null) {
+                var groupNodes = new LinkedHashMap<Integer, Integer>();
+                for (int index = 0; index < allComponents.size(); index++) {
+                    groupNodes.put(terminalGroups[index][0].id(), netlist.getNodeX(index));
+                    groupNodes.put(terminalGroups[index][1].id(), netlist.getNodeY(index));
+                }
+                netlist.setHierarchyGroupNodes(groupNodes);
+            }
+            bindElectricalSourceWaveforms(model, netlist, allComponents);
             registerMagneticCouplings(netlist, allComponents, couplingComponents);
             return netlist;
         } else {
@@ -265,7 +292,7 @@ public class NetlistBuilder {
             }
             if (type == CircuitTypCore.TH_PvCHIP.getTypeNumber()) {
                 components.add(expansion(component, CircuitTypCore.TH_FLOW, component.getName(),
-                        SourceType.QUELLE_SIGNALGESTEUERT, 0));
+                        CircuitSourceType.QUELLE_SIGNALGESTEUERT.getOldGeckoID(), 0));
                 components.add(expansion(component, CircuitTypCore.TH_RTH,
                         component.getName() + LOSS_SOURCE_RESISTOR_SUFFIX, LOSS_SOURCE_PARALLEL_RESISTANCE, 0));
                 groups.add(new CircuitTopology.Group[]{input, output});
@@ -296,7 +323,7 @@ public class NetlistBuilder {
         }
         boolean legacyLabelOnly = !hasWires && components.stream().allMatch(component -> component.getTerminalData().isEmpty());
         return buildFromComponentsWithGroups(components, groups.toArray(new CircuitTopology.Group[0][]), referenceNodes,
-                legacyLabelOnly, topology.connectionGroupOrder());
+                legacyLabelOnly, topology.connectionGroupOrder(), CircuitModel.ComponentData::getName);
     }
 
     private static boolean groupsLabelFree(CircuitModel.ComponentData component) {
@@ -328,7 +355,7 @@ public class NetlistBuilder {
      */
     private static CircuitNetlist buildFromComponentsWithGroups(List<CircuitModel.ComponentData> components,
             CircuitTopology.Group[][] terminalGroups, boolean[][] referenceNodes, boolean legacyLabelOnly,
-            List<CircuitTopology.Group> connectionOrder) {
+            List<CircuitTopology.Group> connectionOrder, Function<CircuitModel.ComponentData, String> executionName) {
         // Step 1: Build node label → index map
         // Ground reference: label "0" or "" → node 0
         // Legacy label-only models share named numerical nodes across physical component types.
@@ -337,8 +364,9 @@ public class NetlistBuilder {
         int nextNode = 1;
 
         for (int component = 0; component < terminalGroups.length; component++) {
-            for (int side = 0; side < 2; side++) {
+            for (int side = 0; side < terminalGroups[component].length; side++) {
                 var group = terminalGroups[component][side];
+                if (group == null) continue;
                 Object key = nodeKey(group, legacyLabelOnly);
                 if (referenceNodes[component][side]) groupToNode.put(key, 0);
                 else if (!groupToNode.containsKey(key)) {
@@ -423,7 +451,7 @@ public class NetlistBuilder {
         // Step 4: Build component name-to-index map
         Map<String, Integer> nameToIndex = new LinkedHashMap<>();
         for (int i = 0; i < elementCount; i++) {
-            String name = components.get(i).getName();
+            String name = executionName.apply(components.get(i));
             if (name != null && !name.isEmpty()) {
                 nameToIndex.put(name, i);
             }
@@ -453,7 +481,46 @@ public class NetlistBuilder {
                 nodeCount - 1, voltageSourceCount, elementCount);
         netlist.setComponentNameToIndex(nameToIndex);
         if (wireReference) netlist.setNumericalNodeOrder(order);
+        Map<Integer, Integer> gateNodes = new LinkedHashMap<>();
+        for (int index = 0; index < terminalGroups.length; index++) {
+            var ports = terminalGroups[index];
+            if (ports.length > 2 && ports[2] != null) gateNodes.put(index, groupToNode.get(nodeKey(ports[2], legacyLabelOnly)));
+        }
+        netlist.setMosfetGateNodes(gateNodes);
         return netlist;
+    }
+
+    private static void bindElectricalSourceWaveforms(CircuitModel model, CircuitNetlist netlist,
+            List<CircuitModel.ComponentData> components) {
+        Set<Long> assigned = new HashSet<>();
+        for (int i = 0; i < components.size(); i++) {
+            CircuitTypCore type = netlist.getType(i);
+            if (type != CircuitTypCore.LK_U && type != CircuitTypCore.LK_I) continue;
+            var component = components.get(i);
+            try {
+                double mode = netlist.getParameter(i)[0];
+                if (mode != (int) mode) throw new IllegalArgumentException("Invalid electrical source mode " + mode);
+                if (CircuitSourceType.getFromID((int) mode) != CircuitSourceType.PWL) continue;
+                String resourceToken = component.getImportTokens().get(PiecewiseLinearWaveform.RESOURCE_ID_TOKEN);
+                if (resourceToken == null) throw new IllegalArgumentException("Missing PWL resource identifier.");
+                long resourceId = Long.parseLong(resourceToken);
+                var resource = model.getResources().get(resourceId);
+                var failure = model.getResourceFailures().get(resourceId);
+                if (failure != null) throw new IllegalArgumentException(failure.message());
+                if (resourceId == 0 || !resourceToken.equals(Long.toString(resourceId))
+                        || resource == null || resource.id() != resourceId || !assigned.add(resourceId)) {
+                    throw new IllegalArgumentException("Missing or ambiguous PWL resource " + resourceId);
+                }
+                Object owner = component.getParameters().get("uniqueObjectIdentifier");
+                if (!(owner instanceof Long ownerId) || !resource.ownerIds().equals(List.of(ownerId))
+                        || !model.hasUniqueComponentIdentifier(ownerId)) {
+                    throw new IllegalArgumentException("The PWL resource requires the numeric source identifier as its sole owner.");
+                }
+                netlist.setPwlWaveform(i, PiecewiseLinearWaveform.fromBytes(resource.bytes()));
+            } catch (IllegalArgumentException error) {
+                throw new IllegalArgumentException("Source '" + component.getName() + "': " + error.getMessage(), error);
+            }
+        }
     }
 
     private static Object nodeKey(CircuitTopology.Group group, boolean legacyLabelOnly) {
@@ -503,7 +570,10 @@ public class NetlistBuilder {
 
     private static String terminalLabel(CircuitModel.ComponentData component, boolean xTerminal) {
         String[] labels = xTerminal ? component.getTerminalXLabels() : component.getTerminalYLabels();
-        if (labels.length > 1 || (labels.length == 1 && labels[0] == null)) {
+        boolean gateOnInput = xTerminal && component.getAcComponent() != null
+                && component.getAcComponent().law() instanceof gecko.core.ac.AcComponent.Mosfet;
+        int maximum = gateOnInput ? 2 : 1;
+        if (labels.length > maximum || java.util.Arrays.stream(labels).anyMatch(java.util.Objects::isNull)) {
             throw new IllegalArgumentException("Component '" + component.getName()
                     + "' requires one valid label per electrical terminal");
         }

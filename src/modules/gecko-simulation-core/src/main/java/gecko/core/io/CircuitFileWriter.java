@@ -29,12 +29,17 @@ public final class CircuitFileWriter {
 
     /** Returns a gzip-compressed UTF-8 circuit with embedded resource bytes. */
     public byte[] write(CircuitModel model) throws IOException {
+        if (!gecko.core.simulation.SimulationTiming.validOutputStart(model.getOutputStartTime(),
+                model.getSimulationDuration())) {
+            throw new IOException("Output start time must be finite and between zero and the stop time.");
+        }
         if (!model.getResourceFailures().isEmpty()) {
             throw new IOException("Capture all circuit resources before writing the circuit.");
         }
         var identifiers = identifiers(model);
         var hierarchy = new HierarchyIndex(model);
-        var scopes = hierarchy.parameterScopes(model.getAcSettings() == null ? Map.of() : model.getAcSettings().parameterMap());
+        AcOriginMembership.validate(model, hierarchy);
+        var scopes = hierarchy.parameterScopes(model.rootParameterMap());
         var text = new StringBuilder();
         int ordinal = 0;
         for (var data : model.getCircuitComponents()) component(text, scopes, data, "LK", "e", ++ordinal, identifiers.get(data));
@@ -56,9 +61,16 @@ public final class CircuitFileWriter {
             text.append("<\\Verbindung>\n");
         }
         var settings = new TreeMap<>(model.getSavedSettings());
+        settings.remove("tOUTPUT_START");
+        settings.remove("transientUic");
         settings.remove(AcMetadataCodec.SETTINGS);
         settings.remove(AcMetadataCodec.PROVENANCE);
         settings.remove(HierarchyMetadataCodec.DOCUMENT);
+        settings.remove(HierarchyMetadataCodec.ROOT_PARAMETERS);
+        if (!model.getRootParameterDefinitions().isEmpty()) {
+            settings.put(HierarchyMetadataCodec.ROOT_PARAMETERS,
+                    HierarchyMetadataCodec.encodeRootParameters(model.getRootParameterDefinitions()));
+        }
         if (model.getHierarchy() != null) {
             settings.put(HierarchyMetadataCodec.DOCUMENT, HierarchyMetadataCodec.encode(model.getHierarchy()));
         }
@@ -72,6 +84,10 @@ public final class CircuitFileWriter {
                 || Set.of("e", "c", "eTH", "sp", "verbindungLK", "verbindungCONTROL",
                         "verbindungTHERM", "GeckoFileManager").contains(key));
         settings.put("tDURATION", Double.toString(model.getSimulationDuration()));
+        if (model.getOutputStartTime() != 0) {
+            settings.put("tOUTPUT_START", Double.toString(model.getOutputStartTime()));
+        }
+        if (model.isTransientUic()) settings.put("transientUic", "1");
         settings.put("dt", Double.toString(model.getTimeStep()));
         settings.put("T_pre", Double.toString(model.getPreSimulationTime()));
         settings.put("dt_pre", Double.toString(model.getPreSimulationTimeStep() > 0 ? model.getPreSimulationTimeStep() : model.getTimeStep()));
@@ -127,6 +143,10 @@ public final class CircuitFileWriter {
         var tokens = tokens(data.getSavedBlock());
         tokens.putAll(data.getImportTokens());
         tokens.remove(AcMetadataCodec.COMPONENT);
+        tokens.remove(HierarchyMetadataCodec.SCALAR_BINDINGS);
+        if (!data.getScalarBindings().isEmpty()) {
+            tokens.put(HierarchyMetadataCodec.SCALAR_BINDINGS, HierarchyMetadataCodec.encodeScalarBindings(data.getScalarBindings()));
+        }
         if (data.getAcComponent() != null) {
             tokens.put(AcMetadataCodec.COMPONENT, AcMetadataCodec.encode(data.getAcComponent()));
         }
@@ -139,9 +159,11 @@ public final class CircuitFileWriter {
                 || tokens.containsKey(HierarchyMetadataCodec.OCCURRENCE)) {
             tokens.put("labelAnfangsKnoten[]", strings(data.getTerminalXLabels()));
             tokens.put("labelEndKnoten[]", strings(data.getTerminalYLabels()));
-            double[] values = data.getAcComponent() == null ? data.getNumericParameters()
+            var scope = scopes.getOrDefault(HierarchyIndex.parent(data.getSavedBlock()), scopes.get(0L));
+            double[] values = data.getAcComponent() == null
+                    ? ScalarParameterBindings.values(data.getType(), data.getNumericParameters(), data.getScalarBindings(), scope)
                     : AcMetadataCodec.compatibilityValues(data.getAcComponent(), data.getNumericParameters(),
-                            scopes.getOrDefault(HierarchyIndex.parent(data.getSavedBlock()), scopes.get(0L)));
+                            scope);
             tokens.put("parameter[]", Arrays.stream(values).mapToObj(Double::toString)
                     .collect(Collectors.joining(" ")));
             String[] parameterStrings = data.getParameterStrings();
