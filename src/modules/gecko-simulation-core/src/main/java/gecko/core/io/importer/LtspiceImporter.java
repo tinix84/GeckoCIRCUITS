@@ -359,6 +359,8 @@ public final class LtspiceImporter {
         var directives = new ArrayList<Line>();
         parse(source, sourceName, symbols, wires, flags, directives, issues, origin);
         boolean child = childContext != null;
+        var scalarReads = child ? HierarchyImport.scalarReads(symbols, directives, path.toString())
+                : List.<CircuitHierarchy.RequiredInput>of();
         List<Call> calls = hierarchy == null ? List.of() : hierarchy.resolveCalls(path, symbols, sourceName, issues);
         if (hierarchy != null && (child || !calls.isEmpty())) {
             var namesAtPoint = new HashMap<Point, String>();
@@ -374,7 +376,6 @@ public final class LtspiceImporter {
             }
         }
         List<PlacedSymbol> placed = placeSymbols(symbols, sourceName, issues, origin);
-        var scalarReads = child ? HierarchyImport.scalarReads(placed, path.toString()) : List.<CircuitHierarchy.RequiredInput>of();
         var markers = new LinkedHashMap<Point, ComponentData>();
         var topologyInput = new CircuitModel();
         var aliases = new LinkedHashMap<String, String>();
@@ -807,39 +808,57 @@ public final class LtspiceImporter {
     }
 
     private final class HierarchyImport {
-        private static final java.util.regex.Pattern SCALAR_VALUE =
-                java.util.regex.Pattern.compile("\\{\\s*([A-Za-z_][A-Za-z_0-9]*)\\s*}");
+        private static final java.util.regex.Pattern PROBE =
+                java.util.regex.Pattern.compile("(?i)(?<![\\w.])[vi]\\s*\\([^()]*\\)");
+        private static final java.util.regex.Pattern NUMBER =
+                java.util.regex.Pattern.compile("(?i)(?<![\\w.])\\.?\\d[\\d.]*(?:e[+-]?\\d+)?[a-zµ]*");
+        private static final java.util.regex.Pattern NAME =
+                java.util.regex.Pattern.compile("(?<![\\w.])([A-Za-z_]\\w*+)(?!\\s*\\()");
 
-        private static List<CircuitHierarchy.RequiredInput> scalarReads(List<PlacedSymbol> placed, String source) {
+        /**
+         * Collects the names a child sheet reads: each {expression} in a symbol value, of every symbol including
+         * nested calls and symbols the import later rejects, and each .param body (#204). A caller may set them.
+         */
+        private static List<CircuitHierarchy.RequiredInput> scalarReads(List<Symbol> symbols, List<Line> directives,
+                                                                         String source) {
             var spellings = new LinkedHashMap<String, String>();
             var uses = new LinkedHashMap<String, List<CircuitHierarchy.ScalarUse>>();
-            for (var device : placed) {
-                var symbol = device.symbol();
-                if (symbol.kind().equalsIgnoreCase("bv") || symbol.kind().equalsIgnoreCase("bi")) {
-                    // A behavioural law reads its parameters inside the expression (#204).
-                    var reference = SCALAR_VALUE.matcher(symbol.attributes().getOrDefault("value", ""));
-                    while (reference.find()) {
-                        String key = reference.group(1).toLowerCase(Locale.ROOT);
-                        if (key.equals("pi")) continue;
-                        spellings.putIfAbsent(key, reference.group(1));
-                        uses.computeIfAbsent(key, ignored -> new ArrayList<>()).add(new CircuitHierarchy.ScalarUse(
-                                source, symbol.name(), "Value", symbol.attributeLines().get("value")));
-                    }
-                    continue;
+            java.util.function.BiConsumer<String, CircuitHierarchy.ScalarUse> read = (expression, use) -> {
+                String bare = NUMBER.matcher(PROBE.matcher(expression).replaceAll(" ")).replaceAll(" ");
+                NAME.matcher(bare).results().map(match -> match.group(1)).distinct()
+                        .filter(name -> !name.equalsIgnoreCase("pi")).forEach(name -> {
+                            String key = name.toLowerCase(Locale.ROOT);
+                            spellings.putIfAbsent(key, name);
+                            uses.computeIfAbsent(key, ignored -> new ArrayList<>()).add(use);
+                        });
+            };
+            for (var symbol : symbols) {
+                for (String attribute : List.of("Value", "Value2", "SpiceLine", "SpiceLine2")) {
+                    String key = attribute.toLowerCase(Locale.ROOT);
+                    String text = symbol.attributes().get(key);
+                    if (text != null) read.accept(braced(text), new CircuitHierarchy.ScalarUse(
+                            source, symbol.name(), attribute, symbol.attributeLines().get(key)));
                 }
-                if (!List.of(SpicePorts.RES, SpicePorts.CAP, SpicePorts.VOLTAGE).contains(device.type())) continue;
-                String raw = symbol.attributes().getOrDefault("value", "").strip();
-                var match = SCALAR_VALUE.matcher(raw);
-                if (!match.matches() || !value(symbol).equals(raw)) continue;
-                String spelling = match.group(1);
-                String key = spelling.toLowerCase(Locale.ROOT);
-                if (key.equals("pi")) continue;
-                spellings.putIfAbsent(key, spelling);
-                uses.computeIfAbsent(key, ignored -> new ArrayList<>()).add(new CircuitHierarchy.ScalarUse(
-                        source, symbol.name(), "Value", symbol.attributeLines().get("value")));
+            }
+            for (var directive : directives) {
+                String[] fields = directive.text().split("\\s+", 2);
+                if (fields[0].equalsIgnoreCase(".param") && fields.length == 2) read.accept(fields[1],
+                        new CircuitHierarchy.ScalarUse(source, ".param", "directive", directive.number()));
             }
             return uses.entrySet().stream().map(entry ->
                     new CircuitHierarchy.RequiredInput(spellings.get(entry.getKey()), entry.getValue())).toList();
+        }
+
+        /** Keeps the text inside braces, at any depth, and blanks the rest. */
+        private static String braced(String text) {
+            var inside = new StringBuilder();
+            int depth = 0;
+            for (char c : text.toCharArray()) {
+                if (c == '{') depth++;
+                else if (c == '}') depth = Math.max(0, depth - 1);
+                inside.append(depth > 0 && c != '{' && c != '}' ? c : ' ');
+            }
+            return inside.toString();
         }
 
         private final List<Path> sourceRoots;

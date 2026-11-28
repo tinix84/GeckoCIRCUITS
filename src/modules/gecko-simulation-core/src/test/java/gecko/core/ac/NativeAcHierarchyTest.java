@@ -252,6 +252,37 @@ class NativeAcHierarchyTest {
         }
     }
 
+    @Test void bindsOverridesTheChildReadsOnlyInANestedCallOrAParameterBody() throws Exception {
+        var model = fixture(Map.of(
+                "root.asc", text -> text.replace("caller={first}", "caller={first} TD=5k Gain=2")
+                        .replace("caller=4k", "caller=4k td=6k gain=3"),
+                "wrapper.asc", text -> text.replace("series={caller}", "series={TD} shunt={shuntValue}")
+                        .replace("caller=3k", "caller=3k shuntValue={GAIN*1k}")));
+        assertEquals(List.of(5000.0, 6000.0), seriesSlots(model));
+        assertEquals(List.of(2000.0, 3000.0), model.getCircuitComponents().stream()
+                .filter(component -> component.getName().equals("Rsh"))
+                .map(component -> component.getNumericParameters()[0]).toList());
+        var wrapper = model.getHierarchy().definitions().stream()
+                .filter(definition -> definition.id().endsWith("wrapper.asc")).findFirst().orElseThrow();
+        assertEquals(List.of("TD", "GAIN"), wrapper.requiredInputs().stream()
+                .map(CircuitHierarchy.RequiredInput::name).toList());
+        assertEquals(List.of("Xleaf SpiceLine", ".param directive"), wrapper.requiredInputs().stream()
+                .map(input -> input.uses().getFirst().member() + " " + input.uses().getFirst().attribute()).toList());
+    }
+
+    @Test void bindsAnOverrideReadOnlyByAnUnsupportedChildElement() throws Exception {
+        var model = fixture(Map.of(
+                "wrapper.asc", text -> text.replace("series={caller}", "series={caller} delay=1u"),
+                "leaf.asc", text -> text + """
+                        SYMBOL tline 432 64 R0
+                        SYMATTR InstName T1
+                        SYMATTR Value Td={Delay} Z0=50
+                        """));
+        assertEquals(List.of(1000.0, 4000.0), seriesSlots(model));
+        assertTrue(model.getConversionIssues().stream().anyMatch(issue -> issue.component().equals("T1")
+                && issue.message().contains("tline")), model.getConversionIssues().toString());
+    }
+
     @Test void checksRequiredOverridesWhenReadingNativeAcData() throws Exception {
         var model = fixture(Map.of(
                 "leaf.asc", text -> text.replace("series=3k shunt=2k", "shunt=2k") + """
